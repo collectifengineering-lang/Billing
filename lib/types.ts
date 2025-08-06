@@ -66,6 +66,13 @@ export interface Project {
   customerName: string;
 }
 
+export interface Invoice {
+  id: string;
+  projectId: string;
+  amount: number;
+  date: string;
+}
+
 export interface ProjectWithBilling extends ZohoProject {
   billingData: BillingData;
 } 
