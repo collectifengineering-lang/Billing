@@ -64,6 +64,12 @@ export interface Project {
   id: string;
   name: string;
   customerName: string;
+  project_id: string;
+  project_name: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  customer_id: string;
 }
 
 export interface Invoice {
