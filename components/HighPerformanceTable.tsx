@@ -664,7 +664,7 @@ export default function HighPerformanceTable({
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">High Performance Projections Table</h3>
+        <h3 className="text-lg font-medium text-gray-900">Projections Table</h3>
         <p className="text-sm text-gray-600">
           Virtualized table with {activeProjects.length} active projects - click any cell to edit
         </p>

@@ -90,10 +90,50 @@ export function calculateDashboardStats(billingData: BillingData[], closedProjec
   const closedProjectsCount = closedProjects ? closedProjects.size : 0;
   const activeProjects = totalProjects - closedProjectsCount;
 
+  // Get data from localStorage for projections and statuses
+  const monthlyProjections = safeLocalStorageGet('monthlyProjections') || {};
+  const monthlyStatuses = safeLocalStorageGet('monthlyStatuses') || {};
+  
+  // Calculate Total Billed YTD (sum of all projections marked as "Billed" for current year)
+  const currentYear = new Date().getFullYear().toString();
+  let totalBilledYTD = 0;
+  
+  Object.keys(monthlyProjections).forEach(projectId => {
+    const projectProjections = monthlyProjections[projectId];
+    const projectStatuses = monthlyStatuses[projectId];
+    
+    if (projectProjections && projectStatuses) {
+      Object.keys(projectProjections).forEach(month => {
+        // Check if month is in current year and status is "Billed"
+        if (month.startsWith(currentYear) && projectStatuses[month] === 'Billed') {
+          totalBilledYTD += projectProjections[month] || 0;
+        }
+      });
+    }
+  });
+  
+  // Calculate Backlog (sum of all projections NOT marked as "Billed" for current and future months)
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+  let backlog = 0;
+  
+  Object.keys(monthlyProjections).forEach(projectId => {
+    const projectProjections = monthlyProjections[projectId];
+    const projectStatuses = monthlyStatuses[projectId];
+    
+    if (projectProjections && projectStatuses) {
+      Object.keys(projectProjections).forEach(month => {
+        // Check if month is current or future and status is NOT "Billed"
+        if (month >= currentMonth && projectStatuses[month] !== 'Billed') {
+          backlog += projectProjections[month] || 0;
+        }
+      });
+    }
+  });
+
   return {
     totalProjects,
-    totalBilled: billingData.reduce((sum, data) => sum + data.totalBilled, 0),
-    totalUnbilled: billingData.reduce((sum, data) => sum + data.totalUnbilled, 0),
+    totalBilled: totalBilledYTD, // Use YTD billed amount
+    totalUnbilled: backlog, // Use backlog amount
     totalProjected: billingData.reduce((sum, data) => sum + data.totalProjected, 0),
     activeProjects,
   };
