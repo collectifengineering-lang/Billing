@@ -70,6 +70,7 @@ export interface Project {
   start_date: string;
   end_date: string;
   customer_id: string;
+  customer_name: string;
 }
 
 export interface Invoice {
