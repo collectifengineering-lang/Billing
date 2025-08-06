@@ -1,5 +1,6 @@
 import { RefreshCw, Database, List, Settings, Clock } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface DashboardHeaderProps {
   onRefresh: () => void;
@@ -24,7 +25,17 @@ export default function DashboardHeader({ onRefresh, onForceRefresh, cacheInfo, 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-8">
-            <h1 className="text-2xl font-bold text-gray-900">Zoho Billing Platform</h1>
+            <div className="flex items-center space-x-4">
+              <div className="relative w-12 h-12">
+                <Image
+                  src="/collectif-logo.png"
+                  alt="Collectif Logo"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900">Collectif MEP's Billings</h1>
+            </div>
             <div className="flex items-center space-x-4">
               <Link 
                 href="/projects" 

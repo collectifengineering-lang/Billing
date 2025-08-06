@@ -18,13 +18,13 @@ export default function DashboardStats({ billingData, closedProjects }: Dashboar
       color: 'bg-blue-500',
     },
     {
-      name: 'Total Billed',
+      name: 'Total Billed YTD',
       value: formatCurrency(stats.totalBilled),
       icon: DollarSign,
       color: 'bg-green-500',
     },
     {
-      name: 'Total Unbilled',
+      name: 'Backlog',
       value: formatCurrency(stats.totalUnbilled),
       icon: TrendingUp,
       color: 'bg-yellow-500',
