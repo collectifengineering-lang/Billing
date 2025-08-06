@@ -96,8 +96,11 @@ export interface Invoice {
   project_id: string;
   invoice_number: string;
   status: string;
+  customer_id: string;
+  total: number;
   billed_amount: number;
   unbilled_amount: number;
+  // Add more if needed
 }
 
 export interface ProjectWithBilling extends ZohoProject {
