@@ -1,4 +1,5 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
   "/page": "app/page.js",
   "/api/signed-fees/route": "app/api/signed-fees/route.js",
   "/login/page": "app/login/page.js",
@@ -7,5 +8,9 @@
   "/api/comments/route": "app/api/comments/route.js",
   "/api/statuses/route": "app/api/statuses/route.js",
   "/api/closed-projects/route": "app/api/closed-projects/route.js",
-  "/api/project-assignments/route": "app/api/project-assignments/route.js"
+  "/api/project-assignments/route": "app/api/project-assignments/route.js",
+  "/api/migrate/route": "app/api/migrate/route.js",
+  "/api/project-managers/route": "app/api/project-managers/route.js",
+  "/api/invoices/route": "app/api/invoices/route.js",
+  "/api/projects/route": "app/api/projects/route.js"
 }
