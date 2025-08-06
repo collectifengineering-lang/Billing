@@ -67,12 +67,12 @@ export function exportProjectionsToCSV(
            const projectId = row.projectId;
            console.log('CSV Export - Project ID type:', typeof projectId, 'value:', projectId);
            
-           if (typeof projectId === 'number') {
-             // If it's already a number, convert to string without scientific notation
-             value = projectId.toLocaleString('fullwide', { useGrouping: false });
-           } else {
-             // If it's already a string, use it as is
+           // Fix: Avoid using toLocaleString on 'never' type, ensure projectId is string or number
+           // Ensure projectId is string or number before converting to string
+           if (typeof projectId === 'number' || typeof projectId === 'string') {
              value = String(projectId);
+           } else {
+             value = '';
            }
            console.log('CSV Export - Final Project ID value:', value);
          } else if (header === 'Project Name') {
