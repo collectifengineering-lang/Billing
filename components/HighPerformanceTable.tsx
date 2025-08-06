@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { FixedSizeList as List } from 'react-window';
 import { formatCurrency, formatMonth, isCurrentMonth, isPastMonth, safeLocalStorageGet, safeLocalStorageSet } from '../lib/utils';
 import { BillingData } from '../lib/types';
-import { User, X } from 'lucide-react';
+import { User, X, ChevronUp, ChevronDown, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import CSVImportExport from './CSVImportExport';
 
@@ -26,6 +26,30 @@ interface ProjectAssignment {
   [projectId: string]: string;
 }
 
+type SortField = 'projectName' | 'signedFee' | 'asrFee' | 'totalFee' | 'projected' | string; // string for month sorting
+type SortDirection = 'asc' | 'desc';
+
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
+
+/**
+ * High Performance Table Component with Sorting Functionality
+ * 
+ * Features:
+ * - Virtualized rendering for large datasets
+ * - Clickable headers for sorting by:
+ *   - Project Name (alphabetical)
+ *   - Signed Fee (numerical)
+ *   - Total ASR Fee (numerical)
+ *   - Total Fee (numerical)
+ *   - Projected Total (numerical)
+ *   - Individual month projections (numerical)
+ * - Visual sort indicators (chevron up/down)
+ * - Hover effects for better UX
+ * - Maintains existing editing and data management features
+ */
 export default function HighPerformanceTable({ 
   billingData, 
   projections, 
@@ -52,6 +76,12 @@ export default function HighPerformanceTable({
   const [projectManagers, setProjectManagers] = useState<ProjectManager[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment>({});
   const [isScrolledHorizontal, setIsScrolledHorizontal] = useState(false);
+  
+  // Sorting state
+  const [sortState, setSortState] = useState<SortState>({ field: 'projectName', direction: 'asc' });
+  
+  // Filter state
+  const [filterText, setFilterText] = useState('');
   
   // User-entered data persistence
   const [signedFees, setSignedFees] = useState<Record<string, number>>({});
@@ -623,11 +653,83 @@ export default function HighPerformanceTable({
     setMenuPosition(null);
   };
 
-  const activeProjects = safeBillingData.filter(project => !closedProjects.has(project.projectId));
+  // Sorting functions
+  const sortProjects = useCallback((projects: BillingData[]) => {
+    return [...projects].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortState.field) {
+        case 'projectName':
+          aValue = a.projectName.toLowerCase();
+          bValue = b.projectName.toLowerCase();
+          break;
+        case 'signedFee':
+          aValue = signedFees[a.projectId] || a.signedFee || 0;
+          bValue = signedFees[b.projectId] || b.signedFee || 0;
+          break;
+        case 'asrFee':
+          aValue = getAsrFee(a.projectId);
+          bValue = getAsrFee(b.projectId);
+          break;
+        case 'totalFee':
+          aValue = getTotalFee(a);
+          bValue = getTotalFee(b);
+          break;
+        case 'projected':
+          aValue = getTotalProjected(a.projectId);
+          bValue = getTotalProjected(b.projectId);
+          break;
+        default:
+          // Handle month-specific sorting
+          if (monthRange.includes(sortState.field)) {
+            aValue = getCellValue(a.projectId, sortState.field);
+            bValue = getCellValue(b.projectId, sortState.field);
+          } else {
+            return 0;
+          }
+          break;
+      }
+
+      if (aValue < bValue) return sortState.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortState.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [sortState, signedFees, getAsrFee, getTotalFee, getTotalProjected, monthRange, getCellValue]);
+
+  const handleSort = useCallback((field: SortField) => {
+    setSortState(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  }, []);
+
+  const getSortIcon = (field: SortField) => {
+    if (sortState.field !== field) return null;
+    return sortState.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+  };
+
+  const getMonthSortIcon = (month: string) => {
+    if (sortState.field !== month) return null;
+    return sortState.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
+  };
+
+  const activeProjects = sortProjects(safeBillingData.filter(project => !closedProjects.has(project.projectId)));
+
+  // Filter projects by project name
+  const filteredProjects = useMemo(() => {
+    if (!filterText.trim()) {
+      return activeProjects;
+    }
+    return activeProjects.filter(project => 
+      project.projectName.toLowerCase().includes(filterText.toLowerCase())
+    );
+  }, [activeProjects, filterText]);
 
   // Debug logging
   console.log('HighPerformanceTable: safeBillingData length:', safeBillingData.length);
   console.log('HighPerformanceTable: activeProjects length:', activeProjects.length);
+  console.log('HighPerformanceTable: filteredProjects length:', filteredProjects.length);
   console.log('HighPerformanceTable: closedProjects size:', closedProjects.size);
   if (safeBillingData.length > 0) {
     console.log('HighPerformanceTable: First billing data item:', safeBillingData[0]);
@@ -692,9 +794,38 @@ export default function HighPerformanceTable({
           <div>
             <h3 className="text-lg font-medium text-gray-900">Projections Table</h3>
             <p className="text-sm text-gray-600">
-              Virtualized table with {activeProjects.length} active projects - click any cell to edit
+              Virtualized table with {filteredProjects.length} active projects - click any cell to edit
             </p>
           </div>
+        </div>
+        
+        {/* Filter Section */}
+        <div className="mb-4">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Filter projects by name..."
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
+            {filterText && (
+              <button
+                onClick={() => setFilterText('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
+          </div>
+          {filterText && (
+            <div className="mt-2 text-sm text-gray-600">
+              Showing {filteredProjects.length} of {activeProjects.length} projects
+            </div>
+          )}
         </div>
         
         {/* CSV Import/Export Component */}
@@ -715,38 +846,68 @@ export default function HighPerformanceTable({
           {/* Sticky header */}
           <div className="flex bg-gray-50 border-b border-gray-200 sticky-header">
             <div className="flex-shrink-0 w-[264px] bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-3 flex items-center justify-start">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap">
+              <div 
+                className="h-18 px-4 py-3 flex items-center justify-start cursor-pointer hover:bg-gray-100 transition-colors group"
+                onClick={() => handleSort('projectName')}
+              >
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
                   Project
                 </span>
+                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                  {getSortIcon('projectName')}
+                </div>
               </div>
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-3 flex items-center justify-end">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap">
+              <div 
+                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 transition-colors group"
+                onClick={() => handleSort('signedFee')}
+              >
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
                   Signed Fee
                 </span>
+                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                  {getSortIcon('signedFee')}
+                </div>
               </div>
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-3 flex items-center justify-end">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap">
+              <div 
+                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 transition-colors group"
+                onClick={() => handleSort('asrFee')}
+              >
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
                   Total ASR Fee
                 </span>
+                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                  {getSortIcon('asrFee')}
+                </div>
               </div>
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-3 flex items-center justify-end">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap">
+              <div 
+                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 transition-colors group"
+                onClick={() => handleSort('totalFee')}
+              >
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
                   Total Fee
                 </span>
+                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                  {getSortIcon('totalFee')}
+                </div>
               </div>
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-3 flex items-center justify-end">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap">
+              <div 
+                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 transition-colors group"
+                onClick={() => handleSort('projected')}
+              >
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
                   Projected
                 </span>
+                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                  {getSortIcon('projected')}
+                </div>
               </div>
             </div>
           </div>
@@ -755,14 +916,14 @@ export default function HighPerformanceTable({
           <div ref={stickyBodyRef} className="flex-1 hide-scrollbar" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
             <List
               height={stickyBodyHeight}
-              itemCount={activeProjects.length}
+              itemCount={filteredProjects.length}
               itemSize={72}
               width={776}
               outerRef={stickyListRef}
               overscanCount={5}
             >
               {({ index, style }) => {
-                const project = activeProjects[index];
+                const project = filteredProjects[index];
                 if (!project) return null;
 
                 const totalProjected = getTotalProjected(project.projectId);
@@ -772,7 +933,7 @@ export default function HighPerformanceTable({
                 const assignedManager = projectManagers.find(m => m.id === projectAssignments[project.projectId]);
 
                 return (
-                  <div style={style} className="flex border-b border-gray-200 bg-white sticky-column">
+                  <div style={style} className="flex border-b border-gray-200 sticky-column">
                     <div className="flex-shrink-0 w-[264px] bg-gray-50 border-r border-gray-200">
                       <div className="flex items-center h-18 px-4">
                         <div className="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
@@ -915,11 +1076,18 @@ export default function HighPerformanceTable({
                   return (
                     <div
                       key={month}
-                      className="flex-shrink-0 w-32 flex items-center justify-center px-4 py-3 border-r border-gray-200 h-18 bg-gray-50"
+                      className="flex-shrink-0 w-32 flex items-center justify-center px-4 py-3 border-r border-gray-200 h-18 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors group"
+                      onClick={() => handleSort(month)}
+                      title={`Click to sort by ${formatMonth(month)} projections`}
                     >
-                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap">
-                        {formatMonth(month)}
-                      </span>
+                      <div className="flex flex-col items-center group-hover:text-gray-700">
+                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
+                          {formatMonth(month)}
+                        </span>
+                        <div className="text-gray-400 mt-0.5 group-hover:text-gray-600">
+                          {getMonthSortIcon(month)}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -930,14 +1098,14 @@ export default function HighPerformanceTable({
             <div ref={bodyWrapperRef} className="flex-1 body-wrapper" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
               <List
                 height={bodyHeight}
-                itemCount={activeProjects.length}
+                itemCount={filteredProjects.length}
                 itemSize={72}
                 width={monthRange.length * 128}
                 outerRef={scrollableListRef}
                 overscanCount={5}
               >
                 {({ index, style }) => {
-                  const project = activeProjects[index];
+                  const project = filteredProjects[index];
                   if (!project) return null;
 
                   return (
