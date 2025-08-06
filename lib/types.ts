@@ -60,6 +60,12 @@ export interface DashboardStats {
   activeProjects: number;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  customerName: string;
+}
+
 export interface ProjectWithBilling extends ZohoProject {
   billingData: BillingData;
 } 
