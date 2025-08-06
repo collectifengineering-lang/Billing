@@ -6,6 +6,7 @@ import { formatCurrency, formatMonth, isCurrentMonth, isPastMonth, safeLocalStor
 import { BillingData } from '../lib/types';
 import { User, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import CSVImportExport from './CSVImportExport';
 
 interface HighPerformanceTableProps {
   billingData: BillingData[];
@@ -254,7 +255,7 @@ export default function HighPerformanceTable({
     const handleStorageChange = (event: StorageEvent) => {
       console.log('HighPerformanceTable: Storage change event:', event.key, event.newValue);
       if (event.key === 'closedProjects' && event.newValue) {
-        const newClosedProjects = new Set(JSON.parse(event.newValue));
+        const newClosedProjects = new Set<string>(JSON.parse(event.newValue) as string[]);
         setClosedProjects(newClosedProjects);
         onClosedProjectsChange?.(newClosedProjects);
       }
@@ -661,13 +662,50 @@ export default function HighPerformanceTable({
     };
   }, [activeProjects.length, scrollbarWidth]);
 
+  const handleImportData = (importedData: Record<string, Record<string, number>>) => {
+    // Merge imported data with existing data
+    const updatedMonthlyProjections = { ...monthlyProjections };
+    
+    Object.keys(importedData).forEach(projectId => {
+      if (!updatedMonthlyProjections[projectId]) {
+        updatedMonthlyProjections[projectId] = {};
+      }
+      
+      Object.keys(importedData[projectId]).forEach(month => {
+        updatedMonthlyProjections[projectId][month] = importedData[projectId][month];
+      });
+    });
+    
+    setMonthlyProjections(updatedMonthlyProjections);
+    localStorage.setItem('monthlyProjections', JSON.stringify(updatedMonthlyProjections));
+    
+    // Trigger parent update if callback exists
+    if (onUpdateProjections) {
+      onUpdateProjections(updatedMonthlyProjections);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Projections Table</h3>
-        <p className="text-sm text-gray-600">
-          Virtualized table with {activeProjects.length} active projects - click any cell to edit
-        </p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Projections Table</h3>
+            <p className="text-sm text-gray-600">
+              Virtualized table with {activeProjects.length} active projects - click any cell to edit
+            </p>
+          </div>
+        </div>
+        
+        {/* CSV Import/Export Component */}
+        <CSVImportExport
+          billingData={safeBillingData}
+          monthlyProjections={monthlyProjections}
+          asrFees={asrFees}
+          signedFees={signedFees}
+          monthRange={monthRange}
+          onImportData={handleImportData}
+        />
       </div>
 
       {/* Main table container with proper scroll handling */}

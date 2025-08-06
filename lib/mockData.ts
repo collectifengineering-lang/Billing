@@ -6,7 +6,7 @@ import { processBillingData, initializeProjectionsTable } from './utils';
 export const mockProjects: ZohoProject[] = [
   {
     project_id: '1',
-    name: 'Website Redesign',
+    project_name: 'Website Redesign',
     description: 'Complete website redesign for ABC Corp',
     status: 'active',
     start_date: '2024-01-15',
@@ -19,7 +19,7 @@ export const mockProjects: ZohoProject[] = [
   },
   {
     project_id: '2',
-    name: 'Mobile App Development',
+    project_name: 'Mobile App Development',
     description: 'iOS and Android app for XYZ Inc',
     status: 'active',
     start_date: '2024-02-01',
@@ -32,7 +32,7 @@ export const mockProjects: ZohoProject[] = [
   },
   {
     project_id: '3',
-    name: 'E-commerce Platform',
+    project_name: 'E-commerce Platform',
     description: 'Online store for DEF Retail',
     status: 'active',
     start_date: '2024-03-01',
@@ -45,7 +45,7 @@ export const mockProjects: ZohoProject[] = [
   },
   {
     project_id: '4',
-    name: 'CRM Integration',
+    project_name: 'CRM Integration',
     description: 'Salesforce integration for GHI Services',
     status: 'active',
     start_date: '2024-01-01',
