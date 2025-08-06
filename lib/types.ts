@@ -66,11 +66,25 @@ export interface Project {
   customerName: string;
   project_id: string;
   project_name: string;
-  status: string;
-  start_date: string;
-  end_date: string;
+  project_code: string;
   customer_id: string;
   customer_name: string;
+  description: string;
+  can_be_invoiced: boolean;
+  status: string;
+  billing_type: string;
+  created_time: string;
+  last_modified_time: string;
+  has_attachment: boolean;
+  total_hours: string;
+  billable_hours: string;
+  other_service_app_source: string;
+  users_working: number;
+  cf_market: string;
+  cf_market_unformatted: string;
+  custom_fields: any[];
+  start_date: string;
+  end_date: string;
 }
 
 export interface Invoice {
@@ -82,8 +96,8 @@ export interface Invoice {
   project_id: string;
   invoice_number: string;
   status: string;
-  customer_id: string;
-  total: number;
+  billed_amount: number;
+  unbilled_amount: number;
 }
 
 export interface ProjectWithBilling extends ZohoProject {
