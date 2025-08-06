@@ -23,6 +23,22 @@ export function getCurrentMonthRange(monthsBack: number = 12, monthsForward: num
   return generateMonthRange(startDate, endDate);
 }
 
+export function getProjectionsMonthRange(): string[] {
+  const startDate = new Date(2022, 0, 1); // January 1, 2022
+  const today = new Date();
+  const endDate = addMonths(today, 24); // 24 months beyond current month
+  
+  return generateMonthRange(startDate, endDate);
+}
+
+export function getChartMonthRange(): string[] {
+  const today = new Date();
+  const startDate = subMonths(today, 12); // 1 year in the past
+  const endDate = addMonths(today, 12); // 1 year in the future
+  
+  return generateMonthRange(startDate, endDate);
+}
+
 export function processBillingData(
   projects: ZohoProject[],
   invoices: ZohoInvoice[],
@@ -33,7 +49,7 @@ export function processBillingData(
   const safeInvoices = invoices || [];
   const safeProjections = projections || {};
   
-  const monthRange = getCurrentMonthRange();
+  const monthRange = getProjectionsMonthRange();
   
   return safeProjects.map(project => {
     const projectInvoices = safeInvoices.filter(invoice => invoice.project_id === project.project_id);
@@ -235,7 +251,7 @@ export function createChartData(billingData: BillingData[]): ChartData[] {
 export function initializeProjectionsTable(projects: ZohoProject[]): ProjectionsTable {
   // Handle undefined or null projects
   const safeProjects = projects || [];
-  const monthRange = getCurrentMonthRange();
+  const monthRange = getProjectionsMonthRange();
   const table: ProjectionsTable = {};
 
   safeProjects.forEach(project => {

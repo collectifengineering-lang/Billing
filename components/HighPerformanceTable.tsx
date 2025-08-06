@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FixedSizeList as List } from 'react-window';
-import { formatCurrency, formatMonth, isCurrentMonth, isPastMonth, safeLocalStorageGet, safeLocalStorageSet } from '../lib/utils';
+import { formatCurrency, formatMonth, isCurrentMonth, isPastMonth, safeLocalStorageGet, safeLocalStorageSet, getProjectionsMonthRange } from '../lib/utils';
 import { BillingData } from '../lib/types';
 import { User, X, ChevronUp, ChevronDown, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -109,13 +109,7 @@ export default function HighPerformanceTable({
 
   // Performance optimizations
   const monthRange = useMemo(() => {
-    const today = new Date();
-    const months: string[] = [];
-    for (let i = -12; i <= 24; i++) {
-      const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
-      months.push(date.toISOString().slice(0, 7));
-    }
-    return months;
+    return getProjectionsMonthRange();
   }, []);
 
   const currentMonth = useMemo(() => {

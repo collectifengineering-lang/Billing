@@ -1,5 +1,5 @@
 import { BillingData } from '@/lib/types';
-import { formatCurrency, formatMonth, getCurrentMonthRange, safeLocalStorageGet } from '@/lib/utils';
+import { formatCurrency, formatMonth, getChartMonthRange, safeLocalStorageGet } from '@/lib/utils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useState, useEffect } from 'react';
 
@@ -47,7 +47,7 @@ export default function BillingChart({ billingData, closedProjects }: BillingCha
   const monthlyStatuses = safeLocalStorageGet('monthlyStatuses') || {};
   
   // Create monthly aggregated data for the chart
-  const monthRange = getCurrentMonthRange(12, 12); // 12 months back, 12 months forward
+  const monthRange = getChartMonthRange(); // 1 year in past, 1 year in future
   
   const chartData = monthRange.map(month => {
     let monthProjected = 0;

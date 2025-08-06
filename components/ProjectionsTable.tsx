@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, X, User } from 'lucide-react';
 import { BillingData, ProjectionsTable as ProjectionsTableType, ProjectManager } from '@/lib/types';
 import { formatMonth, isFutureMonth, isCurrentMonth, isPastMonth, formatCurrency } from '@/lib/utils';
-import { getCurrentMonthRange } from '@/lib/utils';
+import { getProjectionsMonthRange } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
 
 interface ProjectionsTableProps {
@@ -31,7 +31,7 @@ export default function ProjectionsTable({
   const [asrFees, setAsrFees] = useState<Record<string, number>>({});
   const [monthlyProjections, setMonthlyProjections] = useState<Record<string, Record<string, number>>>({});
   const tableRef = useRef<HTMLDivElement>(null);
-  const monthRange = getCurrentMonthRange();
+  const monthRange = getProjectionsMonthRange();
 
   // Load project managers and assignments from localStorage
   useEffect(() => {
