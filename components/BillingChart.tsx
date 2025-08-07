@@ -1,7 +1,8 @@
 import { BillingData } from '@/lib/types';
-import { formatCurrency, formatMonth, getChartMonthRange, safeLocalStorageGet } from '@/lib/utils';
+import { formatCurrency, formatMonth, getChartMonthRange } from '@/lib/utils';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 
 interface BillingChartProps {
   billingData: BillingData[];
@@ -16,19 +17,12 @@ export default function BillingChart({ billingData, closedProjects }: BillingCha
   // State to trigger re-renders when projections change
   const [projectionsVersion, setProjectionsVersion] = useState(0);
   
-  // Listen for localStorage changes
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'monthlyProjections' || event.key === 'monthlyStatuses') {
-        setProjectionsVersion(prev => prev + 1);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  // Also listen for custom events from the same tab
+  // SWR data fetching
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
+  const { data: monthlyProjectionsData } = useSWR('/api/projections', fetcher);
+  const { data: monthlyStatusesData } = useSWR('/api/statuses', fetcher);
+  
+  // Listen for custom events from the same tab
   useEffect(() => {
     const handleProjectionsUpdate = () => {
       setProjectionsVersion(prev => prev + 1);
@@ -42,9 +36,9 @@ export default function BillingChart({ billingData, closedProjects }: BillingCha
     };
   }, []);
   
-  // Get data from localStorage
-  const monthlyProjections = safeLocalStorageGet('monthlyProjections') || {};
-  const monthlyStatuses = safeLocalStorageGet('monthlyStatuses') || {};
+  // Get data from SWR (database only)
+  const monthlyProjections = monthlyProjectionsData || {};
+  const monthlyStatuses = monthlyStatusesData || {};
   
   // Create monthly aggregated data for the chart
   const monthRange = getChartMonthRange(); // 1 year in past, 1 year in future

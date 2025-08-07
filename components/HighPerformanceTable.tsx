@@ -15,6 +15,7 @@ interface HighPerformanceTableProps {
   onUpdateProjections: (projections: any) => void;
   closedProjects?: Set<string>;
   onClosedProjectsChange?: (closedProjects: Set<string>) => void;
+  useDB?: boolean;
 }
 
 interface ProjectManager {
@@ -50,13 +51,15 @@ interface SortState {
  * - Visual sort indicators (chevron up/down)
  * - Hover effects for better UX
  * - Maintains existing editing and data management features
+ * - Always uses database via SWR (no localStorage fallback)
  */
 export default function HighPerformanceTable({ 
   billingData, 
   projections, 
   onUpdateProjections,
   closedProjects: externalClosedProjects,
-  onClosedProjectsChange
+  onClosedProjectsChange,
+  useDB = true
 }: HighPerformanceTableProps) {
   // Handle undefined or null billingData
   const safeBillingData = billingData || [];
@@ -84,19 +87,25 @@ export default function HighPerformanceTable({
   // Filter state
   const [filterText, setFilterText] = useState('');
   
-  // SWR data fetching
+  // SWR data fetching with enhanced configuration for real-time sync
   const fetcher = (url: string) => fetch(url).then(res => res.json());
   
-  const { data: signedFeesData, mutate: mutateSignedFees } = useSWR('/api/signed-fees', fetcher);
-  const { data: asrFeesData, mutate: mutateAsrFees } = useSWR('/api/asr-fees', fetcher);
-  const { data: monthlyProjectionsData, mutate: mutateMonthlyProjections } = useSWR('/api/projections', fetcher);
-  const { data: monthlyStatusesData, mutate: mutateMonthlyStatuses } = useSWR('/api/statuses', fetcher);
-  const { data: monthlyCommentsData, mutate: mutateMonthlyComments } = useSWR('/api/comments', fetcher);
-  const { data: closedProjectsData, mutate: mutateClosedProjects } = useSWR('/api/closed-projects', fetcher);
-  const { data: projectAssignmentsData, mutate: mutateProjectAssignments } = useSWR('/api/project-assignments', fetcher);
-  const { data: projectManagersData, mutate: mutateProjectManagers } = useSWR('/api/project-managers', fetcher);
+  const swrConfig = {
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    refreshInterval: 0, // Disable auto-refresh, rely on focus/reconnect
+  };
+  
+  const { data: signedFeesData, mutate: mutateSignedFees } = useSWR('/api/signed-fees', fetcher, swrConfig);
+  const { data: asrFeesData, mutate: mutateAsrFees } = useSWR('/api/asr-fees', fetcher, swrConfig);
+  const { data: monthlyProjectionsData, mutate: mutateMonthlyProjections } = useSWR('/api/projections', fetcher, swrConfig);
+  const { data: monthlyStatusesData, mutate: mutateMonthlyStatuses } = useSWR('/api/statuses', fetcher, swrConfig);
+  const { data: monthlyCommentsData, mutate: mutateMonthlyComments } = useSWR('/api/comments', fetcher, swrConfig);
+  const { data: closedProjectsData, mutate: mutateClosedProjects } = useSWR('/api/closed-projects', fetcher, swrConfig);
+  const { data: projectAssignmentsData, mutate: mutateProjectAssignments } = useSWR('/api/project-assignments', fetcher, swrConfig);
+  const { data: projectManagersData, mutate: mutateProjectManagers } = useSWR('/api/project-managers', fetcher, swrConfig);
 
-  // User-entered data persistence (fallback to localStorage during migration)
+  // User-entered data persistence (only for immediate UI updates, always sync with SWR)
   const [signedFees, setSignedFees] = useState<Record<string, number>>({});
   const [asrFees, setAsrFees] = useState<Record<string, number>>({});
   const [monthlyProjections, setMonthlyProjections] = useState<Record<string, Record<string, number>>>({});
@@ -129,115 +138,56 @@ export default function HighPerformanceTable({
     return new Date().toISOString().slice(0, 7);
   }, []);
 
-  // Load data from localStorage and trigger migration if needed
+  // Sync SWR data with local state (always use database data as source of truth)
   useEffect(() => {
-    console.log('HighPerformanceTable: Component mounted, loading data from localStorage');
-    
-    const loadData = () => {
-      try {
-        console.log('HighPerformanceTable: Loading data from localStorage');
-        
-        const savedClosedProjects = localStorage.getItem('closedProjects');
-        if (savedClosedProjects && Array.isArray(JSON.parse(savedClosedProjects))) {
-          const newClosedProjects = new Set(JSON.parse(savedClosedProjects) as string[]);
-          setClosedProjects(newClosedProjects);
-          onClosedProjectsChange?.(newClosedProjects);
-          console.log('HighPerformanceTable: Loaded closed projects:', savedClosedProjects);
-        }
+    if (signedFeesData && Object.keys(signedFeesData).length > 0) {
+      setSignedFees(signedFeesData);
+    }
+  }, [signedFeesData]);
 
-        const savedProjectManagers = localStorage.getItem('projectManagers');
-        console.log('HighPerformanceTable: Raw project managers from localStorage:', savedProjectManagers);
-        if (savedProjectManagers && Array.isArray(JSON.parse(savedProjectManagers))) {
-          setProjectManagers(JSON.parse(savedProjectManagers));
-          console.log('HighPerformanceTable: Loaded project managers:', savedProjectManagers);
-        } else if (savedProjectManagers === null) {
-          console.log('HighPerformanceTable: No project managers found in localStorage');
-          // Don't reset to empty array if no data exists
-        } else {
-          console.log('HighPerformanceTable: Invalid project managers format, resetting to empty array');
-          setProjectManagers([]);
-        }
+  useEffect(() => {
+    if (asrFeesData && Object.keys(asrFeesData).length > 0) {
+      setAsrFees(asrFeesData);
+    }
+  }, [asrFeesData]);
 
-        const savedProjectAssignments = localStorage.getItem('projectAssignments');
-        if (savedProjectAssignments && typeof JSON.parse(savedProjectAssignments) === 'object') {
-          setProjectAssignments(JSON.parse(savedProjectAssignments));
-          console.log('HighPerformanceTable: Loaded project assignments:', savedProjectAssignments);
-        }
+  useEffect(() => {
+    if (monthlyProjectionsData && Object.keys(monthlyProjectionsData).length > 0) {
+      setMonthlyProjections(monthlyProjectionsData);
+    }
+  }, [monthlyProjectionsData]);
 
-        const savedSignedFees = localStorage.getItem('signedFees');
-        if (savedSignedFees && typeof JSON.parse(savedSignedFees) === 'object') {
-          setSignedFees(JSON.parse(savedSignedFees));
-        }
+  useEffect(() => {
+    if (monthlyStatusesData && Object.keys(monthlyStatusesData).length > 0) {
+      setMonthlyStatuses(monthlyStatusesData);
+    }
+  }, [monthlyStatusesData]);
 
-        const savedAsrFees = localStorage.getItem('asrFees');
-        if (savedAsrFees && typeof JSON.parse(savedAsrFees) === 'object') {
-          setAsrFees(JSON.parse(savedAsrFees));
-        }
+  useEffect(() => {
+    if (monthlyCommentsData && Object.keys(monthlyCommentsData).length > 0) {
+      setMonthlyComments(monthlyCommentsData);
+    }
+  }, [monthlyCommentsData]);
 
-        const savedMonthlyProjections = localStorage.getItem('monthlyProjections');
-        if (savedMonthlyProjections && typeof JSON.parse(savedMonthlyProjections) === 'object') {
-          setMonthlyProjections(JSON.parse(savedMonthlyProjections));
-        }
+  useEffect(() => {
+    if (closedProjectsData && Array.isArray(closedProjectsData)) {
+      const newClosedProjects = new Set(closedProjectsData);
+      setClosedProjects(newClosedProjects);
+      onClosedProjectsChange?.(newClosedProjects);
+    }
+  }, [closedProjectsData, onClosedProjectsChange]);
 
-        const savedMonthlyStatuses = localStorage.getItem('monthlyStatuses');
-        if (savedMonthlyStatuses && typeof JSON.parse(savedMonthlyStatuses) === 'object') {
-          setMonthlyStatuses(JSON.parse(savedMonthlyStatuses));
-        }
+  useEffect(() => {
+    if (projectAssignmentsData && typeof projectAssignmentsData === 'object') {
+      setProjectAssignments(projectAssignmentsData);
+    }
+  }, [projectAssignmentsData]);
 
-        const savedMonthlyComments = localStorage.getItem('monthlyComments');
-        if (savedMonthlyComments && typeof JSON.parse(savedMonthlyComments) === 'object') {
-          setMonthlyComments(JSON.parse(savedMonthlyComments));
-        }
-      } catch (error) {
-        console.error('HighPerformanceTable: Error loading data from localStorage:', error);
-        // Only clear specific corrupted data, not all data
-        console.log('HighPerformanceTable: Attempting to clear only corrupted data');
-      }
-    };
-
-    // Load data immediately
-    loadData();
-
-    // Trigger migration if there's localStorage data
-    const triggerMigration = async () => {
-      const hasLocalData = localStorage.getItem('monthlyProjections') || 
-                          localStorage.getItem('signedFees') || 
-                          localStorage.getItem('asrFees');
-      
-      if (hasLocalData) {
-        try {
-          console.log('HighPerformanceTable: Triggering migration from localStorage to database');
-          await fetch('/api/migrate', { method: 'POST' });
-          console.log('HighPerformanceTable: Migration completed');
-        } catch (error) {
-          console.error('HighPerformanceTable: Migration failed:', error);
-        }
-      }
-    };
-
-    triggerMigration();
-
-    // Also listen for focus events to reload data when returning to the page
-    const handleFocus = () => {
-      console.log('HighPerformanceTable: Window focused, reloading data');
-      loadData();
-    };
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('HighPerformanceTable: Page became visible, reloading data');
-        loadData();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
+  useEffect(() => {
+    if (projectManagersData && Array.isArray(projectManagersData)) {
+      setProjectManagers(projectManagersData);
+    }
+  }, [projectManagersData]);
 
   // Debug component lifecycle
   useEffect(() => {
@@ -306,72 +256,7 @@ export default function HighPerformanceTable({
     };
   }, [openDropdown, dropdownPosition, openMenuCell, menuPosition, editingCommentCell]);
 
-  // Cross-tab synchronization
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      console.log('HighPerformanceTable: Storage change event:', event.key, event.newValue);
-      if (event.key === 'closedProjects' && event.newValue) {
-        const newClosedProjects = new Set<string>(JSON.parse(event.newValue) as string[]);
-        setClosedProjects(newClosedProjects);
-        onClosedProjectsChange?.(newClosedProjects);
-      }
-      if (event.key === 'projectManagers' && event.newValue) {
-        console.log('HighPerformanceTable: Processing project managers storage change:', event.newValue);
-        setProjectManagers(JSON.parse(event.newValue));
-      }
-      if (event.key === 'projectAssignments' && event.newValue) {
-        setProjectAssignments(JSON.parse(event.newValue));
-      }
-      if (event.key === 'signedFees' && event.newValue) {
-        setSignedFees(JSON.parse(event.newValue));
-      }
-      if (event.key === 'asrFees' && event.newValue) {
-        setAsrFees(JSON.parse(event.newValue));
-      }
-      if (event.key === 'monthlyProjections' && event.newValue) {
-        setMonthlyProjections(JSON.parse(event.newValue));
-        // Dispatch custom event to notify chart of projection changes
-        window.dispatchEvent(new CustomEvent('projectionsUpdated'));
-      }
-      if (event.key === 'monthlyStatuses' && event.newValue) {
-        setMonthlyStatuses(JSON.parse(event.newValue));
-        // Dispatch custom event to notify chart of status changes
-        window.dispatchEvent(new CustomEvent('projectionsUpdated'));
-      }
-      if (event.key === 'monthlyComments' && event.newValue) {
-        setMonthlyComments(JSON.parse(event.newValue));
-      }
-    };
-
-    const handleProjectManagersUpdate = () => {
-      try {
-        console.log('HighPerformanceTable: Handling project managers update event');
-        const savedProjectManagers = localStorage.getItem('projectManagers');
-        console.log('HighPerformanceTable: Retrieved project managers from localStorage:', savedProjectManagers);
-        if (savedProjectManagers && Array.isArray(JSON.parse(savedProjectManagers))) {
-          setProjectManagers(JSON.parse(savedProjectManagers));
-          console.log('HighPerformanceTable: Updated project managers state:', savedProjectManagers);
-        } else if (savedProjectManagers === null) {
-          console.log('HighPerformanceTable: No project managers found during update');
-          // Don't reset to empty array if no data exists
-        } else {
-          console.log('HighPerformanceTable: Invalid project managers format during update, resetting to empty array');
-          setProjectManagers([]);
-        }
-      } catch (error) {
-        console.error('HighPerformanceTable: Error handling project managers update:', error);
-        setProjectManagers([]);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('projectManagersUpdated', handleProjectManagersUpdate);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('projectManagersUpdated', handleProjectManagersUpdate);
-    };
-  }, []);
+  // Cross-tab synchronization removed - now using SWR for real-time sync
 
   // Vertical scroll synchronization
   useEffect(() => {
@@ -493,45 +378,39 @@ export default function HighPerformanceTable({
     setScrollbarHeight(calculateScrollbarHeight());
   }, []);
 
-  // Optimized data getters using SWR data with fallback to localStorage
+  // Data getters using SWR data (database only, no localStorage fallback)
   const getCellValue = useCallback((projectId: string, month: string) => {
-    return monthlyProjectionsData?.[projectId]?.[month] || monthlyProjections[projectId]?.[month] || 0;
-  }, [monthlyProjectionsData, monthlyProjections]);
+    return monthlyProjectionsData?.[projectId]?.[month] || 0;
+  }, [monthlyProjectionsData]);
 
   const getAsrFee = useCallback((projectId: string) => {
-    return asrFeesData?.[projectId] || asrFees[projectId] || projections[projectId]?.asrFee || 0;
-  }, [asrFeesData, asrFees, projections]);
+    return asrFeesData?.[projectId] || 0;
+  }, [asrFeesData]);
 
   const getTotalFee = useCallback((project: BillingData) => {
-    // Only use user-entered data or API data, ignore Zoho signedFee
-    const userSignedFee = signedFees[project.projectId];
-    const apiSignedFee = signedFeesData?.[project.projectId];
-    
-    // Use user-entered data first, then API data, never Zoho data
-    const finalSignedFee = userSignedFee !== undefined ? userSignedFee : 
-                          (apiSignedFee !== undefined ? apiSignedFee : 0);
-    
+    // Only use API data, never Zoho signedFee
+    const apiSignedFee = signedFeesData?.[project.projectId] || 0;
     const asrFee = getAsrFee(project.projectId);
-    return finalSignedFee + asrFee;
-  }, [signedFeesData, signedFees, getAsrFee]);
+    return apiSignedFee + asrFee;
+  }, [signedFeesData, getAsrFee]);
 
   const getTotalProjected = useCallback((projectId: string) => {
     return monthRange.reduce((sum, month) => sum + getCellValue(projectId, month), 0);
   }, [monthRange, getCellValue]);
 
   const getProjectManagerColor = useCallback((projectId: string) => {
-    const managerId = projectAssignmentsData?.[projectId] || projectAssignments[projectId];
-    const manager = projectManagersData?.[managerId] || projectManagers.find(m => m.id === managerId);
+    const managerId = projectAssignmentsData?.[projectId];
+    const manager = projectManagersData?.find((m: ProjectManager) => m.id === managerId);
     return manager?.color;
-  }, [projectAssignmentsData, projectAssignments, projectManagersData, projectManagers]);
+  }, [projectAssignmentsData, projectManagersData]);
 
   const getCellStatus = useCallback((projectId: string, month: string) => {
-    return monthlyStatusesData?.[projectId]?.[month] || monthlyStatuses[projectId]?.[month] || '';
-  }, [monthlyStatusesData, monthlyStatuses]);
+    return monthlyStatusesData?.[projectId]?.[month] || '';
+  }, [monthlyStatusesData]);
 
   const getCellComment = useCallback((projectId: string, month: string) => {
-    return monthlyCommentsData?.[projectId]?.[month] || monthlyComments[projectId]?.[month] || '';
-  }, [monthlyCommentsData, monthlyComments]);
+    return monthlyCommentsData?.[projectId]?.[month] || '';
+  }, [monthlyCommentsData]);
 
   const getCellClass = (status: string) => {
     switch (status) {
@@ -631,55 +510,83 @@ export default function HighPerformanceTable({
     }
   }, [editingSignedFee, editValue, mutateSignedFees]);
 
-  const handleProjectClose = useCallback((projectId: string) => {
-    const updatedClosedProjects = new Set(closedProjects);
-    updatedClosedProjects.add(projectId);
-    setClosedProjects(updatedClosedProjects);
-    onClosedProjectsChange?.(updatedClosedProjects);
-    localStorage.setItem('closedProjects', JSON.stringify(Array.from(updatedClosedProjects)));
-    setOpenDropdown(null);
-    toast.success('Project closed');
-  }, [closedProjects, onClosedProjectsChange]);
+  const handleProjectClose = useCallback(async (projectId: string) => {
+    try {
+      await fetch('/api/closed-projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      
+      const updatedClosedProjects = new Set(closedProjects);
+      updatedClosedProjects.add(projectId);
+      setClosedProjects(updatedClosedProjects);
+      onClosedProjectsChange?.(updatedClosedProjects);
+      mutateClosedProjects();
+      setOpenDropdown(null);
+      toast.success('Project closed');
+    } catch (error) {
+      console.error('Error closing project:', error);
+      toast.error('Failed to close project');
+    }
+  }, [closedProjects, onClosedProjectsChange, mutateClosedProjects]);
 
-  const handleProjectReopen = useCallback((projectId: string) => {
-    const updatedClosedProjects = new Set(closedProjects);
-    updatedClosedProjects.delete(projectId);
-    setClosedProjects(updatedClosedProjects);
-    onClosedProjectsChange?.(updatedClosedProjects);
-    localStorage.setItem('closedProjects', JSON.stringify(Array.from(updatedClosedProjects)));
-    toast.success('Project reopened');
-  }, [closedProjects, onClosedProjectsChange]);
+  const handleProjectReopen = useCallback(async (projectId: string) => {
+    try {
+      await fetch('/api/closed-projects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      
+      const updatedClosedProjects = new Set(closedProjects);
+      updatedClosedProjects.delete(projectId);
+      setClosedProjects(updatedClosedProjects);
+      onClosedProjectsChange?.(updatedClosedProjects);
+      mutateClosedProjects();
+      toast.success('Project reopened');
+    } catch (error) {
+      console.error('Error reopening project:', error);
+      toast.error('Failed to reopen project');
+    }
+  }, [closedProjects, onClosedProjectsChange, mutateClosedProjects]);
 
-  const handleStatusSelect = (status: string) => {
+  const handleStatusSelect = async (status: string) => {
     if (!openMenuCell) return;
     const { projectId, month } = openMenuCell;
-    const updatedStatuses = { ...monthlyStatuses };
-    if (status === 'Clear') {
-      if (updatedStatuses[projectId]) {
-        delete updatedStatuses[projectId][month];
-        if (Object.keys(updatedStatuses[projectId]).length === 0) {
-          delete updatedStatuses[projectId];
-        }
+    
+    try {
+      if (status === 'Clear') {
+        await fetch('/api/statuses', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, month }),
+        });
+      } else {
+        await fetch('/api/statuses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, month, status }),
+        });
       }
-    } else {
-      if (!updatedStatuses[projectId]) {
-        updatedStatuses[projectId] = {};
-      }
-      updatedStatuses[projectId][month] = status;
+      
+      mutateMonthlyStatuses();
+      
+      // Dispatch custom event to notify chart of status changes
+      window.dispatchEvent(new CustomEvent('projectionsUpdated'));
+      
+      setOpenMenuCell(null);
+      setMenuPosition(null);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Failed to update status');
     }
-    setMonthlyStatuses(updatedStatuses);
-    localStorage.setItem('monthlyStatuses', JSON.stringify(updatedStatuses));
-    
-    // Dispatch custom event to notify chart of status changes
-    window.dispatchEvent(new CustomEvent('projectionsUpdated'));
-    
-    setOpenMenuCell(null);
-    setMenuPosition(null);
   };
 
-  const handleMenuSelect = (action: string) => {
+  const handleMenuSelect = async (action: string) => {
     if (!openMenuCell) return;
     const { projectId, month } = openMenuCell;
+    
     if (action === 'AddComment' || action === 'EditComment') {
       setEditingCommentCell(openMenuCell);
       setCommentValue(getCellComment(projectId, month));
@@ -688,43 +595,26 @@ export default function HighPerformanceTable({
       setMenuPosition(null);
       return;
     }
+    
     if (action === 'RemoveComment') {
-      const updatedComments = { ...monthlyComments };
-      if (updatedComments[projectId]) {
-        delete updatedComments[projectId][month];
-        if (Object.keys(updatedComments[projectId]).length === 0) {
-          delete updatedComments[projectId];
-        }
+      try {
+        await fetch('/api/comments', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, month }),
+        });
+        mutateMonthlyComments();
+        setOpenMenuCell(null);
+        setMenuPosition(null);
+      } catch (error) {
+        console.error('Error removing comment:', error);
+        toast.error('Failed to remove comment');
       }
-      setMonthlyComments(updatedComments);
-      localStorage.setItem('monthlyComments', JSON.stringify(updatedComments));
-      setOpenMenuCell(null);
-      setMenuPosition(null);
       return;
     }
-    // Existing status logic
-    const updatedStatuses = { ...monthlyStatuses };
-    if (action === 'Clear') {
-      if (updatedStatuses[projectId]) {
-        delete updatedStatuses[projectId][month];
-        if (Object.keys(updatedStatuses[projectId]).length === 0) {
-          delete updatedStatuses[projectId];
-        }
-      }
-    } else {
-      if (!updatedStatuses[projectId]) {
-        updatedStatuses[projectId] = {};
-      }
-      updatedStatuses[projectId][month] = action;
-    }
-    setMonthlyStatuses(updatedStatuses);
-    localStorage.setItem('monthlyStatuses', JSON.stringify(updatedStatuses));
     
-    // Dispatch custom event to notify chart of status changes
-    window.dispatchEvent(new CustomEvent('projectionsUpdated'));
-    
-    setOpenMenuCell(null);
-    setMenuPosition(null);
+    // Handle status actions
+    await handleStatusSelect(action);
   };
 
   // Sorting functions
@@ -788,13 +678,13 @@ export default function HighPerformanceTable({
     return sortState.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
 
-  // Use SWR data for closed projects with fallback to localStorage
+  // Use SWR data for closed projects (database only)
   const closedProjectsSet = useMemo(() => {
     if (closedProjectsData && Array.isArray(closedProjectsData)) {
       return new Set(closedProjectsData);
     }
-    return closedProjects;
-  }, [closedProjectsData, closedProjects]);
+    return new Set<string>();
+  }, [closedProjectsData]);
 
   const activeProjects = sortProjects(safeBillingData.filter(project => !closedProjectsSet.has(project.projectId)));
 
@@ -846,61 +736,41 @@ export default function HighPerformanceTable({
     };
   }, [activeProjects.length, scrollbarWidth]);
 
-  const handleImportData = (importedData: Record<string, Record<string, number>>) => {
-    // Merge imported data with existing data
-    const updatedMonthlyProjections = { ...monthlyProjections };
-    
-    Object.keys(importedData).forEach(projectId => {
-      if (!updatedMonthlyProjections[projectId]) {
-        updatedMonthlyProjections[projectId] = {};
+  const handleImportData = async (importedData: Record<string, Record<string, number>>) => {
+    try {
+      // Import data via API calls
+      const importPromises: Promise<Response>[] = [];
+      
+      Object.keys(importedData).forEach(projectId => {
+        Object.keys(importedData[projectId]).forEach(month => {
+          const value = importedData[projectId][month];
+          if (value !== 0) { // Only import non-zero values
+            importPromises.push(
+              fetch('/api/projections', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId, month, value }),
+              })
+            );
+          }
+        });
+      });
+      
+      if (importPromises.length > 0) {
+        await Promise.all(importPromises);
+        mutateMonthlyProjections();
+        toast.success('Data imported successfully');
       }
       
-      Object.keys(importedData[projectId]).forEach(month => {
-        updatedMonthlyProjections[projectId][month] = importedData[projectId][month];
-      });
-    });
-    
-    setMonthlyProjections(updatedMonthlyProjections);
-    localStorage.setItem('monthlyProjections', JSON.stringify(updatedMonthlyProjections));
-    
-    // Trigger parent update if callback exists
-    if (onUpdateProjections) {
-      onUpdateProjections(updatedMonthlyProjections);
+      // Trigger parent update if callback exists
+      if (onUpdateProjections) {
+        onUpdateProjections(importedData);
+      }
+    } catch (error) {
+      console.error('Error importing data:', error);
+      toast.error('Failed to import data');
     }
   };
-
-  // Sync SWR data with local state (but preserve user-entered data)
-  useEffect(() => {
-    if (signedFeesData && Object.keys(signedFeesData).length > 0) {
-      setSignedFees(prev => {
-        const merged = { ...prev };
-        Object.keys(signedFeesData).forEach(projectId => {
-          // Only update if user hasn't entered a value for this project
-          // or if the SWR data is newer (has a different value)
-          if (merged[projectId] === undefined || merged[projectId] !== signedFeesData[projectId]) {
-            merged[projectId] = signedFeesData[projectId];
-          }
-        });
-        return merged;
-      });
-    }
-  }, [signedFeesData]);
-
-  useEffect(() => {
-    if (asrFeesData && Object.keys(asrFeesData).length > 0) {
-      setAsrFees(prev => {
-        const merged = { ...prev };
-        Object.keys(asrFeesData).forEach(projectId => {
-          // Only update if user hasn't entered a value for this project
-          // or if the SWR data is newer (has a different value)
-          if (merged[projectId] === undefined || merged[projectId] !== asrFeesData[projectId]) {
-            merged[projectId] = asrFeesData[projectId];
-          }
-        });
-        return merged;
-      });
-    }
-  }, [asrFeesData]);
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -1477,26 +1347,33 @@ export default function HighPerformanceTable({
           </div>
           <div className="px-4 py-3 border-t border-gray-200 flex justify-end">
             <button
-              onClick={() => {
+              onClick={async () => {
                 const { projectId, month } = editingCommentCell;
-                const updatedComments = { ...monthlyComments };
-                if (!updatedComments[projectId]) {
-                  updatedComments[projectId] = {};
-                }
                 const trimmed = commentValue.trim();
-                if (trimmed) {
-                  updatedComments[projectId][month] = trimmed;
-                } else {
-                  delete updatedComments[projectId][month];
-                  if (Object.keys(updatedComments[projectId]).length === 0) {
-                    delete updatedComments[projectId];
+                
+                try {
+                  if (trimmed) {
+                    await fetch('/api/comments', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ projectId, month, comment: trimmed }),
+                    });
+                  } else {
+                    await fetch('/api/comments', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ projectId, month }),
+                    });
                   }
+                  
+                  mutateMonthlyComments();
+                  setEditingCommentCell(null);
+                  setCommentValue('');
+                  setCommentPosition(null);
+                } catch (error) {
+                  console.error('Error saving comment:', error);
+                  toast.error('Failed to save comment');
                 }
-                setMonthlyComments(updatedComments);
-                localStorage.setItem('monthlyComments', JSON.stringify(updatedComments));
-                setEditingCommentCell(null);
-                setCommentValue('');
-                setCommentPosition(null);
               }}
               className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md"
             >

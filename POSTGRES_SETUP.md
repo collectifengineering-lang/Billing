@@ -1,144 +1,265 @@
-# Supabase Database Setup Guide
+# PostgreSQL Setup Guide
 
-## Step 1: Integrate Supabase via Vercel Marketplace
+## Overview
+This guide covers setting up PostgreSQL database integration for the billing platform, including Supabase integration, Prisma configuration, and localStorage migration.
 
-1. Go to your Vercel dashboard: https://vercel.com/dashboard
-2. Find your project and click on it
-3. Navigate to **Settings** → **Integrations**
-4. Click **Browse Marketplace**
-5. Search for **Supabase** and click **Add Integration**
-6. Follow the setup wizard to connect your Supabase project
-7. This will automatically add base environment variables like `SUPABASE_URL`
+## Database Setup
 
-## Step 2: Add Required Environment Variables
+### Option 1: Supabase (Recommended)
 
-After the Supabase integration, you need to manually add these additional environment variables:
+#### 1. Create Supabase Project
+1. Go to [Supabase](https://supabase.com)
+2. Create a new project
+3. Note your project URL and API keys
 
-### Required Variables:
+#### 2. Environment Variables
+Add these to your `.env.local` and Vercel environment variables:
 
-1. **`DATABASE_URL`** (Pooled connection for runtime queries - optimized for Vercel):
-   ```
-   postgresql://postgres.rjhkagqsiamwpiiszbgs:eUAUpixlcPkwgMhs@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=3&pool_timeout=30
-   ```
+```bash
+# Supabase Configuration
+DATABASE_URL="postgresql://[user]:[password]@db.[project-ref].supabase.co:6543/postgres?pgbouncer=true&connection_limit=3&pool_timeout=30"
+DIRECT_URL="postgresql://[user]:[password]@db.[project-ref].supabase.co:5432/postgres"
+SUPABASE_URL="https://[project-ref].supabase.co"
+SUPABASE_ANON_KEY="[your-anon-key]"
+SUPABASE_SERVICE_ROLE_KEY="[your-service-role-key]"
+NEXT_PUBLIC_SUPABASE_URL="https://[project-ref].supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="[your-anon-key]"
+NEXT_PUBLIC_USE_DB="true"
+```
 
-2. **`DIRECT_URL`** (Direct connection for migrations):
-   ```
-   postgresql://postgres.rjhkagqsiamwpiiszbgs:eUAUpixlcPkwgMhs@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
-   ```
+#### 3. Database Schema
+Run the provided SQL script in Supabase SQL Editor:
 
-3. **`NEXT_PUBLIC_SUPABASE_URL`**:
-   ```
-   https://rjhkagqsiamwpiiszbgs.supabase.co
-   ```
+```sql
+-- Enable RLS
+ALTER TABLE IF EXISTS "Projection" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "Status" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "Comment" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "SignedFee" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "AsrFee" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "ClosedProject" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "ProjectAssignment" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "ProjectManager" ENABLE ROW LEVEL SECURITY;
 
-4. **`NEXT_PUBLIC_SUPABASE_ANON_KEY`**:
-   ```
-   eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqaGthZ3FzaWFtd3BpaXN6YmdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ1NzMwNDYsImV4cCI6MjA3MDE0OTA0Nn0.J75QFPOpFGr5PdZ4bEVw3x5KrC2eV9p7xgvkLVjHCe4
-   ```
+-- Create policies (permissive for now)
+CREATE POLICY "Enable all access" ON "Projection" FOR ALL USING (true);
+CREATE POLICY "Enable all access" ON "Status" FOR ALL USING (true);
+CREATE POLICY "Enable all access" ON "Comment" FOR ALL USING (true);
+CREATE POLICY "Enable all access" ON "SignedFee" FOR ALL USING (true);
+CREATE POLICY "Enable all access" ON "AsrFee" FOR ALL USING (true);
+CREATE POLICY "Enable all access" ON "ClosedProject" FOR ALL USING (true);
+CREATE POLICY "Enable all access" ON "ProjectAssignment" FOR ALL USING (true);
+CREATE POLICY "Enable all access" ON "ProjectManager" FOR ALL USING (true);
+```
 
-5. **`SUPABASE_SERVICE_ROLE_KEY`**:
-   ```
-   eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqaGthZ3FzaWFtd3BpaXN6YmdzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDU3MzA0NiwiZXhwIjoyMDcwMTQ5MDQ2fQ.F0X2jfuUS-_92Ucaak8axkA8MIVs1NPhL1i6fGfXGCY
-   ```
+### Option 2: Vercel Postgres
+1. Go to Vercel Dashboard → Your Project → Storage
+2. Create a new Postgres database
+3. Copy the connection strings to environment variables
 
-### How to Add Environment Variables:
+## Prisma Configuration
 
-1. Go to your Vercel dashboard: https://vercel.com/dashboard
-2. Find your project and click on it
-3. Navigate to **Settings** → **Environment Variables**
-4. Add each variable one by one with the values above
-5. Make sure to set the environment to **Production** (and optionally **Preview**)
+### 1. Schema Configuration
+Ensure `prisma/schema.prisma` has the correct configuration:
 
-## Step 3: Deploy to Activate Environment Variables
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")  // Pooled URL for runtime queries
+  directUrl = env("DIRECT_URL")    // Direct URL for migrations and Prisma Studio
+}
 
-1. Commit your changes to your repository
-2. Push to your main branch
-3. Vercel will automatically redeploy with the new environment variables
+generator client {
+  provider = "prisma-client-js"
+}
+```
 
-## Step 4: Run Database Migration
+### 2. Generate Prisma Client
+```bash
+npx prisma generate
+```
 
-After deployment, call the `/api/migrate` endpoint to create the database schema:
+### 3. Push Schema to Database
+```bash
+npx prisma db push
+```
 
+## localStorage Migration
+
+### Automatic Migration
+The application now includes automatic localStorage migration:
+
+1. **Detection**: App detects existing localStorage data on first load
+2. **Migration**: Data is automatically migrated to database via API calls
+3. **Cleanup**: localStorage is cleared after successful migration
+4. **Database-Only**: All future operations use database exclusively
+
+### Migration Process
+- **Projections**: Monthly revenue projections
+- **Statuses**: Project status tracking
+- **Comments**: Project notes and comments
+- **Signed Fees**: User-entered fee amounts
+- **ASR Fees**: Additional service revenue
+- **Closed Projects**: Completed project tracking
+- **Project Assignments**: Manager assignments
+- **Project Managers**: Manager definitions
+
+### Manual Migration (if needed)
+If automatic migration fails, you can manually trigger it:
+
+```javascript
+// In browser console
+await fetch('/api/migrate', { method: 'POST' });
+```
+
+## Environment Variables
+
+### Required Variables
+```bash
+# Database URLs
+DATABASE_URL="postgresql://[user]:[password]@[host]:6543/[db]?pgbouncer=true&connection_limit=3&pool_timeout=30"
+DIRECT_URL="postgresql://[user]:[password]@[host]:5432/[db]"
+
+# Supabase (if using Supabase)
+SUPABASE_URL="https://[project-ref].supabase.co"
+SUPABASE_ANON_KEY="[your-anon-key]"
+SUPABASE_SERVICE_ROLE_KEY="[your-service-role-key]"
+NEXT_PUBLIC_SUPABASE_URL="https://[project-ref].supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="[your-anon-key]"
+
+# Feature Flags
+NEXT_PUBLIC_USE_DB="true"
+```
+
+### Vercel Configuration
+1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
+2. Add all required environment variables
+3. Redeploy the application
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. PrismaClientInitializationError
+**Error**: `Error validating datasource db: the URL must start with the protocol prisma:// or prisma+postgres://`
+
+**Solution**:
+- Ensure `DATABASE_URL` uses `postgresql://` protocol (not `postgres://`)
+- Remove any Prisma Accelerate configuration from `vercel.json`
+- Verify environment variables are correctly set in Vercel
+
+#### 2. Connection Timeouts
+**Error**: Database connection timeouts or pool errors
+
+**Solution**:
+- Verify `DATABASE_URL` includes `pgbouncer=true&connection_limit=3&pool_timeout=30`
+- Check Supabase connection limits
+- Ensure `DIRECT_URL` is set for migrations
+
+#### 3. RLS Errors
+**Error**: Row Level Security warnings in Supabase
+
+**Solution**:
+- Run the RLS setup SQL script in Supabase SQL Editor
+- Ensure all tables have RLS enabled with appropriate policies
+
+#### 4. Migration Issues
+**Error**: localStorage migration fails
+
+**Solution**:
+- Check browser console for specific error messages
+- Verify all API endpoints are working
+- Try manual migration via browser console
+- Clear localStorage and start fresh if needed
+
+### Testing Database Connection
+
+#### 1. Test Migration Endpoint
 ```bash
 curl -X POST https://your-app.vercel.app/api/migrate
 ```
 
-**Note:** Migrations use `DIRECT_URL` (direct connection on port 5432) to avoid pooler validation issues; runtime uses `DATABASE_URL` (pooled on port 6543).
+#### 2. Test API Endpoints
+```bash
+# Test projections
+curl https://your-app.vercel.app/api/projections
 
-## Step 5: Verify Setup
+# Test statuses
+curl https://your-app.vercel.app/api/statuses
 
-1. Check that your app is running without errors
-2. Verify that data is being saved to the database instead of localStorage
-3. Test that multiple users can see the same data
+# Test comments
+curl https://your-app.vercel.app/api/comments
+```
 
-## Troubleshooting
+#### 3. Check Database Tables
+In Supabase SQL Editor:
+```sql
+SELECT * FROM "Projection" LIMIT 5;
+SELECT * FROM "Status" LIMIT 5;
+SELECT * FROM "Comment" LIMIT 5;
+```
 
-### If PrismaClientInitializationError occurs on URL protocol:
-1. **Ensure DATABASE_URL and DIRECT_URL start with "postgresql://"** (change from Supabase's default "postgres://" if needed)
-2. **Verify no quotes or typos** in Vercel env vars
-3. **Test by logging URL prefixes** in `/api/migrate`
-4. **Check that both URLs use the correct protocol** - Prisma is picky about the full 'postgresql://' protocol
+## Performance Optimization
 
-### For Vercel runtime issues like 500 errors:
-1. **Ensure PrismaClient is a singleton** to avoid connection exhaustion
-2. **Check Vercel Runtime Logs** for detailed errors post-deploy
-3. **If max connections reached**, adjust `connection_limit=3` in `DATABASE_URL`
-4. **Verify the optimized DATABASE_URL** includes `&connection_limit=3&pool_timeout=30`
+### Connection Pooling
+- **Runtime**: Use pooled connections (`DATABASE_URL` on port 6543)
+- **Migrations**: Use direct connections (`DIRECT_URL` on port 5432)
+- **Limits**: Set `connection_limit=3` for Vercel serverless functions
 
-### If you see P6001 errors:
-1. **Confirm no Accelerate environment variables remain** in your Vercel project
-2. **Check that `vercel.json` does NOT have** `PRISMA_GENERATE_DATAPROXY: "true"`
-3. **Redeploy your application** after removing any Accelerate configurations
-4. **Verify both `DATABASE_URL` and `DIRECT_URL` are set** in Vercel environment variables
+### SWR Configuration
+The application uses SWR with optimized settings:
+```javascript
+const swrConfig = {
+  revalidateOnFocus: true,
+  revalidateOnReconnect: true,
+  refreshInterval: 0, // Disable auto-refresh, rely on focus/reconnect
+};
+```
 
-### If you see connection timeouts or pool errors:
-1. **Verify `DATABASE_URL` uses port 6543** (pooled connection)
-2. **Check that `&pgbouncer=true&connection_limit=3&pool_timeout=30`** parameters are included
-3. **Ensure `DIRECT_URL` uses port 5432** (direct connection)
-4. **Run migrations via `/api/migrate`** after deployment
+### Caching Strategy
+- **Client-side**: SWR provides intelligent caching
+- **Server-side**: Prisma connection pooling
+- **Real-time**: Focus and reconnect triggers data refresh
 
-### If migration doesn't work:
-1. Check the browser console for migration errors
-2. Verify that localStorage has data to migrate
-3. Check the `/api/migrate` endpoint in the Network tab
-4. Look at Vercel function logs for detailed error messages
-5. **Confirm `DIRECT_URL` is properly configured** for migrations
+## Security Considerations
 
-### If data isn't syncing between users:
-1. Verify that the API endpoints are working
-2. Check that SWR is fetching data correctly
-3. Ensure the database is accessible from your deployment
+### Row Level Security (RLS)
+- All tables have RLS enabled
+- Permissive policies for development
+- Customize policies for production
 
-### Environment Variable Checklist:
-- ✅ `DATABASE_URL` (pooled, port 6543, with `&pgbouncer=true&connection_limit=3&pool_timeout=30`)
-- ✅ `DIRECT_URL` (direct, port 5432, no pooling parameters)
-- ✅ `NEXT_PUBLIC_SUPABASE_URL`
-- ✅ `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- ✅ `SUPABASE_SERVICE_ROLE_KEY`
-- ❌ No `PRISMA_GENERATE_DATAPROXY` in `vercel.json`
-- ✅ Both URLs use `postgresql://` protocol (not `postgres://`)
+### Environment Variables
+- Never commit sensitive data to version control
+- Use Vercel environment variables for production
+- Rotate database credentials regularly
 
-## Database Schema
+### API Security
+- All endpoints require proper authentication
+- Input validation on all API calls
+- Error messages don't expose sensitive information
 
-The following tables are created:
+## Monitoring and Maintenance
 
-- `Projection` - Monthly projection values
-- `Status` - Monthly status values  
-- `Comment` - Monthly comment values
-- `SignedFee` - Project signed fees
-- `AsrFee` - Project ASR fees
-- `ClosedProject` - Closed project IDs
-- `ProjectAssignment` - Project manager assignments
-- `ProjectManager` - Project manager definitions
+### Database Monitoring
+- Monitor connection pool usage
+- Track query performance
+- Set up alerts for connection failures
 
-## API Endpoints
+### Application Monitoring
+- Monitor API response times
+- Track migration success rates
+- Monitor SWR cache hit rates
 
-- `GET/POST /api/projections` - Monthly projections
-- `GET/POST /api/statuses` - Monthly statuses
-- `GET/POST /api/comments` - Monthly comments
-- `GET/POST /api/signed-fees` - Signed fees
-- `GET/POST /api/asr-fees` - ASR fees
-- `GET/POST/DELETE /api/closed-projects` - Closed projects
-- `GET/POST/DELETE /api/project-assignments` - Project assignments
-- `GET/POST /api/project-managers` - Project managers
-- `POST /api/migrate` - Trigger database schema creation 
+### Regular Maintenance
+- Update Prisma client regularly
+- Monitor Supabase usage limits
+- Review and update RLS policies
+
+## Support
+
+For database-related issues:
+1. Check the troubleshooting section above
+2. Verify environment variables are correctly set
+3. Test database connectivity directly
+4. Review Supabase/Vercel logs for detailed error information
+5. Contact system administrator for database access issues 

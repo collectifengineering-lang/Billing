@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
+import { useMigration } from '../lib/migrationContext';
 import { Project, Invoice, BillingData } from '../lib/types';
 import { processBillingData, initializeProjectionsTable } from '../lib/utils';
 import { fetchProjects, fetchInvoices, zohoService } from '../lib/zoho';
@@ -13,6 +14,7 @@ import HighPerformanceTable from '../components/HighPerformanceTable';
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
+  const { isMigrating, isMigrated, hasLocalData, migrateData } = useMigration();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -22,6 +24,9 @@ export default function Dashboard() {
   const [projections, setProjections] = useState<any>({});
   const [autoRefreshStatus, setAutoRefreshStatus] = useState<any>(null);
   const [closedProjects, setClosedProjects] = useState<Set<string>>(new Set());
+
+  // Force useDB to true - always use database now
+  const useDB = true;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -33,6 +38,14 @@ export default function Dashboard() {
       return;
     }
   }, [user, loading, router]);
+
+  // Handle migration on mount
+  useEffect(() => {
+    if (hasLocalData && !isMigrated && !isMigrating) {
+      console.log('Dashboard: Found localStorage data, starting migration');
+      migrateData();
+    }
+  }, [hasLocalData, isMigrated, isMigrating, migrateData]);
 
   useEffect(() => {
     console.log('Dashboard: useEffect triggered - user:', !!user, 'isBasic:', user?.isBasic, 'loading:', loading);
@@ -113,6 +126,19 @@ export default function Dashboard() {
     setProjections(projectionsData);
   };
 
+  // Show migration loader
+  if (isMigrating) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Migrating data to database...</p>
+          <p className="mt-2 text-sm text-gray-500">This may take a few moments</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -160,6 +186,7 @@ export default function Dashboard() {
             onUpdateProjections={updateProjections}
             closedProjects={closedProjects}
             onClosedProjectsChange={setClosedProjects}
+            useDB={useDB}
           />
         </div>
       </div>

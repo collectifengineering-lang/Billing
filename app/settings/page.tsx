@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, X, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
-import { safeLocalStorageGet, safeLocalStorageSet, isLocalStorageAvailable } from '../../lib/utils';
+import useSWR, { mutate } from 'swr';
 
 interface ProjectManager {
   id: string;
@@ -17,11 +17,14 @@ interface ProjectManager {
 function SettingsPageContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [projectManagers, setProjectManagers] = useState<ProjectManager[]>([]);
   const [newManagerName, setNewManagerName] = useState('');
   const [newManagerColor, setNewManagerColor] = useState('#3b82f6');
   const isInitialLoad = useRef(true);
   const hasLoaded = useRef(false);
+
+  // SWR data fetching
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
+  const { data: projectManagersData, mutate: mutateProjectManagers } = useSWR('/api/project-managers', fetcher);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -39,154 +42,6 @@ function SettingsPageContent() {
     }
   }, [user, loading, router]);
 
-  // Load project managers from localStorage on mount
-  useEffect(() => {
-    if (hasLoaded.current) return;
-    
-    console.log('Settings: Component mounted, loading project managers');
-
-    const loadProjectManagers = () => {
-      try {
-        const savedManagers = safeLocalStorageGet('projectManagers');
-        console.log('Settings: Loading project managers from localStorage:', savedManagers);
-        if (savedManagers && Array.isArray(savedManagers)) {
-          console.log('Settings: Parsed project managers:', savedManagers);
-          setProjectManagers(savedManagers);
-        } else if (savedManagers === null) {
-          console.log('Settings: No saved project managers found in localStorage');
-          setProjectManagers([]);
-        } else {
-          console.log('Settings: Invalid project managers data format, resetting to empty array');
-          setProjectManagers([]);
-        }
-      } catch (error) {
-        console.error('Settings: Error loading project managers from localStorage:', error);
-        setProjectManagers([]);
-      }
-    };
-
-    loadProjectManagers();
-    hasLoaded.current = true;
-    isInitialLoad.current = false;
-
-    // Also listen for focus events to reload data when returning to the page
-    const handleFocus = () => {
-      console.log('Settings: Window focused, reloading project managers');
-      loadProjectManagers();
-    };
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('Settings: Page became visible, reloading project managers');
-        loadProjectManagers();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  // Handle storage events for cross-tab synchronization
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      console.log('Settings: Storage change event:', event.key, event.newValue);
-      if (event.key === 'projectManagers' && event.newValue) {
-        console.log('Settings: Processing project managers storage change:', event.newValue);
-        try {
-          const parsedManagers = JSON.parse(event.newValue);
-          if (Array.isArray(parsedManagers)) {
-            setProjectManagers(parsedManagers);
-            console.log('Settings: Updated project managers from storage event:', parsedManagers);
-          }
-        } catch (error) {
-          console.error('Settings: Error parsing project managers from storage event:', error);
-        }
-      }
-    };
-
-    const handleProjectManagersUpdate = () => {
-      console.log('Settings: Handling project managers update event');
-      try {
-        const savedManagers = safeLocalStorageGet('projectManagers');
-        if (savedManagers && Array.isArray(savedManagers)) {
-          setProjectManagers(savedManagers);
-          console.log('Settings: Updated project managers from custom event:', savedManagers);
-        }
-      } catch (error) {
-        console.error('Settings: Error handling project managers update event:', error);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('projectManagersUpdated', handleProjectManagersUpdate);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('projectManagersUpdated', handleProjectManagersUpdate);
-    };
-  }, []);
-
-  // Save function that can be called explicitly
-  const saveProjectManagers = (managers: ProjectManager[]) => {
-    try {
-      console.log('Settings: Saving project managers to localStorage:', managers);
-      const success = safeLocalStorageSet('projectManagers', managers);
-      if (success) {
-        // Dispatch custom event to notify other components
-        window.dispatchEvent(new Event('projectManagersUpdated'));
-        console.log('Settings: Project managers saved successfully');
-      } else {
-        console.error('Settings: Failed to save project managers to localStorage');
-        toast.error('Failed to save project managers');
-      }
-    } catch (error) {
-      console.error('Settings: Error saving project managers to localStorage:', error);
-      toast.error('Failed to save project managers');
-    }
-  };
-
-  const addProjectManager = () => {
-    if (!newManagerName.trim()) {
-      toast.error('Please enter a project manager name');
-      return;
-    }
-
-    const newManager: ProjectManager = {
-      id: Date.now().toString(),
-      name: newManagerName.trim(),
-      color: newManagerColor,
-    };
-
-    console.log('Settings: Adding project manager:', newManager);
-    const updatedManagers = [...projectManagers, newManager];
-    console.log('Settings: Updated project managers array:', updatedManagers);
-    setProjectManagers(updatedManagers);
-    saveProjectManagers(updatedManagers);
-    setNewManagerName('');
-    setNewManagerColor('#3b82f6');
-    toast.success('Project manager added successfully');
-  };
-
-  const removeProjectManager = (id: string) => {
-    const updatedManagers = projectManagers.filter(manager => manager.id !== id);
-    setProjectManagers(updatedManagers);
-    saveProjectManagers(updatedManagers);
-    toast.success('Project manager removed');
-  };
-
-  const updateProjectManager = (id: string, field: 'name' | 'color', value: string) => {
-    const updatedManagers = projectManagers.map(manager => 
-      manager.id === id ? { ...manager, [field]: value } : manager
-    );
-    setProjectManagers(updatedManagers);
-    saveProjectManagers(updatedManagers);
-  };
-
   // Show loading while checking authentication
   if (loading) {
     return (
@@ -203,6 +58,68 @@ function SettingsPageContent() {
   if (!user || !user.isAdmin) {
     return null;
   }
+
+  const projectManagers = projectManagersData || [];
+
+  const addProjectManager = async () => {
+    if (!newManagerName.trim()) {
+      toast.error('Please enter a project manager name');
+      return;
+    }
+
+    const newManager: ProjectManager = {
+      id: Date.now().toString(),
+      name: newManagerName.trim(),
+      color: newManagerColor,
+    };
+
+    try {
+      await fetch('/api/project-managers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newManager),
+      });
+      
+      mutateProjectManagers();
+      setNewManagerName('');
+      setNewManagerColor('#3b82f6');
+      toast.success('Project manager added successfully');
+    } catch (error) {
+      console.error('Error adding project manager:', error);
+      toast.error('Failed to add project manager');
+    }
+  };
+
+  const removeProjectManager = async (id: string) => {
+    try {
+      await fetch('/api/project-managers', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      
+      mutateProjectManagers();
+      toast.success('Project manager removed');
+    } catch (error) {
+      console.error('Error removing project manager:', error);
+      toast.error('Failed to remove project manager');
+    }
+  };
+
+  const updateProjectManager = async (id: string, field: 'name' | 'color', value: string) => {
+    try {
+      await fetch('/api/project-managers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, [field]: value }),
+      });
+      
+      mutateProjectManagers();
+    } catch (error) {
+      console.error('Error updating project manager:', error);
+      toast.error('Failed to update project manager');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
