@@ -197,7 +197,7 @@ class ZohoService {
             rate_per_hour: project.rate_per_hour || 0,
             customer_id: project.customer_id || '',
             customer_name: project.customer_name || '',
-            signed_fee: project.revenue_budget || project.budget_amount || 0, // Use revenue_budget as signed fee, fallback to budget_amount
+            signed_fee: undefined, // Remove Zoho signed fee, only use user-entered data
           };
         }) || [];
         

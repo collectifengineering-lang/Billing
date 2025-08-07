@@ -15,7 +15,7 @@ export const mockProjects: ZohoProject[] = [
     rate_per_hour: 150,
     customer_id: '1',
     customer_name: 'ABC Corporation',
-    signed_fee: 50000, // Maps to revenue_budget in Zoho
+    signed_fee: undefined, // Remove Zoho signed fee, only use user-entered data
   },
   {
     project_id: '2',
@@ -28,7 +28,7 @@ export const mockProjects: ZohoProject[] = [
     rate_per_hour: 175,
     customer_id: '2',
     customer_name: 'XYZ Industries',
-    signed_fee: 75000, // Maps to revenue_budget in Zoho
+    signed_fee: undefined, // Remove Zoho signed fee, only use user-entered data
   },
   {
     project_id: '3',
@@ -41,7 +41,7 @@ export const mockProjects: ZohoProject[] = [
     rate_per_hour: 200,
     customer_id: '3',
     customer_name: 'DEF Retail',
-    signed_fee: 100000, // Maps to revenue_budget in Zoho
+    signed_fee: undefined, // Remove Zoho signed fee, only use user-entered data
   },
   {
     project_id: '4',
@@ -54,7 +54,7 @@ export const mockProjects: ZohoProject[] = [
     rate_per_hour: 125,
     customer_id: '4',
     customer_name: 'GHI Services',
-    signed_fee: 30000, // Maps to revenue_budget in Zoho
+    signed_fee: undefined, // Remove Zoho signed fee, only use user-entered data
   },
 ];
 

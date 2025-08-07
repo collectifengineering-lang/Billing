@@ -503,25 +503,13 @@ export default function HighPerformanceTable({
   }, [asrFeesData, asrFees, projections]);
 
   const getTotalFee = useCallback((project: BillingData) => {
-    // Prioritize user-entered data over API data
+    // Only use user-entered data or API data, ignore Zoho signedFee
     const userSignedFee = signedFees[project.projectId];
     const apiSignedFee = signedFeesData?.[project.projectId];
-    const zohoSignedFee = project.signedFee;
     
-    // Use user-entered data first, then API data, then Zoho data
+    // Use user-entered data first, then API data, never Zoho data
     const finalSignedFee = userSignedFee !== undefined ? userSignedFee : 
-                          (apiSignedFee !== undefined ? apiSignedFee : 
-                          (zohoSignedFee || 0));
-    
-    console.log('HighPerformanceTable getTotalFee debug:', {
-      projectId: project.projectId,
-      userSignedFee,
-      apiSignedFee,
-      zohoSignedFee,
-      finalSignedFee,
-      signedFeesData: signedFeesData,
-      signedFees: signedFees
-    });
+                          (apiSignedFee !== undefined ? apiSignedFee : 0);
     
     const asrFee = getAsrFee(project.projectId);
     return finalSignedFee + asrFee;
@@ -1096,25 +1084,13 @@ export default function HighPerformanceTable({
                           />
                         ) : (
                           (() => {
-                            // Prioritize user-entered data over API data
+                            // Only use user-entered data or API data, ignore Zoho signedFee
                             const userSignedFee = signedFees[project.projectId];
                             const apiSignedFee = signedFeesData?.[project.projectId];
-                            const zohoSignedFee = project.signedFee;
                             
-                            // Use user-entered data first, then API data, then Zoho data
+                            // Use user-entered data first, then API data, never Zoho data
                             const displayValue = userSignedFee !== undefined ? userSignedFee : 
-                                              (apiSignedFee !== undefined ? apiSignedFee : 
-                                              (zohoSignedFee || 0));
-                            
-                            console.log('HighPerformanceTable signed fee display debug:', {
-                              projectId: project.projectId,
-                              userSignedFee,
-                              apiSignedFee,
-                              zohoSignedFee,
-                              displayValue,
-                              signedFeesData: signedFeesData,
-                              signedFees: signedFees
-                            });
+                                              (apiSignedFee !== undefined ? apiSignedFee : 0);
                             
                             return (
                               <div 
@@ -1184,7 +1160,13 @@ export default function HighPerformanceTable({
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
               <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900">
-                {formatCurrency(safeBillingData.reduce((sum, project) => sum + (signedFees[project.projectId] || project.signedFee || 0), 0))}
+                {formatCurrency(safeBillingData.reduce((sum, project) => {
+                  const userSignedFee = signedFees[project.projectId];
+                  const apiSignedFee = signedFeesData?.[project.projectId];
+                  const finalSignedFee = userSignedFee !== undefined ? userSignedFee : 
+                                        (apiSignedFee !== undefined ? apiSignedFee : 0);
+                  return sum + finalSignedFee;
+                }, 0))}
               </div>
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">

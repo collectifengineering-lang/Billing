@@ -81,7 +81,7 @@ export function processBillingData(
       projectId: project.project_id,
       projectName: project.project_name, // Changed from project.name
       customerName: project.customer_name,
-      signedFee: project.signed_fee,
+      signedFee: undefined, // Remove Zoho signed fee, only use user-entered data
       monthlyData,
       totalBilled,
       totalUnbilled,

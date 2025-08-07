@@ -451,8 +451,7 @@ export default function ProjectionsTable({
 
   const getTotalFee = (project: BillingData) => {
     const userSignedFee = signedFees[project.projectId];
-    const zohoSignedFee = project.signedFee;
-    const finalSignedFee = userSignedFee || zohoSignedFee || 0;
+    const finalSignedFee = userSignedFee || 0;
     
     const asrFee = getAsrFee(project.projectId);
     return finalSignedFee + asrFee;
@@ -617,7 +616,7 @@ export default function ProjectionsTable({
                       </td>
                       <td 
                         className={`w-32 px-4 py-2 border-b border-gray-200 text-sm text-right border-r border-gray-200 cursor-pointer hover:bg-yellow-50 h-18 ${getCellBackgroundClass(project.projectId)}`}
-                        onClick={() => handleSignedFeeClick(project.projectId, signedFees[project.projectId] || project.signedFee || 0)}
+                        onClick={() => handleSignedFeeClick(project.projectId, signedFees[project.projectId] || 0)}
                       >
                         {editingSignedFee === project.projectId ? (
                           <input
@@ -632,8 +631,7 @@ export default function ProjectionsTable({
                         ) : (
                           (() => {
                             const userSignedFee = signedFees[project.projectId];
-                            const zohoSignedFee = project.signedFee;
-                            const displayValue = userSignedFee || zohoSignedFee || 0;
+                            const displayValue = userSignedFee || 0;
                             
                             return formatCurrency(displayValue);
                           })()
