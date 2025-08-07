@@ -10,9 +10,14 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && next build",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio",
+    "prisma:setup": "prisma generate && prisma db push",
     "db:push": "prisma db push",
     "db:setup": "prisma generate && prisma db push",
-    "db:migrate": "curl -X POST https://your-app.vercel.app/api/migrate"
+    "db:migrate": "curl -X POST https://billing-collectif-engineering.vercel.app/api/migrate",
+    "db:migrate:local": "curl -X POST http://localhost:3000/api/migrate"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.19.0",
