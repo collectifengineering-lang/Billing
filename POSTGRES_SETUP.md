@@ -305,3 +305,36 @@ After deployment, test your database connection:
 - Visit `/api/test-db` to verify the connection works
 - Check Vercel function logs for any connection errors
 - Monitor Supabase dashboard for connection usage 
+
+## Troubleshooting Connection Strings
+
+If you get "invalid domain character in database URL" error:
+
+1. **URL-encode special characters in password**:
+   - `@` → `%40`
+   - `$` → `%24`
+   - `/` → `%2F`
+   - `:` → `%3A`
+   - `%` → `%25`
+   - `#` → `%23`
+   - `&` → `%26`
+   - `+` → `%2B`
+   - `=` → `%3D`
+   - `?` → `%3F`
+
+2. **Example**: If password is `p@ss$word`, change to:
+   ```
+   postgresql://postgres.[user]:p%40ss%24word@db.[ref].supabase.co:6543/postgres?pgbouncer=true&connection_limit=1&pool_timeout=30&prepared_statements=false
+   ```
+
+3. **Check for typos/spaces** in Vercel environment variables
+4. **Test connection locally** with `prisma db push` using `.env`
+5. **Copy raw values** from Supabase dashboard > Database Settings > Connection Strings (URI format)
+
+### Migration Issues
+
+If migrations fail:
+
+1. **Run locally first**: `npx prisma db push` with DIRECT_URL
+2. **Check environment**: Ensure DIRECT_URL is set correctly
+3. **Test connection**: Use the `/api/test-db` endpoint after deployment 

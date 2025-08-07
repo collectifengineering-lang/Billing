@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 // GET: Fetch all projections
 export async function GET() {
   try {
+    console.log('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
     console.log('Fetching projections from database...');
     const projections = await prisma.projection.findMany();
     console.log('Fetched', projections.length, 'projections from database');
@@ -19,16 +20,20 @@ export async function GET() {
     }, {} as Record<string, Record<string, number>>);
     
     return NextResponse.json(formatted);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching projections:', error);
+    console.error('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
     
     // If it's a table doesn't exist error, return empty data
-    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    if (error instanceof Error && (error.message?.includes('does not exist') || 'code' in error && (error as any).code === 'P2021')) {
       console.log('Tables do not exist, returning empty projections');
       return NextResponse.json({});
     }
     
-    return NextResponse.json({ error: 'Failed to fetch projections' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to fetch projections',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
@@ -39,6 +44,7 @@ export async function POST(request: Request) {
   const { projectId, month, value } = requestData;
   
   try {
+    console.log('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
     console.log('Updating projection for project:', projectId, 'month:', month);
     
     await prisma.projection.upsert({
@@ -49,11 +55,12 @@ export async function POST(request: Request) {
     
     console.log('Projection updated successfully');
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating projection:', error);
+    console.error('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
     
     // If it's a table doesn't exist error, try to create the schema
-    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    if (error instanceof Error && (error.message?.includes('does not exist') || 'code' in error && (error as any).code === 'P2021')) {
       console.log('Table does not exist, attempting to create schema...');
       
       try {
@@ -82,14 +89,18 @@ export async function POST(request: Request) {
         });
         
         return NextResponse.json({ success: true });
-      } catch (createError: any) {
+      } catch (createError: unknown) {
         console.error('Failed to create table:', createError);
         return NextResponse.json({ 
-          error: 'Database schema not ready. Please run database setup first.' 
+          error: 'Database schema not ready. Please run database setup first.',
+          details: createError instanceof Error ? createError.message : 'Unknown error'
         }, { status: 500 });
       }
     }
     
-    return NextResponse.json({ error: 'Failed to update projection' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to update projection',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 } 

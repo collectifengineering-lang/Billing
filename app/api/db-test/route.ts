@@ -22,6 +22,7 @@ export async function GET() {
   }
 
   try {
+    console.log('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
     console.log('Testing database connection...');
     
     // Check if we can connect to the database
@@ -37,6 +38,7 @@ export async function GET() {
     
   } catch (error: unknown) {
     console.error('Database connection failed:', error);
+    console.error('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
     
     return NextResponse.json({ 
       error: 'Database connection failed', 
