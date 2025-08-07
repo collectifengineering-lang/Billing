@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../lib/db';
 
 export async function POST() {
   try {
     console.log('Attempting to create tables...');
-    
-    // Create a new Prisma client instance
-    const prisma = new PrismaClient();
     
     try {
       // Try to create a test record in the Status table
@@ -32,8 +29,6 @@ export async function POST() {
       
       console.log('Test record cleaned up successfully');
       
-      await prisma.$disconnect();
-      
       return NextResponse.json({ 
         success: true, 
         message: 'Tables created successfully',
@@ -42,8 +37,6 @@ export async function POST() {
       
     } catch (tableError: any) {
       console.error('Table creation failed:', tableError);
-      
-      await prisma.$disconnect();
       
       return NextResponse.json({ 
         error: 'Table creation failed', 

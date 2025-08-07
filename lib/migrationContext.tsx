@@ -181,7 +181,30 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
 
       // Execute all migrations
       if (migrationPromises.length > 0) {
-        await Promise.all(migrationPromises);
+        const results = await Promise.allSettled(migrationPromises);
+        
+        // Check for failed migrations
+        const failedMigrations = results.filter(result => result.status === 'rejected');
+        if (failedMigrations.length > 0) {
+          console.error('Some migrations failed:', failedMigrations);
+          
+          // Check if it's a connection issue
+          const hasConnectionError = failedMigrations.some(result => 
+            result.status === 'rejected' && 
+            (result.reason?.message?.includes('Failed to fetch') || 
+             result.reason?.message?.includes('connection') ||
+             result.reason?.message?.includes('timeout'))
+          );
+          
+          if (hasConnectionError) {
+            toast.error('Migration failed: Check database connections');
+          } else {
+            toast.error('Migration failed: Some data could not be migrated');
+          }
+          
+          throw new Error('Migration failed');
+        }
+        
         console.log('Migration completed successfully');
         toast.success('Data migrated to database successfully');
       }

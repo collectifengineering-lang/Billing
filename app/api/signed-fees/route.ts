@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/db';
+import { prisma } from '../../../lib/db';
 
 // GET: Fetch all signed fees
 export async function GET() {

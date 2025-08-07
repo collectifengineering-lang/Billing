@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/db';
+import { prisma } from '../../../lib/db';
 
 export async function POST() {
   try {
-    console.log('Starting database migration...');
+    console.log('Attempting migration...');
     
     // Enhanced debugging: Log DATABASE_URL and DIRECT_URL prefixes for debugging (redacted)
     const dbUrl = process.env.DATABASE_URL;
@@ -147,16 +147,7 @@ export async function POST() {
       }
     }
   } catch (error: any) {
-    console.error('Database migration failed:', error);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
-    console.error('Full error details:', error);
-    
-    return NextResponse.json({ 
-      error: 'Database migration failed', 
-      details: error.message,
-      code: error.code,
-      suggestion: 'Verify both DATABASE_URL and DIRECT_URL are configured correctly'
-    }, { status: 500 });
+    console.error('Migration error:', error);
+    return NextResponse.json({ error: 'Failed to migrate: ' + (error as Error).message }, { status: 500 });
   }
 } 

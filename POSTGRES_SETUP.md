@@ -17,7 +17,7 @@ Add these to your `.env.local` and Vercel environment variables:
 
 ```bash
 # Supabase Configuration
-DATABASE_URL="postgresql://[user]:[password]@db.[project-ref].supabase.co:6543/postgres?pgbouncer=true&connection_limit=3&pool_timeout=30"
+DATABASE_URL="postgresql://[user]:[password]@db.[project-ref].supabase.co:6543/postgres?pgbouncer=true&connection_limit=1&pool_timeout=30&prepared_statements=false"
 DIRECT_URL="postgresql://[user]:[password]@db.[project-ref].supabase.co:5432/postgres"
 SUPABASE_URL="https://[project-ref].supabase.co"
 SUPABASE_ANON_KEY="[your-anon-key]"
@@ -26,6 +26,8 @@ NEXT_PUBLIC_SUPABASE_URL="https://[project-ref].supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="[your-anon-key]"
 NEXT_PUBLIC_USE_DB="true"
 ```
+
+**Important**: For max connections errors on Supabase free tier, set DATABASE_URL params: `?pgbouncer=true&connection_limit=1&pool_timeout=30&prepared_statements=false`. Use transaction mode (port 6543) for runtime to leverage pooling. Direct connections (port 5432) are limited to ~2 concurrent on free tier, so reserve for migrations.
 
 #### 3. Database Schema
 Run the provided SQL script in Supabase SQL Editor:
@@ -152,9 +154,10 @@ NEXT_PUBLIC_USE_DB="true"
 **Error**: Database connection timeouts or pool errors
 
 **Solution**:
-- Verify `DATABASE_URL` includes `pgbouncer=true&connection_limit=3&pool_timeout=30`
+- Verify `DATABASE_URL` includes `pgbouncer=true&connection_limit=1&pool_timeout=30&prepared_statements=false`
 - Check Supabase connection limits
 - Ensure `DIRECT_URL` is set for migrations
+- For Supabase free tier max connections: Use `connection_limit=1` per function to avoid pile-up
 
 #### 3. RLS Errors
 **Error**: Row Level Security warnings in Supabase
@@ -163,7 +166,17 @@ NEXT_PUBLIC_USE_DB="true"
 - Run the RLS setup SQL script in Supabase SQL Editor
 - Ensure all tables have RLS enabled with appropriate policies
 
-#### 4. Migration Issues
+#### 4. Max Connections Errors (Supabase Free Tier)
+**Error**: `FATAL: remaining connection slots are reserved for non-replication superuser connections`
+
+**Solution**:
+- Update DATABASE_URL to use `connection_limit=1` (one connection per Vercel function)
+- Add `prepared_statements=false` to prevent Prisma pooling errors
+- Use transaction mode (port 6543) for runtime operations
+- Reserve direct connections (port 5432) for migrations only
+- If migrations fail, run `prisma db push` locally with DIRECT_URL in .env, then test app
+
+#### 5. Migration Issues
 **Error**: localStorage migration fails
 
 **Solution**:

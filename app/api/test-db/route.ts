@@ -1,19 +1,14 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../../lib/db';
 
 export async function GET() {
   try {
     console.log('Testing basic database connection...');
     
-    // Create a new Prisma client instance
-    const prisma = new PrismaClient();
-    
-    // Try a simple query
+    // Try a simple query using the singleton
     const result = await prisma.$queryRaw`SELECT 1 as test`;
     
     console.log('Database connection successful:', result);
-    
-    await prisma.$disconnect();
     
     return NextResponse.json({ 
       success: true, 
