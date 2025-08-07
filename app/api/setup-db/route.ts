@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../lib/database';
+import { prisma } from '../../../lib/db';
+
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
 
 export async function POST() {
   try {

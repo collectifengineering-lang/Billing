@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../lib/db';
 
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
+
 // GET: Fetch all projections
 export async function GET() {
   try {

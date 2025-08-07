@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
+
 // GET: Fetch all project managers
 export async function GET() {
   try {

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { zohoService } from '../../../lib/zoho';
 
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     console.log('API: Fetching invoices from Zoho');

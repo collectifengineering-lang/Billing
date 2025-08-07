@@ -1,7 +1,26 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../lib/database';
 
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
+  // Only attempt database connection in production runtime
+  if (process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV) {
+    return NextResponse.json({ 
+      success: false, 
+      message: 'Database connection skipped during build'
+    });
+  }
+
+  // Check if prisma client is available
+  if (!prisma) {
+    return NextResponse.json({ 
+      success: false, 
+      message: 'Prisma client not available'
+    }, { status: 500 });
+  }
+
   try {
     console.log('Testing database connection...');
     

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createDatabaseSchema } from '../../../lib/database';
 
+// Force dynamic rendering to prevent static generation
+export const dynamic = 'force-dynamic';
+
 export async function POST() {
   try {
     console.log('Setting up database schema...');

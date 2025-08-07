@@ -276,3 +276,32 @@ For database-related issues:
 3. Test database connectivity directly
 4. Review Supabase/Vercel logs for detailed error information
 5. Contact system administrator for database access issues 
+
+## Vercel Build Error Fix
+
+### All API routes now have `export const dynamic = 'force-dynamic'`
+This prevents static generation and ensures routes only run at runtime, avoiding build-time database connection attempts.
+
+### Prisma client is configured to skip database connections during build time
+This ensures that the Prisma client does not attempt to connect to the database during the Next.js build process.
+
+### Environment variables should be properly set in Vercel dashboard
+This includes `DATABASE_URL`, `DIRECT_URL`, and any other relevant environment variables.
+
+**Note:** The build error occurs because Next.js tries to statically generate API routes during build, which attempts database connections. The `dynamic = 'force-dynamic'` export prevents this.
+
+## Dynamic API Route Configuration
+
+All API routes now include:
+```typescript
+export const dynamic = 'force-dynamic';
+```
+
+This prevents static generation and ensures routes only run at runtime, avoiding build-time database connection attempts.
+
+## Testing
+
+After deployment, test your database connection:
+- Visit `/api/test-db` to verify the connection works
+- Check Vercel function logs for any connection errors
+- Monitor Supabase dashboard for connection usage 
