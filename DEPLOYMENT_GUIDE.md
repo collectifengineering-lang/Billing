@@ -30,6 +30,7 @@ The deployment was failing due to:
 - Added automatic database schema creation in all API routes
 - Created `/api/setup-database` endpoint for manual database setup
 - Updated all API routes to ensure database schema exists before operations
+- **Updated for Prisma Accelerate**: Tables are created automatically on first data insertion
 
 ## Next Steps
 
@@ -63,10 +64,10 @@ In your Vercel project settings, add these environment variables:
 
 ### 5. Database Setup and Migration
 After deployment:
-1. The app will automatically create database tables via the `/api/setup-database` endpoint
+1. **With Prisma Accelerate**: Tables are created automatically when you first insert data
 2. Data migration from localStorage will happen automatically via the `/api/migrate` endpoint
 3. Check the browser console for migration status
-4. If tables don't exist, the app will create them automatically on first access
+4. The app will handle table creation automatically through Prisma Accelerate
 
 ### 6. Database Schema
 The app includes the following tables:

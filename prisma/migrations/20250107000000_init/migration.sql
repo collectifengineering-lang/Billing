@@ -1,14 +1,14 @@
 -- CreateTable
 CREATE TABLE "Projection" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "projectId" TEXT NOT NULL,
     "month" TEXT NOT NULL,
-    "value" REAL NOT NULL
+    "value" DOUBLE PRECISION NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "Status" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "projectId" TEXT NOT NULL,
     "month" TEXT NOT NULL,
     "status" TEXT NOT NULL
@@ -16,7 +16,7 @@ CREATE TABLE "Status" (
 
 -- CreateTable
 CREATE TABLE "Comment" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "projectId" TEXT NOT NULL,
     "month" TEXT NOT NULL,
     "comment" TEXT NOT NULL
@@ -24,27 +24,27 @@ CREATE TABLE "Comment" (
 
 -- CreateTable
 CREATE TABLE "SignedFee" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "projectId" TEXT NOT NULL,
-    "value" REAL NOT NULL
+    "value" DOUBLE PRECISION NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "AsrFee" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "projectId" TEXT NOT NULL,
-    "value" REAL NOT NULL
+    "value" DOUBLE PRECISION NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "ClosedProject" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "projectId" TEXT NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "ProjectAssignment" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL PRIMARY KEY,
     "projectId" TEXT NOT NULL,
     "managerId" TEXT NOT NULL
 );
