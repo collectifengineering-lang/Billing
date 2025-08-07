@@ -880,11 +880,11 @@ export default function HighPerformanceTable({
         const merged = { ...prev };
         Object.keys(asrFeesData).forEach(projectId => {
           // Only update if user hasn't entered a value for this project
-          if (merged[projectId] === undefined) {
+          // or if the SWR data is newer (has a different value)
+          if (merged[projectId] === undefined || merged[projectId] !== asrFeesData[projectId]) {
             merged[projectId] = asrFeesData[projectId];
           }
         });
-        console.log('Syncing ASR fees from SWR:', { prev, asrFeesData, merged });
         return merged;
       });
     }
