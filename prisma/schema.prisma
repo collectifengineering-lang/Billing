@@ -1,0 +1,64 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Projection {
+  id        Int     @id @default(autoincrement())
+  projectId String
+  month     String
+  value     Float
+  @@unique([projectId, month])
+}
+
+model Status {
+  id        Int     @id @default(autoincrement())
+  projectId String
+  month     String
+  status    String
+  @@unique([projectId, month])
+}
+
+model Comment {
+  id        Int     @id @default(autoincrement())
+  projectId String
+  month     String
+  comment   String
+  @@unique([projectId, month])
+}
+
+model SignedFee {
+  id        Int     @id @default(autoincrement())
+  projectId String @unique
+  value     Float
+}
+
+model AsrFee {
+  id        Int     @id @default(autoincrement())
+  projectId String @unique
+  value     Float
+}
+
+model ClosedProject {
+  id        Int     @id @default(autoincrement())
+  projectId String @unique
+}
+
+model ProjectAssignment {
+  id        Int     @id @default(autoincrement())
+  projectId String @unique
+  managerId String
+}
+
+model ProjectManager {
+  id        String  @id
+  name      String
+  color     String
+}

@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FixedSizeList as List } from 'react-window';
-import { formatCurrency, formatMonth, isCurrentMonth, isPastMonth, safeLocalStorageGet, safeLocalStorageSet, getProjectionsMonthRange } from '../lib/utils';
+import { formatCurrency, formatMonth, isCurrentMonth, isPastMonth, getProjectionsMonthRange } from '../lib/utils';
 import { BillingData } from '../lib/types';
 import { User, X, ChevronUp, ChevronDown, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import CSVImportExport from './CSVImportExport';
+import useSWR, { mutate } from 'swr';
 
 interface HighPerformanceTableProps {
   billingData: BillingData[];
@@ -83,7 +84,19 @@ export default function HighPerformanceTable({
   // Filter state
   const [filterText, setFilterText] = useState('');
   
-  // User-entered data persistence
+  // SWR data fetching
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
+  
+  const { data: signedFeesData, mutate: mutateSignedFees } = useSWR('/api/signed-fees', fetcher);
+  const { data: asrFeesData, mutate: mutateAsrFees } = useSWR('/api/asr-fees', fetcher);
+  const { data: monthlyProjectionsData, mutate: mutateMonthlyProjections } = useSWR('/api/projections', fetcher);
+  const { data: monthlyStatusesData, mutate: mutateMonthlyStatuses } = useSWR('/api/statuses', fetcher);
+  const { data: monthlyCommentsData, mutate: mutateMonthlyComments } = useSWR('/api/comments', fetcher);
+  const { data: closedProjectsData, mutate: mutateClosedProjects } = useSWR('/api/closed-projects', fetcher);
+  const { data: projectAssignmentsData, mutate: mutateProjectAssignments } = useSWR('/api/project-assignments', fetcher);
+  const { data: projectManagersData, mutate: mutateProjectManagers } = useSWR('/api/project-managers', fetcher);
+
+  // User-entered data persistence (fallback to localStorage during migration)
   const [signedFees, setSignedFees] = useState<Record<string, number>>({});
   const [asrFees, setAsrFees] = useState<Record<string, number>>({});
   const [monthlyProjections, setMonthlyProjections] = useState<Record<string, Record<string, number>>>({});
@@ -116,7 +129,7 @@ export default function HighPerformanceTable({
     return new Date().toISOString().slice(0, 7);
   }, []);
 
-  // Load data from localStorage
+  // Load data from localStorage and trigger migration if needed
   useEffect(() => {
     console.log('HighPerformanceTable: Component mounted, loading data from localStorage');
     
@@ -124,18 +137,18 @@ export default function HighPerformanceTable({
       try {
         console.log('HighPerformanceTable: Loading data from localStorage');
         
-        const savedClosedProjects = safeLocalStorageGet('closedProjects');
-        if (savedClosedProjects && Array.isArray(savedClosedProjects)) {
-          const newClosedProjects = new Set(savedClosedProjects);
+        const savedClosedProjects = localStorage.getItem('closedProjects');
+        if (savedClosedProjects && Array.isArray(JSON.parse(savedClosedProjects))) {
+          const newClosedProjects = new Set(JSON.parse(savedClosedProjects) as string[]);
           setClosedProjects(newClosedProjects);
           onClosedProjectsChange?.(newClosedProjects);
           console.log('HighPerformanceTable: Loaded closed projects:', savedClosedProjects);
         }
 
-        const savedProjectManagers = safeLocalStorageGet('projectManagers');
+        const savedProjectManagers = localStorage.getItem('projectManagers');
         console.log('HighPerformanceTable: Raw project managers from localStorage:', savedProjectManagers);
-        if (savedProjectManagers && Array.isArray(savedProjectManagers)) {
-          setProjectManagers(savedProjectManagers);
+        if (savedProjectManagers && Array.isArray(JSON.parse(savedProjectManagers))) {
+          setProjectManagers(JSON.parse(savedProjectManagers));
           console.log('HighPerformanceTable: Loaded project managers:', savedProjectManagers);
         } else if (savedProjectManagers === null) {
           console.log('HighPerformanceTable: No project managers found in localStorage');
@@ -145,35 +158,35 @@ export default function HighPerformanceTable({
           setProjectManagers([]);
         }
 
-        const savedProjectAssignments = safeLocalStorageGet('projectAssignments');
-        if (savedProjectAssignments && typeof savedProjectAssignments === 'object') {
-          setProjectAssignments(savedProjectAssignments);
+        const savedProjectAssignments = localStorage.getItem('projectAssignments');
+        if (savedProjectAssignments && typeof JSON.parse(savedProjectAssignments) === 'object') {
+          setProjectAssignments(JSON.parse(savedProjectAssignments));
           console.log('HighPerformanceTable: Loaded project assignments:', savedProjectAssignments);
         }
 
-        const savedSignedFees = safeLocalStorageGet('signedFees');
-        if (savedSignedFees && typeof savedSignedFees === 'object') {
-          setSignedFees(savedSignedFees);
+        const savedSignedFees = localStorage.getItem('signedFees');
+        if (savedSignedFees && typeof JSON.parse(savedSignedFees) === 'object') {
+          setSignedFees(JSON.parse(savedSignedFees));
         }
 
-        const savedAsrFees = safeLocalStorageGet('asrFees');
-        if (savedAsrFees && typeof savedAsrFees === 'object') {
-          setAsrFees(savedAsrFees);
+        const savedAsrFees = localStorage.getItem('asrFees');
+        if (savedAsrFees && typeof JSON.parse(savedAsrFees) === 'object') {
+          setAsrFees(JSON.parse(savedAsrFees));
         }
 
-        const savedMonthlyProjections = safeLocalStorageGet('monthlyProjections');
-        if (savedMonthlyProjections && typeof savedMonthlyProjections === 'object') {
-          setMonthlyProjections(savedMonthlyProjections);
+        const savedMonthlyProjections = localStorage.getItem('monthlyProjections');
+        if (savedMonthlyProjections && typeof JSON.parse(savedMonthlyProjections) === 'object') {
+          setMonthlyProjections(JSON.parse(savedMonthlyProjections));
         }
 
-        const savedMonthlyStatuses = safeLocalStorageGet('monthlyStatuses');
-        if (savedMonthlyStatuses && typeof savedMonthlyStatuses === 'object') {
-          setMonthlyStatuses(savedMonthlyStatuses);
+        const savedMonthlyStatuses = localStorage.getItem('monthlyStatuses');
+        if (savedMonthlyStatuses && typeof JSON.parse(savedMonthlyStatuses) === 'object') {
+          setMonthlyStatuses(JSON.parse(savedMonthlyStatuses));
         }
 
-        const savedMonthlyComments = safeLocalStorageGet('monthlyComments');
-        if (savedMonthlyComments && typeof savedMonthlyComments === 'object') {
-          setMonthlyComments(savedMonthlyComments);
+        const savedMonthlyComments = localStorage.getItem('monthlyComments');
+        if (savedMonthlyComments && typeof JSON.parse(savedMonthlyComments) === 'object') {
+          setMonthlyComments(JSON.parse(savedMonthlyComments));
         }
       } catch (error) {
         console.error('HighPerformanceTable: Error loading data from localStorage:', error);
@@ -184,6 +197,25 @@ export default function HighPerformanceTable({
 
     // Load data immediately
     loadData();
+
+    // Trigger migration if there's localStorage data
+    const triggerMigration = async () => {
+      const hasLocalData = localStorage.getItem('monthlyProjections') || 
+                          localStorage.getItem('signedFees') || 
+                          localStorage.getItem('asrFees');
+      
+      if (hasLocalData) {
+        try {
+          console.log('HighPerformanceTable: Triggering migration from localStorage to database');
+          await fetch('/api/migrate', { method: 'POST' });
+          console.log('HighPerformanceTable: Migration completed');
+        } catch (error) {
+          console.error('HighPerformanceTable: Migration failed:', error);
+        }
+      }
+    };
+
+    triggerMigration();
 
     // Also listen for focus events to reload data when returning to the page
     const handleFocus = () => {
@@ -221,10 +253,10 @@ export default function HighPerformanceTable({
   // Periodic check to ensure data is loaded (fallback mechanism)
   useEffect(() => {
     const checkDataInterval = setInterval(() => {
-      const savedProjectManagers = safeLocalStorageGet('projectManagers');
-      if (savedProjectManagers && Array.isArray(savedProjectManagers) && projectManagers.length === 0) {
+      const savedProjectManagers = localStorage.getItem('projectManagers');
+      if (savedProjectManagers && Array.isArray(JSON.parse(savedProjectManagers)) && projectManagers.length === 0) {
         console.log('HighPerformanceTable: Periodic check found project managers but state is empty, reloading');
-        setProjectManagers(savedProjectManagers);
+        setProjectManagers(JSON.parse(savedProjectManagers));
       }
     }, 5000); // Check every 5 seconds
 
@@ -314,10 +346,10 @@ export default function HighPerformanceTable({
     const handleProjectManagersUpdate = () => {
       try {
         console.log('HighPerformanceTable: Handling project managers update event');
-        const savedProjectManagers = safeLocalStorageGet('projectManagers');
+        const savedProjectManagers = localStorage.getItem('projectManagers');
         console.log('HighPerformanceTable: Retrieved project managers from localStorage:', savedProjectManagers);
-        if (savedProjectManagers && Array.isArray(savedProjectManagers)) {
-          setProjectManagers(savedProjectManagers);
+        if (savedProjectManagers && Array.isArray(JSON.parse(savedProjectManagers))) {
+          setProjectManagers(JSON.parse(savedProjectManagers));
           console.log('HighPerformanceTable: Updated project managers state:', savedProjectManagers);
         } else if (savedProjectManagers === null) {
           console.log('HighPerformanceTable: No project managers found during update');
@@ -461,38 +493,38 @@ export default function HighPerformanceTable({
     setScrollbarHeight(calculateScrollbarHeight());
   }, []);
 
-  // Optimized data getters
+  // Optimized data getters using SWR data with fallback to localStorage
   const getCellValue = useCallback((projectId: string, month: string) => {
-    return monthlyProjections[projectId]?.[month] || 0;
-  }, [monthlyProjections]);
+    return monthlyProjectionsData?.[projectId]?.[month] || monthlyProjections[projectId]?.[month] || 0;
+  }, [monthlyProjectionsData, monthlyProjections]);
 
   const getAsrFee = useCallback((projectId: string) => {
-    return asrFees[projectId] || projections[projectId]?.asrFee || 0;
-  }, [asrFees, projections]);
+    return asrFeesData?.[projectId] || asrFees[projectId] || projections[projectId]?.asrFee || 0;
+  }, [asrFeesData, asrFees, projections]);
 
   const getTotalFee = useCallback((project: BillingData) => {
-    const signedFee = signedFees[project.projectId] || project.signedFee || 0;
+    const signedFee = signedFeesData?.[project.projectId] || signedFees[project.projectId] || project.signedFee || 0;
     const asrFee = getAsrFee(project.projectId);
     return signedFee + asrFee;
-  }, [signedFees, getAsrFee]);
+  }, [signedFeesData, signedFees, getAsrFee]);
 
   const getTotalProjected = useCallback((projectId: string) => {
     return monthRange.reduce((sum, month) => sum + getCellValue(projectId, month), 0);
   }, [monthRange, getCellValue]);
 
   const getProjectManagerColor = useCallback((projectId: string) => {
-    const managerId = projectAssignments[projectId];
-    const manager = projectManagers.find(m => m.id === managerId);
+    const managerId = projectAssignmentsData?.[projectId] || projectAssignments[projectId];
+    const manager = projectManagersData?.[managerId] || projectManagers.find(m => m.id === managerId);
     return manager?.color;
-  }, [projectAssignments, projectManagers]);
+  }, [projectAssignmentsData, projectAssignments, projectManagersData, projectManagers]);
 
   const getCellStatus = useCallback((projectId: string, month: string) => {
-    return monthlyStatuses[projectId]?.[month] || '';
-  }, [monthlyStatuses]);
+    return monthlyStatusesData?.[projectId]?.[month] || monthlyStatuses[projectId]?.[month] || '';
+  }, [monthlyStatusesData, monthlyStatuses]);
 
   const getCellComment = useCallback((projectId: string, month: string) => {
-    return monthlyComments[projectId]?.[month] || '';
-  }, [monthlyComments]);
+    return monthlyCommentsData?.[projectId]?.[month] || monthlyComments[projectId]?.[month] || '';
+  }, [monthlyCommentsData, monthlyComments]);
 
   const getCellClass = (status: string) => {
     switch (status) {
@@ -510,53 +542,82 @@ export default function HighPerformanceTable({
     setEditValue(currentValue.toString());
   }, []);
 
-  const handleCellSave = useCallback(() => {
+  const handleCellSave = useCallback(async () => {
     if (!editingCell) return;
     const { projectId, month } = editingCell;
     const newValue = parseFloat(editValue) || 0;
-    const updatedMonthlyProjections = {
-      ...monthlyProjections,
-      [projectId]: {
-        ...monthlyProjections[projectId],
-        [month]: newValue,
-      },
-    };
-    setMonthlyProjections(updatedMonthlyProjections);
-    safeLocalStorageSet('monthlyProjections', updatedMonthlyProjections);
     
-    // Dispatch custom event to notify chart of projection changes
-    window.dispatchEvent(new CustomEvent('projectionsUpdated'));
-    
-    setEditingCell(null);
-    setEditValue('');
-  }, [editingCell, editValue, monthlyProjections]);
+    try {
+      await fetch('/api/projections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, month, value: newValue }),
+      });
+      
+      // Update local state and refresh SWR data
+      mutateMonthlyProjections();
+      
+      // Dispatch custom event to notify chart of projection changes
+      window.dispatchEvent(new CustomEvent('projectionsUpdated'));
+      
+      setEditingCell(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error saving projection:', error);
+      toast.error('Failed to save projection');
+    }
+  }, [editingCell, editValue, mutateMonthlyProjections]);
 
-  const handleAsrFeeSave = useCallback(() => {
+  const handleAsrFeeSave = useCallback(async () => {
     if (!editingAsrFee) return;
     const newValue = parseFloat(editValue) || 0;
-    const updatedAsrFees = { ...asrFees, [editingAsrFee]: newValue };
-    setAsrFees(updatedAsrFees);
-    safeLocalStorageSet('asrFees', updatedAsrFees);
-    setEditingAsrFee(null);
-    setEditValue('');
-  }, [editingAsrFee, editValue, asrFees]);
+    
+    try {
+      await fetch('/api/asr-fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: editingAsrFee, value: newValue }),
+      });
+      
+      // Update local state and refresh SWR data
+      mutateAsrFees();
+      
+      setEditingAsrFee(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error saving ASR fee:', error);
+      toast.error('Failed to save ASR fee');
+    }
+  }, [editingAsrFee, editValue, mutateAsrFees]);
 
-  const handleSignedFeeSave = useCallback(() => {
+  const handleSignedFeeSave = useCallback(async () => {
     if (!editingSignedFee) return;
     const newValue = parseFloat(editValue) || 0;
-    const updatedSignedFees = { ...signedFees, [editingSignedFee]: newValue };
-    setSignedFees(updatedSignedFees);
-    safeLocalStorageSet('signedFees', updatedSignedFees);
-    setEditingSignedFee(null);
-    setEditValue('');
-  }, [editingSignedFee, editValue, signedFees]);
+    
+    try {
+      await fetch('/api/signed-fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: editingSignedFee, value: newValue }),
+      });
+      
+      // Update local state and refresh SWR data
+      mutateSignedFees();
+      
+      setEditingSignedFee(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error saving signed fee:', error);
+      toast.error('Failed to save signed fee');
+    }
+  }, [editingSignedFee, editValue, mutateSignedFees]);
 
   const handleProjectClose = useCallback((projectId: string) => {
     const updatedClosedProjects = new Set(closedProjects);
     updatedClosedProjects.add(projectId);
     setClosedProjects(updatedClosedProjects);
     onClosedProjectsChange?.(updatedClosedProjects);
-    safeLocalStorageSet('closedProjects', Array.from(updatedClosedProjects));
+    localStorage.setItem('closedProjects', JSON.stringify(Array.from(updatedClosedProjects)));
     setOpenDropdown(null);
     toast.success('Project closed');
   }, [closedProjects, onClosedProjectsChange]);
@@ -566,7 +627,7 @@ export default function HighPerformanceTable({
     updatedClosedProjects.delete(projectId);
     setClosedProjects(updatedClosedProjects);
     onClosedProjectsChange?.(updatedClosedProjects);
-    safeLocalStorageSet('closedProjects', Array.from(updatedClosedProjects));
+    localStorage.setItem('closedProjects', JSON.stringify(Array.from(updatedClosedProjects)));
     toast.success('Project reopened');
   }, [closedProjects, onClosedProjectsChange]);
 
@@ -588,7 +649,7 @@ export default function HighPerformanceTable({
       updatedStatuses[projectId][month] = status;
     }
     setMonthlyStatuses(updatedStatuses);
-    safeLocalStorageSet('monthlyStatuses', updatedStatuses);
+    localStorage.setItem('monthlyStatuses', JSON.stringify(updatedStatuses));
     
     // Dispatch custom event to notify chart of status changes
     window.dispatchEvent(new CustomEvent('projectionsUpdated'));
@@ -617,7 +678,7 @@ export default function HighPerformanceTable({
         }
       }
       setMonthlyComments(updatedComments);
-      safeLocalStorageSet('monthlyComments', updatedComments);
+      localStorage.setItem('monthlyComments', JSON.stringify(updatedComments));
       setOpenMenuCell(null);
       setMenuPosition(null);
       return;
@@ -638,7 +699,7 @@ export default function HighPerformanceTable({
       updatedStatuses[projectId][month] = action;
     }
     setMonthlyStatuses(updatedStatuses);
-    safeLocalStorageSet('monthlyStatuses', updatedStatuses);
+    localStorage.setItem('monthlyStatuses', JSON.stringify(updatedStatuses));
     
     // Dispatch custom event to notify chart of status changes
     window.dispatchEvent(new CustomEvent('projectionsUpdated'));
@@ -708,7 +769,15 @@ export default function HighPerformanceTable({
     return sortState.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
 
-  const activeProjects = sortProjects(safeBillingData.filter(project => !closedProjects.has(project.projectId)));
+  // Use SWR data for closed projects with fallback to localStorage
+  const closedProjectsSet = useMemo(() => {
+    if (closedProjectsData && Array.isArray(closedProjectsData)) {
+      return new Set(closedProjectsData);
+    }
+    return closedProjects;
+  }, [closedProjectsData, closedProjects]);
+
+  const activeProjects = sortProjects(safeBillingData.filter(project => !closedProjectsSet.has(project.projectId)));
 
   // Filter projects by project name
   const filteredProjects = useMemo(() => {
@@ -924,7 +993,8 @@ export default function HighPerformanceTable({
                 const totalFee = getTotalFee(project);
                 const asrFee = getAsrFee(project.projectId);
                 const isEditingAsrFee = editingAsrFee === project.projectId;
-                const assignedManager = projectManagers.find(m => m.id === projectAssignments[project.projectId]);
+                const managerId = projectAssignmentsData?.[project.projectId] || projectAssignments[project.projectId];
+                const assignedManager = projectManagersData?.[managerId] || projectManagers.find(m => m.id === managerId);
 
                 return (
                   <div style={style} className="flex border-b border-gray-200 sticky-column">
@@ -1182,17 +1252,44 @@ export default function HighPerformanceTable({
         >
           <div className="px-3 py-2 border-b border-gray-200">
             <div className="text-xs font-medium text-gray-500 mb-2">Assign Project Manager</div>
-            {projectManagers.length === 0 ? (
+            {(!projectManagersData || Object.keys(projectManagersData).length === 0) && projectManagers.length === 0 ? (
               <div className="text-xs text-gray-400 italic">No project managers available</div>
             ) : (
               <div className="space-y-1">
+                {Object.values(projectManagersData || {}).map((manager: any) => (
+                  <button
+                    key={manager.id}
+                    onClick={async () => {
+                      try {
+                        await fetch('/api/project-assignments', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ projectId: openDropdown, managerId: manager.id }),
+                        });
+                        mutateProjectAssignments();
+                        setOpenDropdown(null);
+                      } catch (error) {
+                        console.error('Error assigning project manager:', error);
+                        toast.error('Failed to assign project manager');
+                      }
+                    }}
+                    className="w-full flex items-center space-x-2 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 rounded"
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: manager.color }}
+                    />
+                    <span>{manager.name}</span>
+                  </button>
+                ))}
+                {/* Fallback to localStorage data */}
                 {projectManagers.map((manager) => (
                   <button
                     key={manager.id}
                     onClick={() => {
                       const updatedAssignments = { ...projectAssignments, [openDropdown]: manager.id };
                       setProjectAssignments(updatedAssignments);
-                      safeLocalStorageSet('projectAssignments', updatedAssignments);
+                      localStorage.setItem('projectAssignments', JSON.stringify(updatedAssignments));
                       setOpenDropdown(null);
                     }}
                     className="w-full flex items-center space-x-2 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 rounded"
@@ -1208,14 +1305,21 @@ export default function HighPerformanceTable({
             )}
           </div>
 
-          {projectAssignments[openDropdown] && (
+          {(projectAssignmentsData?.[openDropdown] || projectAssignments[openDropdown]) && (
             <button
-              onClick={() => {
-                const updatedAssignments = { ...projectAssignments };
-                delete updatedAssignments[openDropdown];
-                setProjectAssignments(updatedAssignments);
-                safeLocalStorageSet('projectAssignments', updatedAssignments);
-                setOpenDropdown(null);
+              onClick={async () => {
+                try {
+                  await fetch('/api/project-assignments', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectId: openDropdown }),
+                  });
+                  mutateProjectAssignments();
+                  setOpenDropdown(null);
+                } catch (error) {
+                  console.error('Error removing project manager:', error);
+                  toast.error('Failed to remove project manager');
+                }
               }}
               className="w-full px-3 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 flex items-center"
             >
@@ -1319,7 +1423,7 @@ export default function HighPerformanceTable({
                   }
                 }
                 setMonthlyComments(updatedComments);
-                safeLocalStorageSet('monthlyComments', updatedComments);
+                localStorage.setItem('monthlyComments', JSON.stringify(updatedComments));
                 setEditingCommentCell(null);
                 setCommentValue('');
                 setCommentPosition(null);
