@@ -4,7 +4,7 @@ import { zohoService } from '@/lib/zoho';
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const status = zohoService.getTokenStatus();
     

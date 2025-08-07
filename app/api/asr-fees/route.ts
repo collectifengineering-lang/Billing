@@ -24,11 +24,11 @@ export async function GET() {
       return acc;
     }, {} as Record<string, number>);
     return NextResponse.json(formatted);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching ASR fees:', error);
     
     // If it's a table doesn't exist error, return empty data
-    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    if (error instanceof Error && (error.message?.includes('does not exist') || 'code' in error && (error as any).code === 'P2021')) {
       console.log('Tables do not exist, returning empty ASR fees');
       return NextResponse.json({});
     }
@@ -58,11 +58,11 @@ export async function POST(request: Request) {
       create: { projectId, value },
     });
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating ASR fee:', error);
     
     // If it's a table doesn't exist error, try to create the schema
-    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    if (error instanceof Error && (error.message?.includes('does not exist') || 'code' in error && (error as any).code === 'P2021')) {
       console.log('Table does not exist, attempting to create schema...');
       
       try {
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         });
         
         return NextResponse.json({ success: true });
-      } catch (createError: any) {
+      } catch (createError: unknown) {
         console.error('Failed to create table:', createError);
         return NextResponse.json({ 
           error: 'Database schema not ready. Please run database setup first.' 

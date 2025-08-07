@@ -35,14 +35,14 @@ export async function GET() {
       result
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Database connection failed:', error);
     
     return NextResponse.json({ 
       error: 'Database connection failed', 
-      details: error.message,
-      code: error.code,
-      stack: error.stack
+      details: error instanceof Error ? error.message : 'Unknown error',
+      code: error instanceof Error && 'code' in error ? (error as any).code : undefined,
+      stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
 }

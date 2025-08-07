@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Search, Filter, Download, ArrowLeft, RotateCcw } from 'lucide-react';
+import { Search, Download, ArrowLeft, RotateCcw } from 'lucide-react';
 import { BillingData } from '@/lib/types';
 import { fetchProjects, fetchInvoices } from '@/lib/zoho';
 import { processBillingData, initializeProjectionsTable, safeLocalStorageGet, safeLocalStorageSet } from '@/lib/utils';
