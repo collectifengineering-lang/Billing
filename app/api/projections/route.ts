@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
+import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 
 // GET: Fetch all projections
 export async function GET() {
   try {
+    // Ensure database schema exists
+    await ensureDatabaseSchema();
+    
     const projections = await prisma.projection.findMany();
     // Transform to record format: { projectId: { month: value } }
     const formatted = projections.reduce((acc, p) => {

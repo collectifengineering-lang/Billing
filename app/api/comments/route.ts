@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
+import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 
 // GET: Fetch all comments
 export async function GET() {
   try {
+    // Ensure database schema exists
+    await ensureDatabaseSchema();
+    
     const comments = await prisma.comment.findMany();
     // Transform to record format: { projectId: { month: comment } }
     const formatted = comments.reduce((acc, c) => {

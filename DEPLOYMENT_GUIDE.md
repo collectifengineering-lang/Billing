@@ -6,6 +6,8 @@ The deployment was failing due to:
 1. **Prisma Client Generation**: Prisma client wasn't being generated during build due to Vercel's dependency caching
 2. **Database Configuration**: SQLite doesn't work on Vercel - needs PostgreSQL
 3. **Build Process**: Vercel's build command needed explicit Prisma generation
+4. **Database Schema**: Tables weren't being created in production database
+5. **Migration Issues**: Database schema wasn't being set up automatically
 
 ## Changes Made
 
@@ -22,6 +24,12 @@ The deployment was failing due to:
 - Updated build command to explicitly run `prisma generate`
 - Added `.vercelignore` to ensure important files are included
 - Updated `next.config.js` to handle Prisma client properly
+
+### 4. Added Database Schema Management
+- Created `lib/database.ts` with `ensureDatabaseSchema()` helper function
+- Added automatic database schema creation in all API routes
+- Created `/api/setup-database` endpoint for manual database setup
+- Updated all API routes to ensure database schema exists before operations
 
 ## Next Steps
 
@@ -53,11 +61,23 @@ In your Vercel project settings, add these environment variables:
 2. Vercel will automatically redeploy
 3. The build should now succeed
 
-### 5. Database Migration
+### 5. Database Setup and Migration
 After deployment:
-1. Your app will automatically create database tables
-2. Data migration from localStorage will happen automatically
+1. The app will automatically create database tables via the `/api/setup-database` endpoint
+2. Data migration from localStorage will happen automatically via the `/api/migrate` endpoint
 3. Check the browser console for migration status
+4. If tables don't exist, the app will create them automatically on first access
+
+### 6. Database Schema
+The app includes the following tables:
+- `Projection` - Monthly projection values
+- `Status` - Monthly status values  
+- `Comment` - Monthly comments
+- `SignedFee` - Signed fee values
+- `AsrFee` - ASR fee values
+- `ClosedProject` - Closed project tracking
+- `ProjectAssignment` - Project manager assignments
+- `ProjectManager` - Project manager information
 
 ## Troubleshooting
 
@@ -77,6 +97,8 @@ After deployment:
 1. Check browser console for errors
 2. Verify localStorage has data to migrate
 3. Check the `/api/migrate` endpoint
+4. Check the `/api/setup-database` endpoint to ensure tables exist
+5. If you see "table does not exist" errors, the database setup may have failed
 
 ## Local Development
 For local development, you can still use SQLite by creating a `.env.local` file with:

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
+import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 
 // GET: Fetch all statuses
 export async function GET() {
   try {
+    // Ensure database schema exists
+    await ensureDatabaseSchema();
+    
     const statuses = await prisma.status.findMany();
     // Transform to record format: { projectId: { month: status } }
     const formatted = statuses.reduce((acc, s) => {

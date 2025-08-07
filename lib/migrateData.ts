@@ -1,8 +1,12 @@
-import prisma from './prisma';
+import { prisma, ensureDatabaseSchema } from './database';
 
 export async function migrateLocalStorageToDatabase() {
   try {
     console.log('Starting migration from localStorage to database...');
+
+    // First, ensure database schema exists
+    await ensureDatabaseSchema();
+    console.log('Database schema setup completed');
 
     // Check if database is empty
     const projectionCount = await prisma.projection.count();

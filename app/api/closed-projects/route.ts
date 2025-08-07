@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
+import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 
 // GET: Fetch all closed projects
 export async function GET() {
   try {
+    // Ensure database schema exists
+    await ensureDatabaseSchema();
+    
     const closedProjects = await prisma.closedProject.findMany();
     // Transform to array format for Set conversion
     const formatted = closedProjects.map(cp => cp.projectId);

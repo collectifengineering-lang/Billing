@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
+import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 
 // GET: Fetch all project managers
 export async function GET() {
   try {
+    // Ensure database schema exists
+    await ensureDatabaseSchema();
+    
     const projectManagers = await prisma.projectManager.findMany();
     // Transform to record format: { id: { name, color } }
     const formatted = projectManagers.reduce((acc, pm) => {

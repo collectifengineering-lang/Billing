@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
+import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 
 // GET: Fetch all signed fees
 export async function GET() {
   try {
+    // Ensure database schema exists
+    await ensureDatabaseSchema();
+    
     const signedFees = await prisma.signedFee.findMany();
     // Transform to record format: { projectId: value }
     const formatted = signedFees.reduce((acc, sf) => {

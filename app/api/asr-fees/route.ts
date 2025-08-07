@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
+import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 
 // GET: Fetch all ASR fees
 export async function GET() {
   try {
+    // Ensure database schema exists
+    await ensureDatabaseSchema();
+    
     const asrFees = await prisma.asrFee.findMany();
     // Transform to record format: { projectId: value }
     const formatted = asrFees.reduce((acc, af) => {
