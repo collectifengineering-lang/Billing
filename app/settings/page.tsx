@@ -197,7 +197,7 @@ function SettingsPageContent() {
               <p className="text-gray-500 text-center py-8">No project managers added yet.</p>
             ) : (
               <div className="space-y-3">
-                {projectManagers.map((manager) => (
+                {projectManagers.map((manager: ProjectManager) => (
                   <div key={manager.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div 
