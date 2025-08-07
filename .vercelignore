@@ -1,0 +1,19 @@
+# Don't ignore these important files
+!prisma/
+!package.json
+!package-lock.json
+!next.config.js
+!tsconfig.json
+!tailwind.config.js
+!postcss.config.js
+
+# Ignore development files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.log
+.DS_Store
+node_modules/
+.next/
+out/

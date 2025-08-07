@@ -6,6 +6,9 @@ const nextConfig = {
     ZOHO_REFRESH_TOKEN: process.env.ZOHO_REFRESH_TOKEN,
     ZOHO_ORGANIZATION_ID: process.env.ZOHO_ORGANIZATION_ID,
   },
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client'],
+  },
 }
 
 module.exports = nextConfig 
