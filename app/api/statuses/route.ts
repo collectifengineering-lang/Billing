@@ -21,17 +21,26 @@ export async function GET() {
       return acc;
     }, {} as Record<string, Record<string, string>>);
     return NextResponse.json(formatted);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching statuses:', error);
+    
+    // If it's a table doesn't exist error, return empty data
+    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+      console.log('Tables do not exist, returning empty statuses');
+      return NextResponse.json({});
+    }
+    
     return NextResponse.json({ error: 'Failed to fetch statuses' }, { status: 500 });
   }
 }
 
 // POST: Update or create status
 export async function POST(request: Request) {
+  // Store request data at the beginning so it's accessible throughout the function
+  const requestData = await request.json();
+  const { projectId, month, status } = requestData;
+  
   try {
-    const { projectId, month, status } = await request.json();
-    
     // Check if tables exist first
     const schemaExists = await ensureDatabaseSchema();
     
@@ -46,8 +55,47 @@ export async function POST(request: Request) {
       create: { projectId, month, status },
     });
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating status:', error);
+    
+    // If it's a table doesn't exist error, try to create the schema
+    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+      console.log('Table does not exist, attempting to create schema...');
+      
+      try {
+        // Try to create the table by inserting test data
+        await prisma.status.create({
+          data: {
+            projectId: '__test__',
+            month: '__test__',
+            status: '__test__'
+          }
+        });
+        
+        // Delete test data
+        await prisma.status.deleteMany({
+          where: {
+            projectId: '__test__',
+            month: '__test__'
+          }
+        });
+        
+        // Now try the original operation again
+        await prisma.status.upsert({
+          where: { projectId_month: { projectId, month } },
+          update: { status },
+          create: { projectId, month, status },
+        });
+        
+        return NextResponse.json({ success: true });
+      } catch (createError: any) {
+        console.error('Failed to create table:', createError);
+        return NextResponse.json({ 
+          error: 'Database schema not ready. Please run database setup first.' 
+        }, { status: 500 });
+      }
+    }
+    
     return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });
   }
 } 

@@ -35,9 +35,11 @@ export async function GET() {
 
 // POST: Update or create ASR fee
 export async function POST(request: Request) {
+  // Store request data at the beginning so it's accessible throughout the function
+  const requestData = await request.json();
+  const { projectId, value } = requestData;
+  
   try {
-    const { projectId, value } = await request.json();
-    
     // Check if tables exist first
     const schemaExists = await ensureDatabaseSchema();
     

@@ -36,9 +36,11 @@ export async function GET() {
 
 // POST: Update or create projection
 export async function POST(request: Request) {
+  // Store request data at the beginning so it's accessible throughout the function
+  const requestData = await request.json();
+  const { projectId, month, value } = requestData;
+  
   try {
-    const { projectId, month, value } = await request.json();
-    
     // Check if tables exist first
     const schemaExists = await ensureDatabaseSchema();
     
