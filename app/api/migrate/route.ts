@@ -5,11 +5,17 @@ export async function POST() {
   try {
     console.log('Starting database migration...');
     
-    // Debug: Log DATABASE_URL and DIRECT_URL prefixes for debugging (redacted)
+    // Enhanced debugging: Log DATABASE_URL and DIRECT_URL prefixes for debugging (redacted)
     const dbUrl = process.env.DATABASE_URL;
     const directUrl = process.env.DIRECT_URL;
-    console.log('Using DATABASE_URL prefix:', dbUrl ? `${dbUrl.substring(0, 15)}...` : 'DATABASE_URL not set');
-    console.log('Using DIRECT_URL prefix:', directUrl ? `${directUrl.substring(0, 15)}...` : 'DIRECT_URL not set');
+    console.log('DATABASE_URL prefix:', dbUrl ? `${dbUrl.substring(0, 15)}...` : 'Not set');
+    console.log('DIRECT_URL prefix:', directUrl ? `${directUrl.substring(0, 15)}...` : 'Not set');
+    
+    // Log the full URLs for debugging (in development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Full DATABASE_URL:', dbUrl);
+      console.log('Full DIRECT_URL:', directUrl);
+    }
     
     // This will attempt to create the database schema
     // Prisma will automatically use DIRECT_URL for migrations if defined

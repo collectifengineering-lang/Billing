@@ -18,12 +18,12 @@ After the Supabase integration, you need to manually add these additional enviro
 
 1. **`DATABASE_URL`** (Pooled connection for runtime queries - optimized for Vercel):
    ```
-   postgres://postgres.rjhkagqsiamwpiiszbgs:eUAUpixlcPkwgMhs@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=3&pool_timeout=30
+   postgresql://postgres.rjhkagqsiamwpiiszbgs:eUAUpixlcPkwgMhs@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=3&pool_timeout=30
    ```
 
 2. **`DIRECT_URL`** (Direct connection for migrations):
    ```
-   postgres://postgres.rjhkagqsiamwpiiszbgs:eUAUpixlcPkwgMhs@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+   postgresql://postgres.rjhkagqsiamwpiiszbgs:eUAUpixlcPkwgMhs@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
    ```
 
 3. **`NEXT_PUBLIC_SUPABASE_URL`**:
@@ -63,7 +63,7 @@ After deployment, call the `/api/migrate` endpoint to create the database schema
 curl -X POST https://your-app.vercel.app/api/migrate
 ```
 
-**Note:** Migrations use `DIRECT_URL` to create tables like `Projection`; runtime uses `DATABASE_URL`.
+**Note:** Migrations use `DIRECT_URL` (direct connection on port 5432) to avoid pooler validation issues; runtime uses `DATABASE_URL` (pooled on port 6543).
 
 ## Step 5: Verify Setup
 
@@ -72,6 +72,12 @@ curl -X POST https://your-app.vercel.app/api/migrate
 3. Test that multiple users can see the same data
 
 ## Troubleshooting
+
+### If PrismaClientInitializationError occurs on URL protocol:
+1. **Ensure DATABASE_URL and DIRECT_URL start with "postgresql://"** (change from Supabase's default "postgres://" if needed)
+2. **Verify no quotes or typos** in Vercel env vars
+3. **Test by logging URL prefixes** in `/api/migrate`
+4. **Check that both URLs use the correct protocol** - Prisma is picky about the full 'postgresql://' protocol
 
 ### For Vercel runtime issues like 500 errors:
 1. **Ensure PrismaClient is a singleton** to avoid connection exhaustion
@@ -110,6 +116,7 @@ curl -X POST https://your-app.vercel.app/api/migrate
 - ✅ `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - ✅ `SUPABASE_SERVICE_ROLE_KEY`
 - ❌ No `PRISMA_GENERATE_DATAPROXY` in `vercel.json`
+- ✅ Both URLs use `postgresql://` protocol (not `postgres://`)
 
 ## Database Schema
 
