@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
-import { prisma, ensureDatabaseSchema } from '../../../lib/database';
+import prisma from '../../../lib/db';
+import { ensureDatabaseSchema } from '../../../lib/database';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
 // GET: Fetch all project managers
 export async function GET() {
-  // Check if prisma client is available
-  if (!prisma) {
-    return NextResponse.json({ 
-      error: 'Database client not available' 
-    }, { status: 500 });
-  }
-
   try {
     // Ensure database schema exists
     const schemaExists = await ensureDatabaseSchema();
@@ -30,21 +24,21 @@ export async function GET() {
       return acc;
     }, {} as Record<string, { name: string; color: string }>);
     return NextResponse.json(formatted);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching project managers:', error);
+    
+    // If it's a table doesn't exist error, return empty data
+    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+      console.log('Tables do not exist, returning empty project managers');
+      return NextResponse.json({});
+    }
+    
     return NextResponse.json({ error: 'Failed to fetch project managers' }, { status: 500 });
   }
 }
 
 // POST: Update or create project manager
 export async function POST(request: Request) {
-  // Check if prisma client is available
-  if (!prisma) {
-    return NextResponse.json({ 
-      error: 'Database client not available' 
-    }, { status: 500 });
-  }
-
   try {
     const { id, name, color } = await request.json();
     
@@ -62,8 +56,46 @@ export async function POST(request: Request) {
       create: { id, name, color },
     });
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating project manager:', error);
+    
+    // If it's a table doesn't exist error, try to create the schema
+    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+      console.log('Table does not exist, attempting to create schema...');
+      
+      try {
+        // Try to create the table by inserting test data
+        await prisma.projectManager.create({
+          data: {
+            id: '__test__',
+            name: 'test',
+            color: '#000000'
+          }
+        });
+        
+        // Delete test data
+        await prisma.projectManager.deleteMany({
+          where: {
+            id: '__test__'
+          }
+        });
+        
+        // Now try the original operation again
+        await prisma.projectManager.upsert({
+          where: { id },
+          update: { name, color },
+          create: { id, name, color },
+        });
+        
+        return NextResponse.json({ success: true });
+      } catch (createError: any) {
+        console.error('Failed to create table:', createError);
+        return NextResponse.json({ 
+          error: 'Database schema not ready. Please run database setup first.' 
+        }, { status: 500 });
+      }
+    }
+    
     return NextResponse.json({ error: 'Failed to update project manager' }, { status: 500 });
   }
 } 

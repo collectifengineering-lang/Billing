@@ -1,36 +1,26 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../lib/db';
+import prisma from '../../../lib/db';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
 // GET: Fetch all projections
 export async function GET() {
-  // Check if prisma client is available
-  if (!prisma) {
-    return NextResponse.json({ 
-      error: 'Database client not available' 
-    }, { status: 500 });
-  }
-
   try {
     console.log('Fetching projections from database...');
-    
     const projections = await prisma.projection.findMany();
-    console.log(`Found ${projections.length} projections`);
+    console.log('Fetched', projections.length, 'projections from database');
     
     // Transform to record format: { projectId: { month: value } }
-    const formatted = projections.reduce((acc, p) => {
-      if (!acc[p.projectId]) acc[p.projectId] = {};
-      acc[p.projectId][p.month] = p.value;
+    const formatted = projections.reduce((acc, projection) => {
+      if (!acc[projection.projectId]) acc[projection.projectId] = {};
+      acc[projection.projectId][projection.month] = projection.value;
       return acc;
     }, {} as Record<string, Record<string, number>>);
     
     return NextResponse.json(formatted);
   } catch (error: any) {
     console.error('Error fetching projections:', error);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
     
     // If it's a table doesn't exist error, return empty data
     if (error.code === 'P2021' || error.message?.includes('does not exist')) {
@@ -38,31 +28,19 @@ export async function GET() {
       return NextResponse.json({});
     }
     
-    return NextResponse.json({ 
-      error: 'Failed to fetch projections',
-      details: error.message,
-      code: error.code
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch projections' }, { status: 500 });
   }
 }
 
 // POST: Update or create projection
 export async function POST(request: Request) {
-  // Check if prisma client is available
-  if (!prisma) {
-    return NextResponse.json({ 
-      error: 'Database client not available' 
-    }, { status: 500 });
-  }
-
   // Parse request data once and store it
   const requestData = await request.json();
   const { projectId, month, value } = requestData;
   
   try {
-    console.log(`Updating projection: ${projectId}, ${month}, ${value}`);
+    console.log('Updating projection for project:', projectId, 'month:', month);
     
-    // This will create the table if it doesn't exist (Prisma behavior)
     await prisma.projection.upsert({
       where: { projectId_month: { projectId, month } },
       update: { value },
@@ -73,8 +51,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error updating projection:', error);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
     
     // If it's a table doesn't exist error, try to create the schema
     if (error.code === 'P2021' || error.message?.includes('does not exist')) {
@@ -98,32 +74,22 @@ export async function POST(request: Request) {
           }
         });
         
-        // Now try the original operation again using the stored data
+        // Now try the original operation again
         await prisma.projection.upsert({
           where: { projectId_month: { projectId, month } },
           update: { value },
           create: { projectId, month, value },
         });
         
-        console.log('Projection updated successfully after schema creation');
         return NextResponse.json({ success: true });
       } catch (createError: any) {
         console.error('Failed to create table:', createError);
-        console.error('Create error code:', createError.code);
-        console.error('Create error message:', createError.message);
-        
         return NextResponse.json({ 
-          error: 'Database schema not ready. Please run database setup first.',
-          details: createError.message,
-          code: createError.code
+          error: 'Database schema not ready. Please run database setup first.' 
         }, { status: 500 });
       }
     }
     
-    return NextResponse.json({ 
-      error: 'Failed to update projection',
-      details: error.message,
-      code: error.code
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update projection' }, { status: 500 });
   }
 } 

@@ -1,12 +1,6 @@
-import { prisma } from './db';
+import prisma from './db';
 
 export async function ensureDatabaseSchema() {
-  // Check if prisma client is available
-  if (!prisma) {
-    console.log('Prisma client not available');
-    return false;
-  }
-
   try {
     // Check if tables already exist by trying to query them
     await prisma.projection.findFirst();
@@ -54,12 +48,6 @@ export async function ensureDatabaseSchema() {
 }
 
 export async function createDatabaseSchema() {
-  // Check if prisma client is available
-  if (!prisma) {
-    console.log('Prisma client not available');
-    return false;
-  }
-
   try {
     console.log('Creating database schema...');
     

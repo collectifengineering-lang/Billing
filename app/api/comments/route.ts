@@ -1,36 +1,26 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../lib/db';
+import prisma from '../../../lib/db';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
 // GET: Fetch all comments
 export async function GET() {
-  // Check if prisma client is available
-  if (!prisma) {
-    return NextResponse.json({ 
-      error: 'Database client not available' 
-    }, { status: 500 });
-  }
-
   try {
     console.log('Fetching comments from database...');
-    
     const comments = await prisma.comment.findMany();
-    console.log(`Found ${comments.length} comments`);
+    console.log('Fetched', comments.length, 'comments from database');
     
     // Transform to record format: { projectId: { month: comment } }
-    const formatted = comments.reduce((acc, c) => {
-      if (!acc[c.projectId]) acc[c.projectId] = {};
-      acc[c.projectId][c.month] = c.comment;
+    const formatted = comments.reduce((acc, comment) => {
+      if (!acc[comment.projectId]) acc[comment.projectId] = {};
+      acc[comment.projectId][comment.month] = comment.comment;
       return acc;
     }, {} as Record<string, Record<string, string>>);
     
     return NextResponse.json(formatted);
   } catch (error: any) {
     console.error('Error fetching comments:', error);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
     
     // If it's a table doesn't exist error, return empty data
     if (error.code === 'P2021' || error.message?.includes('does not exist')) {
@@ -38,29 +28,18 @@ export async function GET() {
       return NextResponse.json({});
     }
     
-    return NextResponse.json({ 
-      error: 'Failed to fetch comments',
-      details: error.message,
-      code: error.code
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 });
   }
 }
 
 // POST: Update or create comment
 export async function POST(request: Request) {
-  // Check if prisma client is available
-  if (!prisma) {
-    return NextResponse.json({ 
-      error: 'Database client not available' 
-    }, { status: 500 });
-  }
-
   // Parse request data once and store it
   const requestData = await request.json();
   const { projectId, month, comment } = requestData;
   
   try {
-    console.log(`Updating comment: ${projectId}, ${month}, ${comment}`);
+    console.log('Updating comment for project:', projectId, 'month:', month);
     
     await prisma.comment.upsert({
       where: { projectId_month: { projectId, month } },
@@ -72,8 +51,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error updating comment:', error);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
     
     // If it's a table doesn't exist error, try to create the schema
     if (error.code === 'P2021' || error.message?.includes('does not exist')) {
@@ -85,7 +62,7 @@ export async function POST(request: Request) {
           data: {
             projectId: '__test__',
             month: '__test__',
-            comment: '__test__'
+            comment: 'test'
           }
         });
         
@@ -97,32 +74,22 @@ export async function POST(request: Request) {
           }
         });
         
-        // Now try the original operation again using the stored data
+        // Now try the original operation again
         await prisma.comment.upsert({
           where: { projectId_month: { projectId, month } },
           update: { comment },
           create: { projectId, month, comment },
         });
         
-        console.log('Comment updated successfully after schema creation');
         return NextResponse.json({ success: true });
       } catch (createError: any) {
         console.error('Failed to create table:', createError);
-        console.error('Create error code:', createError.code);
-        console.error('Create error message:', createError.message);
-        
         return NextResponse.json({ 
-          error: 'Database schema not ready. Please run database setup first.',
-          details: createError.message,
-          code: createError.code
+          error: 'Database schema not ready. Please run database setup first.' 
         }, { status: 500 });
       }
     }
     
-    return NextResponse.json({ 
-      error: 'Failed to update comment',
-      details: error.message,
-      code: error.code
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update comment' }, { status: 500 });
   }
 } 
