@@ -586,7 +586,13 @@ export default function HighPerformanceTable({
         body: JSON.stringify({ projectId: editingAsrFee, value: newValue }),
       });
       
-      // Update local state and refresh SWR data
+      // Update local state immediately
+      setAsrFees(prev => ({
+        ...prev,
+        [editingAsrFee]: newValue
+      }));
+      
+      // Also refresh SWR data
       mutateAsrFees();
       
       setEditingAsrFee(null);
@@ -608,7 +614,13 @@ export default function HighPerformanceTable({
         body: JSON.stringify({ projectId: editingSignedFee, value: newValue }),
       });
       
-      // Update local state and refresh SWR data
+      // Update local state immediately
+      setSignedFees(prev => ({
+        ...prev,
+        [editingSignedFee]: newValue
+      }));
+      
+      // Also refresh SWR data
       mutateSignedFees();
       
       setEditingSignedFee(null);
@@ -864,11 +876,11 @@ export default function HighPerformanceTable({
         const merged = { ...prev };
         Object.keys(signedFeesData).forEach(projectId => {
           // Only update if user hasn't entered a value for this project
-          if (merged[projectId] === undefined) {
+          // or if the SWR data is newer (has a different value)
+          if (merged[projectId] === undefined || merged[projectId] !== signedFeesData[projectId]) {
             merged[projectId] = signedFeesData[projectId];
           }
         });
-        console.log('Syncing signed fees from SWR:', { prev, signedFeesData, merged });
         return merged;
       });
     }
