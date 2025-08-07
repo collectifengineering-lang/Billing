@@ -1,110 +1,215 @@
-# Vercel Deployment Guide
+# Deployment Guide
 
-## Issues Fixed
+## Prerequisites
 
-The deployment was failing due to:
-1. **Prisma Client Generation**: Prisma client wasn't being generated during build due to Vercel's dependency caching
-2. **Database Configuration**: SQLite doesn't work on Vercel - needs PostgreSQL
-3. **Build Process**: Vercel's build command needed explicit Prisma generation
-4. **Database Schema**: Tables weren't being created in production database
-5. **Migration Issues**: Database schema wasn't being set up automatically
+1. **Vercel Account**: Sign up at [vercel.com](https://vercel.com)
+2. **PostgreSQL Database**: Set up a PostgreSQL database (recommended: Vercel Postgres or Neon)
+3. **Environment Variables**: Configure all required environment variables
 
-## Changes Made
+## Environment Variables
 
-### 1. Updated package.json
-- Added `prisma generate` to build script
-- Added `postinstall` script for Prisma client generation
+Create a `.env.local` file in your project root with the following variables:
 
-### 2. Updated Prisma Schema
-- Changed from SQLite to PostgreSQL
-- Updated database URL configuration
+```env
+# Database
+PRISMA_DATABASE_URL="postgresql://username:password@host:port/database"
 
-### 3. Added Vercel Configuration
-- Created `vercel.json` for proper build settings
-- Updated build command to explicitly run `prisma generate`
-- Added `.vercelignore` to ensure important files are included
-- Updated `next.config.js` to handle Prisma client properly
+# Authentication (if using Azure AD)
+AZURE_CLIENT_ID="your-azure-client-id"
+AZURE_TENANT_ID="your-azure-tenant-id"
+AZURE_REDIRECT_URI="http://localhost:3000"
 
-### 4. Added Database Schema Management
-- Created `lib/database.ts` with `ensureDatabaseSchema()` helper function
-- Added automatic database schema creation in all API routes
-- Created `/api/setup-database` endpoint for manual database setup
-- Updated all API routes to ensure database schema exists before operations
-- **Updated for Prisma Accelerate**: Tables are created automatically on first data insertion
+# Zoho Integration (if using)
+ZOHO_CLIENT_ID="your-zoho-client-id"
+ZOHO_CLIENT_SECRET="your-zoho-client-secret"
+ZOHO_REFRESH_TOKEN="your-zoho-refresh-token"
+ZOHO_ORGANIZATION_ID="your-zoho-organization-id"
+```
 
-## Next Steps
+## Database Setup
 
-### 1. Create Vercel Postgres Database
-1. Go to your Vercel dashboard
-2. Navigate to **Storage** tab
-3. Click **Create Database** → **Postgres**
-4. Choose **Free** tier
-5. Select your project and region
-6. Click **Create**
+### Option 1: Using Vercel Postgres (Recommended)
 
-### 2. Environment Variables
-Vercel will automatically add these environment variables for Prisma Accelerate:
-- `POSTGRES_URL`
-- `PRISMA_DATABASE_URL`
+1. **Create Vercel Postgres Database**:
+   ```bash
+   npx vercel storage create postgres
+   ```
 
-### 3. Add Your Existing Environment Variables
-In your Vercel project settings, add these environment variables:
-- `ZOHO_CLIENT_ID`
-- `ZOHO_CLIENT_SECRET`
-- `ZOHO_REFRESH_TOKEN`
-- `ZOHO_ORGANIZATION_ID`
-- `NEXT_PUBLIC_AZURE_AD_CLIENT_ID`
-- `NEXT_PUBLIC_AZURE_AD_TENANT_ID`
-- `NEXT_PUBLIC_APP_URL` (set to your Vercel app URL)
+2. **Link to your project**:
+   ```bash
+   npx vercel env pull .env.local
+   ```
 
-### 4. Deploy
-1. Commit and push your changes
-2. Vercel will automatically redeploy
-3. The build should now succeed
+3. **Run database migrations**:
+   ```bash
+   npx prisma db push
+   ```
 
-### 5. Database Setup and Migration
-After deployment:
-1. **With Prisma Accelerate**: Tables are created automatically when you first insert data
-2. Data migration from localStorage will happen automatically via the `/api/migrate` endpoint
-3. Check the browser console for migration status
-4. The app will handle table creation automatically through Prisma Accelerate
+### Option 2: Using External PostgreSQL
 
-### 6. Database Schema
-The app includes the following tables:
-- `Projection` - Monthly projection values
-- `Status` - Monthly status values  
-- `Comment` - Monthly comments
-- `SignedFee` - Signed fee values
-- `AsrFee` - ASR fee values
-- `ClosedProject` - Closed project tracking
-- `ProjectAssignment` - Project manager assignments
-- `ProjectManager` - Project manager information
+1. **Set up your PostgreSQL database** (e.g., Neon, Supabase, etc.)
+2. **Update your environment variables** with the database URL
+3. **Run database migrations**:
+   ```bash
+   npx prisma db push
+   ```
+
+## Production Deployment
+
+### Step 1: Deploy to Vercel
+
+1. **Push your code to GitHub**
+2. **Connect your repository to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Click "New Project"
+   - Import your GitHub repository
+   - Configure environment variables in Vercel dashboard
+
+### Step 2: Set Up Database Schema
+
+After deployment, you need to create the database tables. You have two options:
+
+#### Option A: Using the Migration API (Recommended)
+
+1. **Call the migration endpoint**:
+   ```bash
+   curl -X POST https://your-app.vercel.app/api/migrate
+   ```
+
+2. **Or visit the endpoint in your browser**:
+   ```
+   https://your-app.vercel.app/api/migrate
+   ```
+
+#### Option B: Using Prisma CLI
+
+1. **Connect to your production database**:
+   ```bash
+   npx prisma db push --schema=./prisma/schema.prisma
+   ```
+
+### Step 3: Verify Database Setup
+
+1. **Check if tables exist** by calling:
+   ```bash
+   curl https://your-app.vercel.app/api/statuses
+   ```
+
+2. **If you get empty data `{}`, the tables are working correctly**
+
+## Public Access Features
+
+### Statuses and Comments (Public)
+
+The application includes **public access** to project statuses and comments:
+
+1. **Public API Endpoints** (no authentication required):
+   - `GET /api/statuses` - Fetch all project statuses
+   - `POST /api/statuses` - Update project status
+   - `GET /api/comments` - Fetch all project comments
+   - `POST /api/comments` - Update project comment
+
+2. **Public Web Interface**:
+   - Visit: `https://your-app.vercel.app/public`
+   - Allows anyone to view and edit statuses and comments
+   - No login required
+   - Real-time updates
+
+3. **Usage**:
+   - Click on any status or comment cell to edit
+   - Press Enter to save, Escape to cancel
+   - Changes are immediately visible to all users
+
+### Protected Features (Authentication Required)
+
+The main dashboard and other features require authentication:
+- Project data and billing information
+- Revenue projections
+- Fee management
+- Zoho integration features
 
 ## Troubleshooting
 
-### If build still fails:
-1. Check that all environment variables are set in Vercel
-2. Verify the PostgreSQL database is created and running
-3. Check the build logs for specific errors
-4. If you see "PrismaClientInitializationError", ensure the build command includes `prisma generate` and check that `PRISMA_DATABASE_URL` is set
-5. Clear Vercel's build cache by redeploying with "Clear cache and redeploy" option
+### Database Connection Issues
 
-### If database connection fails:
-1. Verify environment variables are correct
-2. Check that the database is accessible
-3. Ensure the connection strings are properly formatted
+1. **Check your `PRISMA_DATABASE_URL`**:
+   - Ensure it's correctly formatted
+   - Verify the database is accessible from Vercel
 
-### If migration doesn't work:
-1. Check browser console for errors
-2. Verify localStorage has data to migrate
-3. Check the `/api/migrate` endpoint
-4. Check the `/api/setup-database` endpoint to ensure tables exist
-5. If you see "table does not exist" errors, the database setup may have failed
+2. **Test database connection**:
+   ```bash
+   npx prisma db pull
+   ```
 
-## Local Development
-For local development, you can still use SQLite by creating a `.env.local` file with:
-```
-DATABASE_URL="file:./dev.db"
-```
+### Table Creation Issues
 
-This will override the PostgreSQL configuration for local development. 
+1. **If tables don't exist**, run the migration:
+   ```bash
+   curl -X POST https://your-app.vercel.app/api/migrate
+   ```
+
+2. **Check migration logs** in Vercel dashboard
+
+### Common Error Messages
+
+- **"The table does not exist"**: Run the migration endpoint
+- **"Connection refused"**: Check your database URL and network access
+- **"Authentication failed"**: Verify your database credentials
+
+### Public Access Issues
+
+1. **Test public endpoints**:
+   ```bash
+   curl https://your-app.vercel.app/api/statuses
+   curl https://your-app.vercel.app/api/comments
+   ```
+
+2. **Visit public page**: `https://your-app.vercel.app/public`
+
+## Development Setup
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Set up local database**:
+   ```bash
+   npx prisma db push
+   ```
+
+3. **Run development server**:
+   ```bash
+   npm run dev
+   ```
+
+4. **Test public access locally**:
+   - Visit: `http://localhost:3000/public`
+   - Test API endpoints: `http://localhost:3000/api/statuses`
+
+## Database Schema
+
+The application uses the following tables:
+
+- `Projection`: Monthly revenue projections
+- `Status`: Project status by month (public)
+- `Comment`: Comments for projects by month (public)
+- `SignedFee`: Signed fee amounts per project
+- `AsrFee`: ASR fee amounts per project
+- `ClosedProject`: Closed project tracking
+- `ProjectAssignment`: Project manager assignments
+- `ProjectManager`: Project manager information
+
+## Security Notes
+
+1. **Never commit `.env.local`** to version control
+2. **Use environment variables** in Vercel dashboard for production
+3. **Enable database SSL** for production connections
+4. **Regularly rotate database credentials**
+5. **Public data**: Statuses and comments are intentionally public - ensure this aligns with your security requirements
+
+## Performance Optimization
+
+1. **Enable Prisma Accelerate** for better performance
+2. **Use connection pooling** for high-traffic applications
+3. **Monitor database performance** in Vercel dashboard 

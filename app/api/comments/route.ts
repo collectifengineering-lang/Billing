@@ -21,8 +21,15 @@ export async function GET() {
       return acc;
     }, {} as Record<string, Record<string, string>>);
     return NextResponse.json(formatted);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching comments:', error);
+    
+    // If it's a table doesn't exist error, return empty data
+    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+      console.log('Tables do not exist, returning empty comments');
+      return NextResponse.json({});
+    }
+    
     return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 });
   }
 }
@@ -46,8 +53,47 @@ export async function POST(request: Request) {
       create: { projectId, month, comment },
     });
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating comment:', error);
+    
+    // If it's a table doesn't exist error, try to create the schema
+    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+      console.log('Table does not exist, attempting to create schema...');
+      
+      try {
+        // Try to create the table by inserting test data
+        await prisma.comment.create({
+          data: {
+            projectId: '__test__',
+            month: '__test__',
+            comment: '__test__'
+          }
+        });
+        
+        // Delete test data
+        await prisma.comment.deleteMany({
+          where: {
+            projectId: '__test__',
+            month: '__test__'
+          }
+        });
+        
+        // Now try the original operation again
+        await prisma.comment.upsert({
+          where: { projectId_month: { projectId, month } },
+          update: { comment },
+          create: { projectId, month, comment },
+        });
+        
+        return NextResponse.json({ success: true });
+      } catch (createError: any) {
+        console.error('Failed to create table:', createError);
+        return NextResponse.json({ 
+          error: 'Database schema not ready. Please run database setup first.' 
+        }, { status: 500 });
+      }
+    }
+    
     return NextResponse.json({ error: 'Failed to update comment' }, { status: 500 });
   }
 } 

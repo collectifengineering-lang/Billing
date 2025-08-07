@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { ensureDatabaseSchema } from '../../../lib/database';
+import { createDatabaseSchema } from '../../../lib/database';
 
 export async function POST() {
   try {
     console.log('Setting up database schema...');
     
-    const success = await ensureDatabaseSchema();
+    const success = await createDatabaseSchema();
     
     if (success) {
       console.log('Database schema setup completed successfully');
