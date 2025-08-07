@@ -38,19 +38,15 @@ export default function ProjectionsTable({
     const savedManagers = localStorage.getItem('projectManagers');
     if (savedManagers) {
       const managers = JSON.parse(savedManagers);
-      console.log('Loading project managers:', managers);
       setProjectManagers(managers);
     } else {
-      console.log('No project managers found in localStorage');
     }
 
     const savedAssignments = localStorage.getItem('projectAssignments');
     if (savedAssignments) {
       const assignments = JSON.parse(savedAssignments);
-      console.log('Loading project assignments:', assignments);
       setProjectAssignments(assignments);
     } else {
-      console.log('No project assignments found in localStorage');
     }
   }, []);
 
@@ -60,7 +56,6 @@ export default function ProjectionsTable({
       const savedManagers = localStorage.getItem('projectManagers');
       if (savedManagers) {
         const managers = JSON.parse(savedManagers);
-        console.log('Storage change - loading project managers:', managers);
         setProjectManagers(managers);
       }
     };
@@ -69,7 +64,6 @@ export default function ProjectionsTable({
       const savedManagers = localStorage.getItem('projectManagers');
       if (savedManagers) {
         const managers = JSON.parse(savedManagers);
-        console.log('Custom event - loading project managers:', managers);
         setProjectManagers(managers);
       }
     };
@@ -85,7 +79,6 @@ export default function ProjectionsTable({
 
   // Save project assignments to localStorage whenever they change
   useEffect(() => {
-    console.log('Saving project assignments to localStorage:', projectAssignments);
     localStorage.setItem('projectAssignments', JSON.stringify(projectAssignments));
   }, [projectAssignments]);
 
@@ -96,7 +89,6 @@ export default function ProjectionsTable({
       if (savedManagers) {
         const managers = JSON.parse(savedManagers);
         if (JSON.stringify(managers) !== JSON.stringify(projectManagers)) {
-          console.log('Periodic check - updating project managers:', managers);
           setProjectManagers(managers);
         }
       }
@@ -136,30 +128,48 @@ export default function ProjectionsTable({
         const signedFeesResponse = await fetch('/api/signed-fees');
         if (signedFeesResponse.ok) {
           const apiSignedFees = await signedFeesResponse.json();
-          setSignedFees(prev => ({ ...prev, ...apiSignedFees }));
+          
+          // Only merge if API data is not empty
+          if (Object.keys(apiSignedFees).length > 0) {
+            setSignedFees(prev => {
+              const merged = { ...prev, ...apiSignedFees };
+              return merged;
+            });
+          }
         }
 
         // Load ASR fees from API
         const asrFeesResponse = await fetch('/api/asr-fees');
         if (asrFeesResponse.ok) {
           const apiAsrFees = await asrFeesResponse.json();
-          setAsrFees(prev => ({ ...prev, ...apiAsrFees }));
+          
+          // Only merge if API data is not empty
+          if (Object.keys(apiAsrFees).length > 0) {
+            setAsrFees(prev => {
+              const merged = { ...prev, ...apiAsrFees };
+              return merged;
+            });
+          }
         }
 
         // Load projections from API
         const projectionsResponse = await fetch('/api/projections');
         if (projectionsResponse.ok) {
           const apiProjections = await projectionsResponse.json();
-          setMonthlyProjections(prev => {
-            const merged = { ...prev };
-            Object.keys(apiProjections).forEach(projectId => {
-              if (!merged[projectId]) merged[projectId] = {};
-              Object.keys(apiProjections[projectId]).forEach(month => {
-                merged[projectId][month] = apiProjections[projectId][month];
+          
+          // Only merge if API data is not empty
+          if (Object.keys(apiProjections).length > 0) {
+            setMonthlyProjections(prev => {
+              const merged = { ...prev };
+              Object.keys(apiProjections).forEach(projectId => {
+                if (!merged[projectId]) merged[projectId] = {};
+                Object.keys(apiProjections[projectId]).forEach(month => {
+                  merged[projectId][month] = apiProjections[projectId][month];
+                });
               });
+              return merged;
             });
-            return merged;
-          });
+          }
         }
       } catch (error) {
         console.error('Error loading data from API:', error);
@@ -171,7 +181,6 @@ export default function ProjectionsTable({
 
   // Save closed projects to localStorage whenever they change
   useEffect(() => {
-    console.log('Closed projects changed:', Array.from(closedProjects));
     localStorage.setItem('closedProjects', JSON.stringify(Array.from(closedProjects)));
   }, [closedProjects]);
 
@@ -182,7 +191,6 @@ export default function ProjectionsTable({
         const newClosedProjects = new Set<string>(JSON.parse(event.newValue));
         // Only update if different to prevent infinite loops or unnecessary re-renders
         if (JSON.stringify(Array.from(newClosedProjects)) !== JSON.stringify(Array.from(closedProjects))) {
-          console.log('Storage event - updating closed projects:', Array.from(newClosedProjects));
           setClosedProjects(newClosedProjects);
         }
       }
@@ -230,8 +238,6 @@ export default function ProjectionsTable({
 
     const { projectId, month } = editingCell;
     const newValue = parseFloat(editValue) || 0;
-
-    console.log('Saving cell:', { projectId, month, newValue });
 
     try {
       // Save to database via API
@@ -444,9 +450,12 @@ export default function ProjectionsTable({
   };
 
   const getTotalFee = (project: BillingData) => {
-    const signedFee = signedFees[project.projectId] || project.signedFee || 0;
+    const userSignedFee = signedFees[project.projectId];
+    const zohoSignedFee = project.signedFee;
+    const finalSignedFee = userSignedFee || zohoSignedFee || 0;
+    
     const asrFee = getAsrFee(project.projectId);
-    return signedFee + asrFee;
+    return finalSignedFee + asrFee;
   };
 
   const getTotalProjected = (projectId: string) => {
@@ -458,16 +467,13 @@ export default function ProjectionsTable({
     if (!managerId) return null;
     
     const manager = projectManagers.find(m => m.id === managerId);
-    console.log('getProjectManagerColor:', { projectId, managerId, manager, projectAssignments });
     return manager?.color || null;
   };
 
   const handleAssignProjectManager = (projectId: string, managerId: string) => {
     console.log('Assigning manager:', { projectId, managerId });
-    console.log('Current projectAssignments before update:', projectAssignments);
     setProjectAssignments(prev => {
       const newAssignments = { ...prev, [projectId]: managerId };
-      console.log('New assignments:', newAssignments);
       return newAssignments;
     });
     setOpenDropdown(null);
@@ -476,11 +482,9 @@ export default function ProjectionsTable({
 
   const handleRemoveProjectManager = (projectId: string) => {
     console.log('Removing manager for project:', projectId);
-    console.log('Current projectAssignments before removal:', projectAssignments);
     setProjectAssignments(prev => {
       const newAssignments = { ...prev };
       delete newAssignments[projectId];
-      console.log('Assignments after removal:', newAssignments);
       return newAssignments;
     });
     setOpenDropdown(null);
@@ -517,7 +521,6 @@ export default function ProjectionsTable({
 
   const getRowStyle = (projectId: string) => {
     const managerColor = getProjectManagerColor(projectId);
-    console.log('getRowStyle:', { projectId, managerColor });
     if (managerColor) {
       return {
         backgroundColor: `${managerColor}15`,
@@ -543,17 +546,10 @@ export default function ProjectionsTable({
         {/* Temporary debug button */}
         <button
           onClick={() => {
-            console.log('=== DEBUG INFO ===');
-            console.log('projectManagers:', projectManagers);
-            console.log('projectAssignments:', projectAssignments);
-            console.log('localStorage projectManagers:', localStorage.getItem('projectManagers'));
-            console.log('localStorage projectAssignments:', localStorage.getItem('projectAssignments'));
-            
             // Test assignment
             if (projectManagers.length > 0 && billingData.length > 0) {
               const testProjectId = billingData[0].projectId;
               const testManagerId = projectManagers[0].id;
-              console.log('Testing assignment:', { testProjectId, testManagerId });
               handleAssignProjectManager(testProjectId, testManagerId);
             }
           }}
@@ -587,18 +583,6 @@ export default function ProjectionsTable({
                   const isEditingAsrFee = editingAsrFee === project.projectId;
                   const managerColor = getProjectManagerColor(project.projectId);
                   const assignedManager = projectManagers.find(m => m.id === projectAssignments[project.projectId]);
-                  
-                  // Debug log for first few projects
-                  if (project.projectId === billingData[0]?.projectId) {
-                    console.log('Rendering project row:', {
-                      projectId: project.projectId,
-                      projectName: project.projectName,
-                      projectAssignments,
-                      projectManagers: projectManagers.length,
-                      managerColor,
-                      assignedManager: assignedManager?.name
-                    });
-                  }
                   
                   return (
                     <tr 
@@ -646,7 +630,13 @@ export default function ProjectionsTable({
                             autoFocus
                           />
                         ) : (
-                          formatCurrency(signedFees[project.projectId] || project.signedFee || 0)
+                          (() => {
+                            const userSignedFee = signedFees[project.projectId];
+                            const zohoSignedFee = project.signedFee;
+                            const displayValue = userSignedFee || zohoSignedFee || 0;
+                            
+                            return formatCurrency(displayValue);
+                          })()
                         )}
                       </td>
                       <td 

@@ -503,9 +503,28 @@ export default function HighPerformanceTable({
   }, [asrFeesData, asrFees, projections]);
 
   const getTotalFee = useCallback((project: BillingData) => {
-    const signedFee = signedFeesData?.[project.projectId] || signedFees[project.projectId] || project.signedFee || 0;
+    // Prioritize user-entered data over API data
+    const userSignedFee = signedFees[project.projectId];
+    const apiSignedFee = signedFeesData?.[project.projectId];
+    const zohoSignedFee = project.signedFee;
+    
+    // Use user-entered data first, then API data, then Zoho data
+    const finalSignedFee = userSignedFee !== undefined ? userSignedFee : 
+                          (apiSignedFee !== undefined ? apiSignedFee : 
+                          (zohoSignedFee || 0));
+    
+    console.log('HighPerformanceTable getTotalFee debug:', {
+      projectId: project.projectId,
+      userSignedFee,
+      apiSignedFee,
+      zohoSignedFee,
+      finalSignedFee,
+      signedFeesData: signedFeesData,
+      signedFees: signedFees
+    });
+    
     const asrFee = getAsrFee(project.projectId);
-    return signedFee + asrFee;
+    return finalSignedFee + asrFee;
   }, [signedFeesData, signedFees, getAsrFee]);
 
   const getTotalProjected = useCallback((projectId: string) => {
@@ -850,6 +869,39 @@ export default function HighPerformanceTable({
     }
   };
 
+  // Sync SWR data with local state (but preserve user-entered data)
+  useEffect(() => {
+    if (signedFeesData && Object.keys(signedFeesData).length > 0) {
+      setSignedFees(prev => {
+        const merged = { ...prev };
+        Object.keys(signedFeesData).forEach(projectId => {
+          // Only update if user hasn't entered a value for this project
+          if (merged[projectId] === undefined) {
+            merged[projectId] = signedFeesData[projectId];
+          }
+        });
+        console.log('Syncing signed fees from SWR:', { prev, signedFeesData, merged });
+        return merged;
+      });
+    }
+  }, [signedFeesData]);
+
+  useEffect(() => {
+    if (asrFeesData && Object.keys(asrFeesData).length > 0) {
+      setAsrFees(prev => {
+        const merged = { ...prev };
+        Object.keys(asrFeesData).forEach(projectId => {
+          // Only update if user hasn't entered a value for this project
+          if (merged[projectId] === undefined) {
+            merged[projectId] = asrFeesData[projectId];
+          }
+        });
+        console.log('Syncing ASR fees from SWR:', { prev, asrFeesData, merged });
+        return merged;
+      });
+    }
+  }, [asrFeesData]);
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
@@ -1043,15 +1095,39 @@ export default function HighPerformanceTable({
                             autoFocus
                           />
                         ) : (
-                          <div 
-                            className="text-sm cursor-pointer hover:bg-gray-100 p-1 rounded"
-                            onClick={() => {
-                              setEditingSignedFee(project.projectId);
-                              setEditValue((signedFees[project.projectId] || project.signedFee || 0).toString());
-                            }}
-                          >
-                            {formatCurrency(signedFees[project.projectId] || project.signedFee || 0)}
-                          </div>
+                          (() => {
+                            // Prioritize user-entered data over API data
+                            const userSignedFee = signedFees[project.projectId];
+                            const apiSignedFee = signedFeesData?.[project.projectId];
+                            const zohoSignedFee = project.signedFee;
+                            
+                            // Use user-entered data first, then API data, then Zoho data
+                            const displayValue = userSignedFee !== undefined ? userSignedFee : 
+                                              (apiSignedFee !== undefined ? apiSignedFee : 
+                                              (zohoSignedFee || 0));
+                            
+                            console.log('HighPerformanceTable signed fee display debug:', {
+                              projectId: project.projectId,
+                              userSignedFee,
+                              apiSignedFee,
+                              zohoSignedFee,
+                              displayValue,
+                              signedFeesData: signedFeesData,
+                              signedFees: signedFees
+                            });
+                            
+                            return (
+                              <div 
+                                className="text-sm cursor-pointer hover:bg-gray-100 p-1 rounded"
+                                onClick={() => {
+                                  setEditingSignedFee(project.projectId);
+                                  setEditValue(displayValue.toString());
+                                }}
+                              >
+                                {formatCurrency(displayValue)}
+                              </div>
+                            );
+                          })()
                         )}
                       </div>
                     </div>
