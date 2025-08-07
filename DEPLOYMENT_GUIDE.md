@@ -34,14 +34,9 @@ The deployment was failing due to:
 6. Click **Create**
 
 ### 2. Environment Variables
-Vercel will automatically add these environment variables:
+Vercel will automatically add these environment variables for Prisma Accelerate:
 - `POSTGRES_URL`
-- `POSTGRES_PRISMA_URL`
-- `POSTGRES_URL_NON_POOLING`
-- `POSTGRES_USER`
-- `POSTGRES_HOST`
-- `POSTGRES_PASSWORD`
-- `POSTGRES_DATABASE`
+- `PRISMA_DATABASE_URL`
 
 ### 3. Add Your Existing Environment Variables
 In your Vercel project settings, add these environment variables:
@@ -70,7 +65,7 @@ After deployment:
 1. Check that all environment variables are set in Vercel
 2. Verify the PostgreSQL database is created and running
 3. Check the build logs for specific errors
-4. If you see "PrismaClientInitializationError", ensure the build command includes `prisma generate`
+4. If you see "PrismaClientInitializationError", ensure the build command includes `prisma generate` and check that `PRISMA_DATABASE_URL` is set
 5. Clear Vercel's build cache by redeploying with "Clear cache and redeploy" option
 
 ### If database connection fails:
