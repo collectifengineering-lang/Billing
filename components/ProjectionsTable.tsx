@@ -128,6 +128,47 @@ export default function ProjectionsTable({
     }
   }, []);
 
+  // Load data from API
+  useEffect(() => {
+    const loadApiData = async () => {
+      try {
+        // Load signed fees from API
+        const signedFeesResponse = await fetch('/api/signed-fees');
+        if (signedFeesResponse.ok) {
+          const apiSignedFees = await signedFeesResponse.json();
+          setSignedFees(prev => ({ ...prev, ...apiSignedFees }));
+        }
+
+        // Load ASR fees from API
+        const asrFeesResponse = await fetch('/api/asr-fees');
+        if (asrFeesResponse.ok) {
+          const apiAsrFees = await asrFeesResponse.json();
+          setAsrFees(prev => ({ ...prev, ...apiAsrFees }));
+        }
+
+        // Load projections from API
+        const projectionsResponse = await fetch('/api/projections');
+        if (projectionsResponse.ok) {
+          const apiProjections = await projectionsResponse.json();
+          setMonthlyProjections(prev => {
+            const merged = { ...prev };
+            Object.keys(apiProjections).forEach(projectId => {
+              if (!merged[projectId]) merged[projectId] = {};
+              Object.keys(apiProjections[projectId]).forEach(month => {
+                merged[projectId][month] = apiProjections[projectId][month];
+              });
+            });
+            return merged;
+          });
+        }
+      } catch (error) {
+        console.error('Error loading data from API:', error);
+      }
+    };
+
+    loadApiData();
+  }, []);
+
   // Save closed projects to localStorage whenever they change
   useEffect(() => {
     console.log('Closed projects changed:', Array.from(closedProjects));
@@ -184,7 +225,7 @@ export default function ProjectionsTable({
     setEditValue(currentValue.toString());
   };
 
-  const handleCellSave = () => {
+  const handleCellSave = async () => {
     if (!editingCell) return;
 
     const { projectId, month } = editingCell;
@@ -192,53 +233,131 @@ export default function ProjectionsTable({
 
     console.log('Saving cell:', { projectId, month, newValue });
 
-    // Update monthly projections in state and localStorage
-    const updatedMonthlyProjections = {
-      ...monthlyProjections,
-      [projectId]: {
-        ...monthlyProjections[projectId],
-        [month]: newValue,
-      },
-    };
-    setMonthlyProjections(updatedMonthlyProjections);
-    localStorage.setItem('monthlyProjections', JSON.stringify(updatedMonthlyProjections));
+    try {
+      // Save to database via API
+      const response = await fetch('/api/projections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, month, value: newValue }),
+      });
 
-    setEditingCell(null);
-    setEditValue('');
+      if (!response.ok) {
+        throw new Error(`Failed to save projection: ${response.statusText}`);
+      }
+
+      // Update monthly projections in state and localStorage
+      const updatedMonthlyProjections = {
+        ...monthlyProjections,
+        [projectId]: {
+          ...monthlyProjections[projectId],
+          [month]: newValue,
+        },
+      };
+      setMonthlyProjections(updatedMonthlyProjections);
+      localStorage.setItem('monthlyProjections', JSON.stringify(updatedMonthlyProjections));
+
+      setEditingCell(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error saving projection:', error);
+      // Still update local state even if API call fails
+      const updatedMonthlyProjections = {
+        ...monthlyProjections,
+        [projectId]: {
+          ...monthlyProjections[projectId],
+          [month]: newValue,
+        },
+      };
+      setMonthlyProjections(updatedMonthlyProjections);
+      localStorage.setItem('monthlyProjections', JSON.stringify(updatedMonthlyProjections));
+      
+      setEditingCell(null);
+      setEditValue('');
+    }
   };
 
-  const handleAsrFeeSave = () => {
+  const handleAsrFeeSave = async () => {
     if (!editingAsrFee) return;
 
     const newValue = parseFloat(editValue) || 0;
 
-    // Update ASR fees in state and localStorage
-    const updatedAsrFees = {
-      ...asrFees,
-      [editingAsrFee]: newValue,
-    };
-    setAsrFees(updatedAsrFees);
-    localStorage.setItem('asrFees', JSON.stringify(updatedAsrFees));
+    try {
+      // Save to database via API
+      const response = await fetch('/api/asr-fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: editingAsrFee, value: newValue }),
+      });
 
-    setEditingAsrFee(null);
-    setEditValue('');
+      if (!response.ok) {
+        throw new Error(`Failed to save ASR fee: ${response.statusText}`);
+      }
+
+      // Update ASR fees in state and localStorage
+      const updatedAsrFees = {
+        ...asrFees,
+        [editingAsrFee]: newValue,
+      };
+      setAsrFees(updatedAsrFees);
+      localStorage.setItem('asrFees', JSON.stringify(updatedAsrFees));
+
+      setEditingAsrFee(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error saving ASR fee:', error);
+      // Still update local state even if API call fails
+      const updatedAsrFees = {
+        ...asrFees,
+        [editingAsrFee]: newValue,
+      };
+      setAsrFees(updatedAsrFees);
+      localStorage.setItem('asrFees', JSON.stringify(updatedAsrFees));
+      
+      setEditingAsrFee(null);
+      setEditValue('');
+    }
   };
 
-  const handleSignedFeeSave = () => {
+  const handleSignedFeeSave = async () => {
     if (!editingSignedFee) return;
 
     const newValue = parseFloat(editValue) || 0;
 
-    // Update signed fees in state and localStorage
-    const updatedSignedFees = {
-      ...signedFees,
-      [editingSignedFee]: newValue,
-    };
-    setSignedFees(updatedSignedFees);
-    localStorage.setItem('signedFees', JSON.stringify(updatedSignedFees));
+    try {
+      // Save to database via API
+      const response = await fetch('/api/signed-fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: editingSignedFee, value: newValue }),
+      });
 
-    setEditingSignedFee(null);
-    setEditValue('');
+      if (!response.ok) {
+        throw new Error(`Failed to save signed fee: ${response.statusText}`);
+      }
+
+      // Update signed fees in state and localStorage
+      const updatedSignedFees = {
+        ...signedFees,
+        [editingSignedFee]: newValue,
+      };
+      setSignedFees(updatedSignedFees);
+      localStorage.setItem('signedFees', JSON.stringify(updatedSignedFees));
+
+      setEditingSignedFee(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error saving signed fee:', error);
+      // Still update local state even if API call fails
+      const updatedSignedFees = {
+        ...signedFees,
+        [editingSignedFee]: newValue,
+      };
+      setSignedFees(updatedSignedFees);
+      localStorage.setItem('signedFees', JSON.stringify(updatedSignedFees));
+      
+      setEditingSignedFee(null);
+      setEditValue('');
+    }
   };
 
   const handleCellCancel = () => {

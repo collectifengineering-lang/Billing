@@ -1,1 +1,4 @@
-{}
+{
+  "/api/asr-fees/route": "app/api/asr-fees/route.js",
+  "/api/signed-fees/route": "app/api/signed-fees/route.js"
+}
