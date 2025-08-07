@@ -5,18 +5,34 @@ export async function migrateLocalStorageToDatabase() {
     console.log('Starting migration from localStorage to database...');
 
     // First, ensure database schema exists
-    await ensureDatabaseSchema();
+    const schemaExists = await ensureDatabaseSchema();
     console.log('Database schema setup completed');
 
-    // Check if database is empty
-    const projectionCount = await prisma.projection.count();
-    const statusCount = await prisma.status.count();
-    const commentCount = await prisma.comment.count();
-    const signedFeeCount = await prisma.signedFee.count();
-    const asrFeeCount = await prisma.asrFee.count();
-    const closedProjectCount = await prisma.closedProject.count();
-    const projectAssignmentCount = await prisma.projectAssignment.count();
-    const projectManagerCount = await prisma.projectManager.count();
+    if (!schemaExists) {
+      console.log('Tables do not exist yet, but Prisma Accelerate will create them on first insert');
+      console.log('Proceeding with migration - tables will be created automatically');
+    }
+
+    // Check if database is empty (only if tables exist)
+    let projectionCount = 0;
+    let statusCount = 0;
+    let commentCount = 0;
+    let signedFeeCount = 0;
+    let asrFeeCount = 0;
+    let closedProjectCount = 0;
+    let projectAssignmentCount = 0;
+    let projectManagerCount = 0;
+
+    if (schemaExists) {
+      projectionCount = await prisma.projection.count();
+      statusCount = await prisma.status.count();
+      commentCount = await prisma.comment.count();
+      signedFeeCount = await prisma.signedFee.count();
+      asrFeeCount = await prisma.asrFee.count();
+      closedProjectCount = await prisma.closedProject.count();
+      projectAssignmentCount = await prisma.projectAssignment.count();
+      projectManagerCount = await prisma.projectManager.count();
+    }
 
     if (projectionCount > 0 || statusCount > 0 || commentCount > 0 || 
         signedFeeCount > 0 || asrFeeCount > 0 || closedProjectCount > 0 || 

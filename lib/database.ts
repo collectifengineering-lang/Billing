@@ -11,7 +11,7 @@ export async function ensureDatabaseSchema() {
   } catch (error) {
     console.log('Tables do not exist, but Prisma Accelerate will create them automatically');
     console.log('Note: With Prisma Accelerate, tables are created automatically when you first insert data');
-    return true; // Let Prisma handle table creation automatically
+    return false; // Tables don't exist yet
   }
 }
 

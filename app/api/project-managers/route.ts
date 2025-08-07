@@ -5,7 +5,13 @@ import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 export async function GET() {
   try {
     // Ensure database schema exists
-    await ensureDatabaseSchema();
+    const schemaExists = await ensureDatabaseSchema();
+    
+    if (!schemaExists) {
+      // Tables don't exist yet, return empty data
+      console.log('Tables do not exist yet, returning empty project managers');
+      return NextResponse.json({});
+    }
     
     const projectManagers = await prisma.projectManager.findMany();
     // Transform to record format: { id: { name, color } }

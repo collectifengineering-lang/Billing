@@ -5,7 +5,13 @@ import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 export async function GET() {
   try {
     // Ensure database schema exists
-    await ensureDatabaseSchema();
+    const schemaExists = await ensureDatabaseSchema();
+    
+    if (!schemaExists) {
+      // Tables don't exist yet, return empty data
+      console.log('Tables do not exist yet, returning empty projections');
+      return NextResponse.json({});
+    }
     
     const projections = await prisma.projection.findMany();
     // Transform to record format: { projectId: { month: value } }
@@ -25,6 +31,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { projectId, month, value } = await request.json();
+    
+    // This will create the table if it doesn't exist (Prisma Accelerate behavior)
     await prisma.projection.upsert({
       where: { projectId_month: { projectId, month } },
       update: { value },

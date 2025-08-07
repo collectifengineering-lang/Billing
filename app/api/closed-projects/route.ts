@@ -5,7 +5,13 @@ import { prisma, ensureDatabaseSchema } from '../../../lib/database';
 export async function GET() {
   try {
     // Ensure database schema exists
-    await ensureDatabaseSchema();
+    const schemaExists = await ensureDatabaseSchema();
+    
+    if (!schemaExists) {
+      // Tables don't exist yet, return empty data
+      console.log('Tables do not exist yet, returning empty closed projects');
+      return NextResponse.json([]);
+    }
     
     const closedProjects = await prisma.closedProject.findMany();
     // Transform to array format for Set conversion
