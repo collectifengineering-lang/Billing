@@ -30,6 +30,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const { id, name, color } = await request.json();
+    
+    // Check if tables exist first
+    const schemaExists = await ensureDatabaseSchema();
+    
+    if (!schemaExists) {
+      console.log('Tables do not exist yet, but Prisma Accelerate will create them on first insert');
+      console.log('Attempting to create table by inserting data...');
+    }
+    
     await prisma.projectManager.upsert({
       where: { id },
       update: { name, color },
