@@ -6,6 +6,13 @@ export const dynamic = 'force-dynamic';
 
 // GET: Fetch all project managers
 export async function GET() {
+  // Check if prisma client is available
+  if (!prisma) {
+    return NextResponse.json({ 
+      error: 'Database client not available' 
+    }, { status: 500 });
+  }
+
   try {
     // Ensure database schema exists
     const schemaExists = await ensureDatabaseSchema();
@@ -31,6 +38,13 @@ export async function GET() {
 
 // POST: Update or create project manager
 export async function POST(request: Request) {
+  // Check if prisma client is available
+  if (!prisma) {
+    return NextResponse.json({ 
+      error: 'Database client not available' 
+    }, { status: 500 });
+  }
+
   try {
     const { id, name, color } = await request.json();
     

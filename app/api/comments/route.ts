@@ -6,6 +6,13 @@ export const dynamic = 'force-dynamic';
 
 // GET: Fetch all comments
 export async function GET() {
+  // Check if prisma client is available
+  if (!prisma) {
+    return NextResponse.json({ 
+      error: 'Database client not available' 
+    }, { status: 500 });
+  }
+
   try {
     console.log('Fetching comments from database...');
     
@@ -41,6 +48,13 @@ export async function GET() {
 
 // POST: Update or create comment
 export async function POST(request: Request) {
+  // Check if prisma client is available
+  if (!prisma) {
+    return NextResponse.json({ 
+      error: 'Database client not available' 
+    }, { status: 500 });
+  }
+
   // Parse request data once and store it
   const requestData = await request.json();
   const { projectId, month, comment } = requestData;

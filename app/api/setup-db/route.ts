@@ -5,6 +5,13 @@ import { prisma } from '../../../lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
+  // Check if prisma client is available
+  if (!prisma) {
+    return NextResponse.json({ 
+      error: 'Database client not available' 
+    }, { status: 500 });
+  }
+
   try {
     console.log('Testing database connection...');
     
