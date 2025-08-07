@@ -5,6 +5,10 @@ export async function POST() {
   try {
     console.log('Starting database migration...');
     
+    // Debug: Log DATABASE_URL prefix for debugging (redacted)
+    const dbUrl = process.env.DATABASE_URL;
+    console.log('DB URL prefix:', dbUrl ? `${dbUrl.substring(0, 20)}...` : 'DATABASE_URL not set');
+    
     // This will attempt to create the database schema
     // We'll use a more direct approach by creating the tables manually
     
@@ -14,11 +18,13 @@ export async function POST() {
       console.log('Database schema already exists');
       return NextResponse.json({ success: true, message: 'Database schema already exists' });
     } catch (error: any) {
+      console.log('Error checking tables:', error.code, error.message);
+      
       if (error.code === 'P2021' || error.message?.includes('does not exist')) {
         console.log('Tables do not exist, creating schema...');
         
         // Try to create tables by inserting test data
-        // This should trigger Prisma Accelerate to create the tables
+        // This should trigger Prisma to create the tables
         
         try {
           // Create test data for each table to trigger table creation
@@ -111,9 +117,12 @@ export async function POST() {
           return NextResponse.json({ success: true, message: 'Database schema created successfully' });
         } catch (createError: any) {
           console.error('Failed to create database schema:', createError);
+          console.error('Error code:', createError.code);
+          console.error('Error message:', createError.message);
           return NextResponse.json({ 
             error: 'Failed to create database schema', 
-            details: createError.message 
+            details: createError.message,
+            code: createError.code
           }, { status: 500 });
         }
       } else {
@@ -122,9 +131,12 @@ export async function POST() {
     }
   } catch (error: any) {
     console.error('Database migration failed:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
     return NextResponse.json({ 
       error: 'Database migration failed', 
-      details: error.message 
+      details: error.message,
+      code: error.code
     }, { status: 500 });
   }
 } 
