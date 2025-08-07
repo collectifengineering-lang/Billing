@@ -16,9 +16,9 @@ After the Supabase integration, you need to manually add these additional enviro
 
 ### Required Variables:
 
-1. **`DATABASE_URL`** (Pooled connection for runtime queries):
+1. **`DATABASE_URL`** (Pooled connection for runtime queries - optimized for Vercel):
    ```
-   postgres://postgres.rjhkagqsiamwpiiszbgs:eUAUpixlcPkwgMhs@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1
+   postgres://postgres.rjhkagqsiamwpiiszbgs:eUAUpixlcPkwgMhs@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=3&pool_timeout=30
    ```
 
 2. **`DIRECT_URL`** (Direct connection for migrations):
@@ -73,6 +73,12 @@ curl -X POST https://your-app.vercel.app/api/migrate
 
 ## Troubleshooting
 
+### For Vercel runtime issues like 500 errors:
+1. **Ensure PrismaClient is a singleton** to avoid connection exhaustion
+2. **Check Vercel Runtime Logs** for detailed errors post-deploy
+3. **If max connections reached**, adjust `connection_limit=3` in `DATABASE_URL`
+4. **Verify the optimized DATABASE_URL** includes `&connection_limit=3&pool_timeout=30`
+
 ### If you see P6001 errors:
 1. **Confirm no Accelerate environment variables remain** in your Vercel project
 2. **Check that `vercel.json` does NOT have** `PRISMA_GENERATE_DATAPROXY: "true"`
@@ -81,7 +87,7 @@ curl -X POST https://your-app.vercel.app/api/migrate
 
 ### If you see connection timeouts or pool errors:
 1. **Verify `DATABASE_URL` uses port 6543** (pooled connection)
-2. **Check that `&pgbouncer=true&connection_limit=1`** parameters are included
+2. **Check that `&pgbouncer=true&connection_limit=3&pool_timeout=30`** parameters are included
 3. **Ensure `DIRECT_URL` uses port 5432** (direct connection)
 4. **Run migrations via `/api/migrate`** after deployment
 
@@ -98,7 +104,7 @@ curl -X POST https://your-app.vercel.app/api/migrate
 3. Ensure the database is accessible from your deployment
 
 ### Environment Variable Checklist:
-- ✅ `DATABASE_URL` (pooled, port 6543, with `&pgbouncer=true&connection_limit=1`)
+- ✅ `DATABASE_URL` (pooled, port 6543, with `&pgbouncer=true&connection_limit=3&pool_timeout=30`)
 - ✅ `DIRECT_URL` (direct, port 5432, no pooling parameters)
 - ✅ `NEXT_PUBLIC_SUPABASE_URL`
 - ✅ `NEXT_PUBLIC_SUPABASE_ANON_KEY`

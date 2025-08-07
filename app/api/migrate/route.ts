@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '../../../lib/database';
+import prisma from '../../../lib/db';
 
 export async function POST() {
   try {
