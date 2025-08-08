@@ -1,312 +1,65 @@
 # PostgreSQL Setup Guide
 
-## Overview
-This guide covers setting up PostgreSQL database integration for the billing platform, including Supabase integration, Prisma configuration, and localStorage migration.
+## Database Configuration
 
-## Database Setup
+### Environment Variables
 
-### Option 1: Supabase (Recommended)
+Set these in your `.env` file and Vercel dashboard:
 
-#### 1. Create Supabase Project
-1. Go to [Supabase](https://supabase.com)
-2. Create a new project
-3. Note your project URL and API keys
-
-#### 2. Environment Variables
-Add these to your `.env.local` and Vercel environment variables:
-
-```bash
-# Supabase Configuration
-DATABASE_URL="postgresql://[user]:[password]@db.[project-ref].supabase.co:6543/postgres?pgbouncer=true&connection_limit=1&pool_timeout=30&prepared_statements=false"
+```env
+DATABASE_URL="postgresql://[user]:[password]@db.[project-ref].supabase.co:6543/postgres?pgbouncer=true&connection_limit=1&pool_timeout=30&connect_timeout=30&prepared_statements=false"
 DIRECT_URL="postgresql://[user]:[password]@db.[project-ref].supabase.co:5432/postgres"
-SUPABASE_URL="https://[project-ref].supabase.co"
-SUPABASE_ANON_KEY="[your-anon-key]"
-SUPABASE_SERVICE_ROLE_KEY="[your-service-role-key]"
-NEXT_PUBLIC_SUPABASE_URL="https://[project-ref].supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="[your-anon-key]"
-NEXT_PUBLIC_USE_DB="true"
 ```
 
-**Important**: For max connections errors on Supabase free tier, set DATABASE_URL params: `?pgbouncer=true&connection_limit=1&pool_timeout=30&prepared_statements=false`. Use transaction mode (port 6543) for runtime to leverage pooling. Direct connections (port 5432) are limited to ~2 concurrent on free tier, so reserve for migrations.
+**Important:** Use transaction mode (port 6543) for runtime queries with pooling parameters. Use direct connection (port 5432) for migrations.
 
-#### 3. Database Schema
-Run the provided SQL script in Supabase SQL Editor:
+### Connection Parameters Explained
 
-```sql
--- Enable RLS
-ALTER TABLE IF EXISTS "Projection" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS "Status" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS "Comment" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS "SignedFee" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS "AsrFee" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS "ClosedProject" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS "ProjectAssignment" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS "ProjectManager" ENABLE ROW LEVEL SECURITY;
+- `pgbouncer=true`: Enables connection pooling
+- `connection_limit=1`: Limits to one connection per function invocation (prevents pile-up)
+- `pool_timeout=30`: Longer wait time to reduce timeouts
+- `connect_timeout=30`: Connection timeout for better handling of transient issues
+- `prepared_statements=false`: Disables prepared statements to fix common Prisma pooling errors
 
--- Create policies (permissive for now)
-CREATE POLICY "Enable all access" ON "Projection" FOR ALL USING (true);
-CREATE POLICY "Enable all access" ON "Status" FOR ALL USING (true);
-CREATE POLICY "Enable all access" ON "Comment" FOR ALL USING (true);
-CREATE POLICY "Enable all access" ON "SignedFee" FOR ALL USING (true);
-CREATE POLICY "Enable all access" ON "AsrFee" FOR ALL USING (true);
-CREATE POLICY "Enable all access" ON "ClosedProject" FOR ALL USING (true);
-CREATE POLICY "Enable all access" ON "ProjectAssignment" FOR ALL USING (true);
-CREATE POLICY "Enable all access" ON "ProjectManager" FOR ALL USING (true);
-```
-
-### Option 2: Vercel Postgres
-1. Go to Vercel Dashboard → Your Project → Storage
-2. Create a new Postgres database
-3. Copy the connection strings to environment variables
-
-## Prisma Configuration
-
-### 1. Schema Configuration
-Ensure `prisma/schema.prisma` has the correct configuration:
-
-```prisma
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")  // Pooled URL for runtime queries
-  directUrl = env("DIRECT_URL")    // Direct URL for migrations and Prisma Studio
-}
-
-generator client {
-  provider = "prisma-client-js"
-}
-```
-
-### 2. Generate Prisma Client
-```bash
-npx prisma generate
-```
-
-### 3. Push Schema to Database
-```bash
-npx prisma db push
-```
-
-## localStorage Migration
-
-### Automatic Migration
-The application now includes automatic localStorage migration:
-
-1. **Detection**: App detects existing localStorage data on first load
-2. **Migration**: Data is automatically migrated to database via API calls
-3. **Cleanup**: localStorage is cleared after successful migration
-4. **Database-Only**: All future operations use database exclusively
-
-### Migration Process
-- **Projections**: Monthly revenue projections
-- **Statuses**: Project status tracking
-- **Comments**: Project notes and comments
-- **Signed Fees**: User-entered fee amounts
-- **ASR Fees**: Additional service revenue
-- **Closed Projects**: Completed project tracking
-- **Project Assignments**: Manager assignments
-- **Project Managers**: Manager definitions
-
-### Manual Migration (if needed)
-If automatic migration fails, you can manually trigger it:
-
-```javascript
-// In browser console
-await fetch('/api/migrate', { method: 'POST' });
-```
-
-## Environment Variables
-
-### Required Variables
-```bash
-# Database URLs
-DATABASE_URL="postgresql://[user]:[password]@[host]:6543/[db]?pgbouncer=true&connection_limit=3&pool_timeout=30"
-DIRECT_URL="postgresql://[user]:[password]@[host]:5432/[db]"
-
-# Supabase (if using Supabase)
-SUPABASE_URL="https://[project-ref].supabase.co"
-SUPABASE_ANON_KEY="[your-anon-key]"
-SUPABASE_SERVICE_ROLE_KEY="[your-service-role-key]"
-NEXT_PUBLIC_SUPABASE_URL="https://[project-ref].supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="[your-anon-key]"
-
-# Feature Flags
-NEXT_PUBLIC_USE_DB="true"
-```
-
-### Vercel Configuration
-1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
-2. Add all required environment variables
-3. Redeploy the application
+**Note:** Supabase uses a single database, so `shadowDatabaseUrl` is not needed and would cause validation errors.
 
 ## Troubleshooting
 
-### Common Issues
+### Connection Timeouts
 
-#### 1. PrismaClientInitializationError
-**Error**: `Error validating datasource db: the URL must start with the protocol prisma:// or prisma+postgres://`
+If you encounter connection timeouts:
 
-**Solution**:
-- Ensure `DATABASE_URL` uses `postgresql://` protocol (not `postgres://`)
-- Remove any Prisma Accelerate configuration from `vercel.json`
-- Verify environment variables are correctly set in Vercel
+1. **Check your DATABASE_URL**: Ensure it uses port 6543 and includes the pooling parameters
+2. **Verify DIRECT_URL**: Should use port 5432 for migrations
+3. **Test locally**: Run `npx prisma db push` with DIRECT_URL in your .env
 
-#### 2. Connection Timeouts
-**Error**: Database connection timeouts or pool errors
+### Max Connections Errors (Supabase Free Tier)
 
-**Solution**:
-- Verify `DATABASE_URL` includes `pgbouncer=true&connection_limit=1&pool_timeout=30&prepared_statements=false`
-- Check Supabase connection limits
-- Ensure `DIRECT_URL` is set for migrations
-- For Supabase free tier max connections: Use `connection_limit=1` per function to avoid pile-up
+If you get "max connections" errors:
 
-#### 3. RLS Errors
-**Error**: Row Level Security warnings in Supabase
+1. **Update DATABASE_URL**: Use the exact format above with `connection_limit=1`
+2. **Use singleton pattern**: Ensure all API routes import the same Prisma client instance
+3. **Disable prepared statements**: Add `prepared_statements=false` to prevent pooling issues
 
-**Solution**:
-- Run the RLS setup SQL script in Supabase SQL Editor
-- Ensure all tables have RLS enabled with appropriate policies
+### Vercel Build Errors
 
-#### 4. Max Connections Errors (Supabase Free Tier)
-**Error**: `FATAL: remaining connection slots are reserved for non-replication superuser connections`
+If you encounter "invalid domain character in database URL" during Vercel deployment:
 
-**Solution**:
-- Update DATABASE_URL to use `connection_limit=1` (one connection per Vercel function)
-- Add `prepared_statements=false` to prevent Prisma pooling errors
-- Use transaction mode (port 6543) for runtime operations
-- Reserve direct connections (port 5432) for migrations only
-- If migrations fail, run `prisma db push` locally with DIRECT_URL in .env, then test app
-
-#### 5. Migration Issues
-**Error**: localStorage migration fails
-
-**Solution**:
-- Check browser console for specific error messages
-- Verify all API endpoints are working
-- Try manual migration via browser console
-- Clear localStorage and start fresh if needed
-
-### Testing Database Connection
-
-#### 1. Test Migration Endpoint
-```bash
-curl -X POST https://your-app.vercel.app/api/migrate
-```
-
-#### 2. Test API Endpoints
-```bash
-# Test projections
-curl https://your-app.vercel.app/api/projections
-
-# Test statuses
-curl https://your-app.vercel.app/api/statuses
-
-# Test comments
-curl https://your-app.vercel.app/api/comments
-```
-
-#### 3. Check Database Tables
-In Supabase SQL Editor:
-```sql
-SELECT * FROM "Projection" LIMIT 5;
-SELECT * FROM "Status" LIMIT 5;
-SELECT * FROM "Comment" LIMIT 5;
-```
-
-## Performance Optimization
-
-### Connection Pooling
-- **Runtime**: Use pooled connections (`DATABASE_URL` on port 6543)
-- **Migrations**: Use direct connections (`DIRECT_URL` on port 5432)
-- **Limits**: Set `connection_limit=3` for Vercel serverless functions
-
-### SWR Configuration
-The application uses SWR with optimized settings:
-```javascript
-const swrConfig = {
-  revalidateOnFocus: true,
-  revalidateOnReconnect: true,
-  refreshInterval: 0, // Disable auto-refresh, rely on focus/reconnect
-};
-```
-
-### Caching Strategy
-- **Client-side**: SWR provides intelligent caching
-- **Server-side**: Prisma connection pooling
-- **Real-time**: Focus and reconnect triggers data refresh
-
-## Security Considerations
-
-### Row Level Security (RLS)
-- All tables have RLS enabled
-- Permissive policies for development
-- Customize policies for production
-
-### Environment Variables
-- Never commit sensitive data to version control
-- Use Vercel environment variables for production
-- Rotate database credentials regularly
-
-### API Security
-- All endpoints require proper authentication
-- Input validation on all API calls
-- Error messages don't expose sensitive information
-
-## Monitoring and Maintenance
-
-### Database Monitoring
-- Monitor connection pool usage
-- Track query performance
-- Set up alerts for connection failures
-
-### Application Monitoring
-- Monitor API response times
-- Track migration success rates
-- Monitor SWR cache hit rates
-
-### Regular Maintenance
-- Update Prisma client regularly
-- Monitor Supabase usage limits
-- Review and update RLS policies
-
-## Support
-
-For database-related issues:
-1. Check the troubleshooting section above
-2. Verify environment variables are correctly set
-3. Test database connectivity directly
-4. Review Supabase/Vercel logs for detailed error information
-5. Contact system administrator for database access issues 
-
-## Vercel Build Error Fix
-
-### All API routes now have `export const dynamic = 'force-dynamic'`
-This prevents static generation and ensures routes only run at runtime, avoiding build-time database connection attempts.
-
-### Prisma client is configured to skip database connections during build time
-This ensures that the Prisma client does not attempt to connect to the database during the Next.js build process.
-
-### Environment variables should be properly set in Vercel dashboard
-This includes `DATABASE_URL`, `DIRECT_URL`, and any other relevant environment variables.
+1. **All API routes now have `export const dynamic = 'force-dynamic'`** to prevent static generation
+2. **Prisma client is configured** to skip database connections during build time
+3. **Environment variables** should be properly set in Vercel dashboard
 
 **Note:** The build error occurs because Next.js tries to statically generate API routes during build, which attempts database connections. The `dynamic = 'force-dynamic'` export prevents this.
 
-## Dynamic API Route Configuration
+### Prisma Schema Validation Errors
 
-All API routes now include:
-```typescript
-export const dynamic = 'force-dynamic';
-```
+If you get "shadowDatabaseUrl is the same as directUrl" error:
 
-This prevents static generation and ensures routes only run at runtime, avoiding build-time database connection attempts.
+1. **Remove shadowDatabaseUrl**: Supabase uses a single database, so shadow database is not needed
+2. **Use only url and directUrl**: Keep the configuration simple for Supabase
+3. **Run `prisma generate`**: After fixing the schema
 
-## Testing
-
-After deployment, test your database connection:
-- Visit `/api/test-db` to verify the connection works
-- Check Vercel function logs for any connection errors
-- Monitor Supabase dashboard for connection usage 
-
-## Troubleshooting Connection Strings
+### Troubleshooting Connection Strings
 
 If you get "invalid domain character in database URL" error:
 
@@ -321,10 +74,11 @@ If you get "invalid domain character in database URL" error:
    - `+` → `%2B`
    - `=` → `%3D`
    - `?` → `%3F`
+   - `space` → `%20`
 
-2. **Example**: If password is `p@ss$word`, change to:
+2. **Example**: If password is `p@ss:word`, change to:
    ```
-   postgresql://postgres.[user]:p%40ss%24word@db.[ref].supabase.co:6543/postgres?pgbouncer=true&connection_limit=1&pool_timeout=30&prepared_statements=false
+   postgresql://postgres.[user]:p%40ss%3Aword@db.[ref].supabase.co:6543/postgres?pgbouncer=true&connection_limit=1&pool_timeout=30&connect_timeout=30&prepared_statements=false
    ```
 
 3. **Check for typos/spaces** in Vercel environment variables
@@ -337,7 +91,7 @@ If migrations fail:
 
 1. **Run locally first**: `npx prisma db push` with DIRECT_URL
 2. **Check environment**: Ensure DIRECT_URL is set correctly
-3. **Test connection**: Use the `/api/test-db` endpoint after deployment 
+3. **Test connection**: Use the `/api/test-db` endpoint after deployment
 
 ### Migration Troubleshooting
 
