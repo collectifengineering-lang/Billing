@@ -1,37 +1,39 @@
-import { BillingData } from '@/lib/types';
+import { BillingData, DashboardStats as DashboardStatsType } from '@/lib/types';
 import { calculateDashboardStats, formatCurrency } from '@/lib/utils';
 import { DollarSign, FileText, TrendingUp, Users } from 'lucide-react';
 
 interface DashboardStatsProps {
   billingData: BillingData[];
   closedProjects?: Set<string>;
+  stats?: DashboardStatsType;
 }
 
-export default function DashboardStats({ billingData, closedProjects }: DashboardStatsProps) {
-  const stats = calculateDashboardStats(billingData, closedProjects);
+export default function DashboardStats({ billingData, closedProjects, stats }: DashboardStatsProps) {
+  // Use provided stats or calculate them
+  const calculatedStats = stats || calculateDashboardStats(billingData, closedProjects);
 
   const statCards = [
     {
       name: 'Total Projects',
-      value: stats.totalProjects,
+      value: calculatedStats.totalProjects,
       icon: FileText,
       color: 'bg-blue-500',
     },
     {
       name: 'Total Billed YTD',
-      value: formatCurrency(stats.totalBilled),
+      value: formatCurrency(calculatedStats.totalBilled),
       icon: DollarSign,
       color: 'bg-green-500',
     },
     {
       name: 'Backlog',
-      value: formatCurrency(stats.totalUnbilled),
+      value: formatCurrency(calculatedStats.totalUnbilled),
       icon: TrendingUp,
       color: 'bg-yellow-500',
     },
     {
       name: 'Active Projects',
-      value: stats.activeProjects,
+      value: calculatedStats.activeProjects,
       icon: Users,
       color: 'bg-purple-500',
     },

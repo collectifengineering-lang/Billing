@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import { useMigration } from '../lib/migrationContext';
 import { Project, Invoice, BillingData } from '../lib/types';
-import { processBillingData, initializeProjectionsTable } from '../lib/utils';
+import { processBillingData, initializeProjectionsTable, enhanceBillingDataWithClockify, calculateDashboardStats } from '../lib/utils';
 import { fetchProjects, fetchInvoices, zohoService } from '../lib/zoho';
+import { fetchAllClockifyTimeSummaries } from '../lib/clockify';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardStats from '../components/DashboardStats';
+import EnhancedDashboardStats from '../components/EnhancedDashboardStats';
 import BillingChart from '../components/BillingChart';
 import HighPerformanceTable from '../components/HighPerformanceTable';
 
@@ -24,6 +26,18 @@ export default function Dashboard() {
   const [projections, setProjections] = useState<any>({});
   const [autoRefreshStatus, setAutoRefreshStatus] = useState<any>(null);
   const [closedProjects, setClosedProjects] = useState<Set<string>>(new Set());
+  const [clockifyData, setClockifyData] = useState<any[]>([]);
+  const [useEnhancedStats, setUseEnhancedStats] = useState(false);
+  const [clockifyStatus, setClockifyStatus] = useState<{
+    configured: boolean;
+    error?: string;
+    workspaces?: any[];
+  }>({ configured: false });
+  
+  // Database data for dashboard stats
+  const [monthlyProjections, setMonthlyProjections] = useState<Record<string, Record<string, number>>>({});
+  const [monthlyStatuses, setMonthlyStatuses] = useState<Record<string, Record<string, string>>>({});
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
 
   // Force useDB to true - always use database now
   const useDB = true;
@@ -73,6 +87,34 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch database projections and statuses
+  useEffect(() => {
+    const fetchDatabaseData = async () => {
+      try {
+        const [projectionsResponse, statusesResponse] = await Promise.all([
+          fetch('/api/projections'),
+          fetch('/api/statuses')
+        ]);
+        
+        if (projectionsResponse.ok) {
+          const projectionsData = await projectionsResponse.json();
+          setMonthlyProjections(projectionsData);
+        }
+        
+        if (statusesResponse.ok) {
+          const statusesData = await statusesResponse.json();
+          setMonthlyStatuses(statusesData);
+        }
+      } catch (error) {
+        console.error('Error fetching database data:', error);
+      }
+    };
+
+    if (user && user.isBasic) {
+      fetchDatabaseData();
+    }
+  }, [user]);
+
   // Process billing data when projects or invoices change
   useEffect(() => {
     if (projects.length > 0 || invoices.length > 0) {
@@ -91,6 +133,79 @@ export default function Dashboard() {
       console.log('Dashboard: Invoices length:', invoices.length);
     }
   }, [projects, invoices, user, loading]);
+
+  // Calculate dashboard stats when data changes
+  useEffect(() => {
+    if (billingData.length > 0) {
+      const stats = calculateDashboardStats(billingData, closedProjects, monthlyProjections, monthlyStatuses);
+      setDashboardStats(stats);
+    }
+  }, [billingData, closedProjects, monthlyProjections, monthlyStatuses]);
+
+  // Enhance billing data with Clockify data when available
+  useEffect(() => {
+    if (billingData.length > 0 && clockifyData.length > 0) {
+      console.log('Dashboard: Enhancing billing data with Clockify data');
+      const enhancedData = enhanceBillingDataWithClockify(billingData, clockifyData);
+      setBillingData(enhancedData);
+      setUseEnhancedStats(true);
+    }
+  }, [billingData, clockifyData]);
+
+  // Test Clockify connection on mount
+  useEffect(() => {
+    testClockifyConnection();
+  }, []);
+
+  const testClockifyConnection = async () => {
+    try {
+      console.log('Dashboard: Testing Clockify connection...');
+      const response = await fetch('/api/clockify?action=test-connection');
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('Dashboard: Clockify connection successful');
+        setClockifyStatus({
+          configured: true,
+          workspaces: data.workspaces
+        });
+        
+        // Fetch Clockify data if connection is successful
+        await fetchClockifyData();
+      } else {
+        console.log('Dashboard: Clockify connection failed:', data.error);
+        setClockifyStatus({
+          configured: false,
+          error: data.error
+        });
+      }
+    } catch (error) {
+      console.error('Dashboard: Error testing Clockify connection:', error);
+      setClockifyStatus({
+        configured: false,
+        error: 'Failed to connect to Clockify'
+      });
+    }
+  };
+
+  const fetchClockifyData = async () => {
+    try {
+      console.log('Dashboard: Fetching Clockify data...');
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 12); // Last 12 months
+      const endDate = new Date();
+      
+      const clockifySummaries = await fetchAllClockifyTimeSummaries(
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0]
+      );
+      setClockifyData(clockifySummaries);
+      console.log('Dashboard: Clockify data fetched:', clockifySummaries.length);
+    } catch (error) {
+      console.error('Dashboard: Error fetching Clockify data:', error);
+      setClockifyData([]);
+    }
+  };
 
   const fetchData = async () => {
     console.log('Dashboard: Starting fetchData');
@@ -114,13 +229,7 @@ export default function Dashboard() {
     }
   };
 
-  const refreshData = () => {
-    fetchData();
-  };
 
-  const forceRefreshData = () => {
-    fetchData();
-  };
 
   const updateProjections = (projectionsData: any) => {
     setProjections(projectionsData);
@@ -167,10 +276,33 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardHeader onRefresh={refreshData} onForceRefresh={forceRefreshData} cacheInfo={cacheInfo} autoRefreshStatus={autoRefreshStatus} />
+      <DashboardHeader cacheInfo={cacheInfo} autoRefreshStatus={autoRefreshStatus} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <DashboardStats billingData={billingData} closedProjects={closedProjects} />
+        {/* Clockify Status Indicator */}
+        {clockifyStatus.configured && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-md p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-800">
+                  Clockify Integration Active
+                </p>
+                <p className="text-xs text-green-600">
+                  Time tracking data will be included in dashboard metrics
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {useEnhancedStats && dashboardStats ? (
+          <EnhancedDashboardStats stats={dashboardStats} />
+        ) : (
+          <DashboardStats billingData={billingData} closedProjects={closedProjects} stats={dashboardStats} />
+        )}
         
         <div className="mt-8">
           <div className="bg-white rounded-lg shadow p-6">

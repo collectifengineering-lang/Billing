@@ -1,19 +1,19 @@
-import { RefreshCw, Database, List, Settings, Clock } from 'lucide-react';
+import { RefreshCw, Database, List, Settings, Clock, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useAuth } from '@/lib/AuthContext';
 
 interface DashboardHeaderProps {
-  onRefresh: () => void;
-  onForceRefresh: () => void;
-  refreshing?: boolean;
-  cacheInfo: any;
+  cacheInfo?: any;
   autoRefreshStatus?: {
     isActive: boolean;
     nextRefreshIn: number;
   };
 }
 
-export default function DashboardHeader({ onRefresh, onForceRefresh, cacheInfo, autoRefreshStatus }: DashboardHeaderProps) {
+export default function DashboardHeader({ cacheInfo, autoRefreshStatus }: DashboardHeaderProps) {
+  const { user } = useAuth();
+  
   const formatTimeRemaining = (ms: number): string => {
     const minutes = Math.floor(ms / (1000 * 60));
     const seconds = Math.floor((ms % (1000 * 60)) / 1000);
@@ -44,33 +44,28 @@ export default function DashboardHeader({ onRefresh, onForceRefresh, cacheInfo, 
                 <List className="h-5 w-5 mr-2" />
                 Project Summary
               </Link>
-              <Link 
-                href="/settings" 
-                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <Settings className="h-5 w-5 mr-2" />
-                Settings
-              </Link>
+              {user?.isAdmin && (
+                <Link 
+                  href="/dashboard" 
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <BarChart3 className="h-5 w-5 mr-2" />
+                  Financial Dashboard
+                </Link>
+              )}
+              {user?.isAdmin && (
+                <Link 
+                  href="/settings" 
+                  className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <Settings className="h-5 w-5 mr-2" />
+                  Settings
+                </Link>
+              )}
             </div>
           </div>
           
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={onRefresh}
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </button>
-              <button
-                onClick={onForceRefresh}
-                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-              >
-                <Database className="h-4 w-4 mr-2" />
-                Force Refresh
-              </button>
-            </div>
             
             {autoRefreshStatus && (
               <div className="flex items-center space-x-2 text-xs text-gray-500">

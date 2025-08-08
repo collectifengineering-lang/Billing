@@ -32,7 +32,7 @@ export interface AuthUser {
 }
 
 export const loginRequest = {
-  scopes: ['User.Read']
+  scopes: ['User.Read', 'Directory.Read.All']
 };
 
 export const graphConfig = {
@@ -68,16 +68,46 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     const account = msalInstance.getActiveAccount();
     if (!account) return null;
 
-    // For now, set basic access for all authenticated users
+    // Get user details from Microsoft Graph to check roles
+    const token = await msalInstance.acquireTokenSilent({
+      scopes: ['User.Read', 'Directory.Read.All']
+    });
+
+    const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+      headers: {
+        'Authorization': `Bearer ${token.accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch user details');
+    }
+
+    const userData = await response.json();
+    
+    // Check if user has admin role by looking at their email domain or specific admin emails
+    // You can customize this logic based on your Azure AD setup
+    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
+    const isAdmin = adminEmails.includes(userData.mail) || 
+                   adminEmails.includes(userData.userPrincipalName) ||
+                   userData.mail?.endsWith('@yourcompany.com'); // Replace with your admin domain
+
     return {
       id: account.localAccountId,
       name: account.name || '',
       email: account.username || '',
-      isAdmin: true,
-      isBasic: true,
+      isAdmin: isAdmin,
+      isBasic: true, // All authenticated users get basic access
     };
   } catch (error) {
     console.error('Get auth user error:', error);
-    return null;
+    // Fallback to basic user if Graph API fails
+    return {
+      id: account?.localAccountId || '',
+      name: account?.name || '',
+      email: account?.username || '',
+      isAdmin: false, // Default to non-admin for security
+      isBasic: true,
+    };
   }
 } 

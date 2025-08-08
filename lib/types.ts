@@ -1,4 +1,5 @@
 import { ZohoProject, ZohoInvoice } from './zoho';
+import { ClockifyTimeReport, ClockifyProject } from './clockify';
 
 export interface ProjectManager {
   id: string;
@@ -22,6 +23,13 @@ export interface BillingData {
   totalProjected: number;
   isClosed?: boolean;
   projectManagerId?: string;
+  // Clockify integration fields
+  clockifyData?: ClockifyTimeReport;
+  totalHours?: number;
+  billableHours?: number;
+  nonBillableHours?: number;
+  hourlyRate?: number;
+  efficiency?: number; // billable hours / total hours
 }
 
 export interface MonthlyBillingData {
@@ -58,6 +66,15 @@ export interface DashboardStats {
   totalUnbilled: number;
   totalProjected: number;
   activeProjects: number;
+  // Clockify KPIs
+  totalHours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  averageHourlyRate: number;
+  totalTimeValue: number;
+  efficiency: number; // billable hours / total hours
+  averageHoursPerProject: number;
+  topPerformingProjects: string[];
 }
 
 export interface Project {
@@ -105,4 +122,221 @@ export interface Invoice {
 
 export interface ProjectWithBilling extends ZohoProject {
   billingData: BillingData;
+}
+
+// New interfaces for Clockify integration
+export interface ClockifyIntegration {
+  isEnabled: boolean;
+  workspaceId?: string;
+  apiKey?: string;
+  lastSync?: string;
+  projectMappings?: ProjectMapping[];
+}
+
+export interface ProjectMapping {
+  zohoProjectId: string;
+  clockifyProjectId: string;
+  zohoProjectName: string;
+  clockifyProjectName: string;
+}
+
+export interface TimeTrackingKPI {
+  projectId: string;
+  projectName: string;
+  totalHours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  hourlyRate: number;
+  totalValue: number;
+  efficiency: number;
+  period: {
+    start: string;
+    end: string;
+  };
+}
+
+export interface EnhancedBillingData extends BillingData {
+  timeTracking?: TimeTrackingKPI;
+  profitability?: {
+    revenue: number;
+    cost: number;
+    profit: number;
+    margin: number;
+  };
+} 
+
+// New interfaces for payroll integration
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  status: 'active' | 'inactive';
+  department?: string;
+  position?: string;
+  hireDate: string;
+  terminationDate?: string;
+}
+
+export interface EmployeeSalary {
+  employeeId: string;
+  effectiveDate: string; // YYYY-MM-DD format
+  endDate?: string; // YYYY-MM-DD format, null if current
+  annualSalary: number;
+  hourlyRate: number; // Calculated from annual salary
+  currency: string;
+  notes?: string;
+}
+
+export interface ProjectMultiplier {
+  projectId: string;
+  projectName: string;
+  multiplier: number; // e.g., 2.5x, 3.0x
+  effectiveDate: string;
+  endDate?: string;
+  notes?: string;
+}
+
+export interface EmployeeTimeEntry {
+  employeeId: string;
+  employeeName: string;
+  projectId: string;
+  projectName: string;
+  date: string;
+  hours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  hourlyRate: number; // Employee's rate at that time
+  projectMultiplier: number; // Project multiplier at that time
+  totalCost: number; // hours * hourlyRate
+  billableValue: number; // billableHours * hourlyRate * multiplier
+  efficiency: number; // billableHours / hours
+  description?: string;
+  tags?: string[];
+}
+
+export interface ProjectProfitabilityReport {
+  projectId: string;
+  projectName: string;
+  period: {
+    start: string;
+    end: string;
+  };
+  totalHours: number;
+  totalBillableHours: number;
+  totalCost: number; // Sum of employee costs
+  totalRevenue: number; // From projections/billing
+  grossProfit: number; // Revenue - Cost
+  profitMargin: number; // (Gross Profit / Revenue) * 100
+  averageMultiplier: number;
+  employeeBreakdown: {
+    employeeId: string;
+    employeeName: string;
+    hours: number;
+    cost: number;
+    billableValue: number;
+    efficiency: number;
+  }[];
+  monthlyBreakdown: {
+    month: string;
+    hours: number;
+    cost: number;
+    revenue: number;
+    profit: number;
+  }[];
+}
+
+export interface EmployeeProfitabilityReport {
+  employeeId: string;
+  employeeName: string;
+  period: {
+    start: string;
+    end: string;
+  };
+  totalHours: number;
+  totalBillableHours: number;
+  totalCost: number;
+  totalBillableValue: number;
+  efficiency: number;
+  averageHourlyRate: number;
+  projectBreakdown: {
+    projectId: string;
+    projectName: string;
+    hours: number;
+    cost: number;
+    billableValue: number;
+    efficiency: number;
+  }[];
+}
+
+// Payroll system integration
+export interface PayrollSystem {
+  name: string;
+  type: 'gusto' | 'quickbooks' | 'adp' | 'surepayroll' | 'custom';
+  apiEndpoint?: string;
+  apiKey?: string;
+  webhookUrl?: string;
+}
+
+// BambooHR specific interfaces
+export interface SurePayrollConfig {
+  clientId: string;
+  apiKey: string;
+  webhookSecret?: string;
+}
+
+export interface SurePayrollEmployee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  email: string;
+  status: 'active' | 'inactive' | 'terminated';
+  hireDate: string;
+  terminationDate?: string;
+  department?: string;
+  jobTitle?: string;
+  location?: string;
+  supervisor?: string;
+  employeeNumber?: string;
+  customFields?: Record<string, any>;
+}
+
+export interface SurePayrollCompensation {
+  employeeId: string;
+  effectiveDate: string;
+  endDate?: string;
+  annualSalary: number;
+  hourlyRate: number;
+  currency: string;
+  paySchedule: 'weekly' | 'bi-weekly' | 'semi-monthly' | 'monthly';
+  payType: 'salary' | 'hourly';
+  benefits?: {
+    healthInsurance?: number;
+    retirement?: number;
+    other?: number;
+  };
+  notes?: string;
+}
+
+export interface SurePayrollTimeOff {
+  employeeId: string;
+  type: string;
+  startDate: string;
+  endDate: string;
+  hours: number;
+  status: 'approved' | 'pending' | 'denied';
+}
+
+export interface SurePayrollReport {
+  id: string;
+  name: string;
+  fields: string[];
+  filters?: Record<string, any>;
+}
+
+export interface SalaryImport {
+  source: 'manual' | 'api' | 'csv' | 'surepayroll';
+  importDate: string;
+  recordsImported: number;
+  errors?: string[];
 } 

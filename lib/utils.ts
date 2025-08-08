@@ -1,6 +1,13 @@
 import { format, subMonths, addMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 import { ZohoProject, ZohoInvoice } from './zoho';
-import { BillingData, MonthlyBillingData, ProjectionsTable, ProjectionCell, ChartData, DashboardStats } from './types';
+import { BillingData, MonthlyBillingData, ProjectionsTable, ProjectionCell, ChartData, DashboardStats, TimeTrackingKPI } from './types';
+import { ClockifyTimeReport } from './clockify';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export function generateMonthRange(startDate: Date, endDate: Date): string[] {
   const months: string[] = [];
@@ -90,7 +97,12 @@ export function processBillingData(
   });
 }
 
-export function calculateDashboardStats(billingData: BillingData[], closedProjects?: Set<string>): DashboardStats {
+export function calculateDashboardStats(
+  billingData: BillingData[], 
+  closedProjects?: Set<string>,
+  monthlyProjections?: Record<string, Record<string, number>>,
+  monthlyStatuses?: Record<string, Record<string, string>>
+): DashboardStats {
   // Handle undefined or null billingData
   if (!billingData || !Array.isArray(billingData)) {
     return {
@@ -99,6 +111,15 @@ export function calculateDashboardStats(billingData: BillingData[], closedProjec
       totalUnbilled: 0,
       totalProjected: 0,
       activeProjects: 0,
+      // Clockify KPIs
+      totalHours: 0,
+      billableHours: 0,
+      nonBillableHours: 0,
+      averageHourlyRate: 0,
+      totalTimeValue: 0,
+      efficiency: 0,
+      averageHoursPerProject: 0,
+      topPerformingProjects: [],
     };
   }
 
@@ -106,17 +127,17 @@ export function calculateDashboardStats(billingData: BillingData[], closedProjec
   const closedProjectsCount = closedProjects ? closedProjects.size : 0;
   const activeProjects = totalProjects - closedProjectsCount;
 
-  // Get data from localStorage for projections and statuses
-  const monthlyProjections = safeLocalStorageGet('monthlyProjections') || {};
-  const monthlyStatuses = safeLocalStorageGet('monthlyStatuses') || {};
+  // Use database projections and statuses if provided, otherwise fall back to localStorage
+  const projections = monthlyProjections || safeLocalStorageGet('monthlyProjections') || {};
+  const statuses = monthlyStatuses || safeLocalStorageGet('monthlyStatuses') || {};
   
   // Calculate Total Billed YTD (sum of all projections marked as "Billed" for current year)
   const currentYear = new Date().getFullYear().toString();
   let totalBilledYTD = 0;
   
-  Object.keys(monthlyProjections).forEach(projectId => {
-    const projectProjections = monthlyProjections[projectId];
-    const projectStatuses = monthlyStatuses[projectId];
+  Object.keys(projections).forEach(projectId => {
+    const projectProjections = projections[projectId];
+    const projectStatuses = statuses[projectId];
     
     if (projectProjections && projectStatuses) {
       Object.keys(projectProjections).forEach(month => {
@@ -132,9 +153,9 @@ export function calculateDashboardStats(billingData: BillingData[], closedProjec
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
   let backlog = 0;
   
-  Object.keys(monthlyProjections).forEach(projectId => {
-    const projectProjections = monthlyProjections[projectId];
-    const projectStatuses = monthlyStatuses[projectId];
+  Object.keys(projections).forEach(projectId => {
+    const projectProjections = projections[projectId];
+    const projectStatuses = statuses[projectId];
     
     if (projectProjections && projectStatuses) {
       Object.keys(projectProjections).forEach(month => {
@@ -146,12 +167,76 @@ export function calculateDashboardStats(billingData: BillingData[], closedProjec
     }
   });
 
+  // Calculate Total Projected (sum of all projections for current and future months)
+  let totalProjected = 0;
+  
+  Object.keys(projections).forEach(projectId => {
+    const projectProjections = projections[projectId];
+    
+    if (projectProjections) {
+      Object.keys(projectProjections).forEach(month => {
+        // Include all projections for current and future months
+        if (month >= currentMonth) {
+          totalProjected += projectProjections[month] || 0;
+        }
+      });
+    }
+  });
+
+  // Calculate Clockify KPIs
+  let totalHours = 0;
+  let billableHours = 0;
+  let nonBillableHours = 0;
+  let totalTimeValue = 0;
+  let totalHourlyRate = 0;
+  let projectsWithTimeData = 0;
+  const projectEfficiencies: { projectId: string; efficiency: number; hours: number }[] = [];
+
+  billingData.forEach(project => {
+    if (project.clockifyData) {
+      const timeData = project.clockifyData;
+      totalHours += timeData.totalHours;
+      billableHours += timeData.billableHours;
+      nonBillableHours += timeData.nonBillableHours;
+      totalTimeValue += timeData.billableAmount;
+      
+      if (timeData.totalHours > 0) {
+        const efficiency = timeData.billableHours / timeData.totalHours;
+        projectEfficiencies.push({
+          projectId: project.projectId,
+          efficiency,
+          hours: timeData.totalHours,
+        });
+        projectsWithTimeData++;
+      }
+    }
+  });
+
+  const averageHourlyRate = projectsWithTimeData > 0 ? totalTimeValue / billableHours : 0;
+  const efficiency = totalHours > 0 ? billableHours / totalHours : 0;
+  const averageHoursPerProject = projectsWithTimeData > 0 ? totalHours / projectsWithTimeData : 0;
+
+  // Get top performing projects (by efficiency and hours)
+  const topPerformingProjects = projectEfficiencies
+    .sort((a, b) => (b.efficiency * b.hours) - (a.efficiency * a.hours))
+    .slice(0, 5)
+    .map(p => p.projectId);
+
   return {
     totalProjects,
-    totalBilled: totalBilledYTD, // Use YTD billed amount
-    totalUnbilled: backlog, // Use backlog amount
-    totalProjected: billingData.reduce((sum, data) => sum + data.totalProjected, 0),
+    totalBilled: totalBilledYTD, // Use YTD billed amount from projections
+    totalUnbilled: backlog, // Use backlog amount from projections
+    totalProjected, // Use total projected amount from projections
     activeProjects,
+    // Clockify KPIs
+    totalHours,
+    billableHours,
+    nonBillableHours,
+    averageHourlyRate,
+    totalTimeValue,
+    efficiency,
+    averageHoursPerProject,
+    topPerformingProjects,
   };
 }
 
@@ -270,4 +355,77 @@ export function initializeProjectionsTable(projects: ZohoProject[]): Projections
   });
 
   return table;
+} 
+
+// New functions for Clockify integration
+export function calculateTimeTrackingKPIs(clockifyData: ClockifyTimeReport): TimeTrackingKPI {
+  const efficiency = clockifyData.totalHours > 0 ? clockifyData.billableHours / clockifyData.totalHours : 0;
+  const averageHourlyRate = clockifyData.billableHours > 0 ? clockifyData.billableAmount / clockifyData.billableHours : 0;
+
+  return {
+    projectId: clockifyData.projectId,
+    projectName: clockifyData.projectName,
+    totalHours: clockifyData.totalHours,
+    billableHours: clockifyData.billableHours,
+    nonBillableHours: clockifyData.nonBillableHours,
+    hourlyRate: averageHourlyRate,
+    totalValue: clockifyData.billableAmount,
+    efficiency,
+    period: clockifyData.period,
+  };
+}
+
+export function enhanceBillingDataWithClockify(
+  billingData: BillingData[],
+  clockifyReports: ClockifyTimeReport[]
+): BillingData[] {
+  return billingData.map(project => {
+    const clockifyReport = clockifyReports.find(report => 
+      report.projectId === project.projectId || 
+      report.projectName.toLowerCase().includes(project.projectName.toLowerCase())
+    );
+
+    if (clockifyReport) {
+      const timeTrackingKPI = calculateTimeTrackingKPIs(clockifyReport);
+      
+      return {
+        ...project,
+        clockifyData: clockifyReport,
+        totalHours: clockifyReport.totalHours,
+        billableHours: clockifyReport.billableHours,
+        nonBillableHours: clockifyReport.nonBillableHours,
+        hourlyRate: timeTrackingKPI.hourlyRate,
+        efficiency: timeTrackingKPI.efficiency,
+      };
+    }
+
+    return project;
+  });
+}
+
+export function calculateProfitabilityMetrics(
+  billingData: BillingData,
+  timeTrackingKPI?: TimeTrackingKPI
+) {
+  const revenue = billingData.totalBilled + billingData.totalUnbilled;
+  const cost = timeTrackingKPI ? timeTrackingKPI.totalValue : 0;
+  const profit = revenue - cost;
+  const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+  return {
+    revenue,
+    cost,
+    profit,
+    margin,
+  };
+}
+
+export function formatHours(hours: number): string {
+  const wholeHours = Math.floor(hours);
+  const minutes = Math.round((hours - wholeHours) * 60);
+  return `${wholeHours}h ${minutes}m`;
+}
+
+export function formatEfficiency(efficiency: number): string {
+  return `${(efficiency * 100).toFixed(1)}%`;
 } 
