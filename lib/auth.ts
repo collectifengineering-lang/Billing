@@ -90,7 +90,21 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
     const isAdmin = adminEmails.includes(userData.mail) || 
                    adminEmails.includes(userData.userPrincipalName) ||
-                   userData.mail?.endsWith('@yourcompany.com'); // Replace with your admin domain
+                   userData.mail?.endsWith('@collectif.nyc') || // Collectif domain
+                   userData.mail?.endsWith('@yourcompany.com'); // Legacy domain
+    
+    // Debug logging
+    console.log('Auth Debug:', {
+      userEmail: userData.mail,
+      userPrincipalName: userData.userPrincipalName,
+      adminEmails,
+      isAdmin,
+      adminEmailsIncludes: adminEmails.includes(userData.mail),
+      adminEmailsIncludesPrincipal: adminEmails.includes(userData.userPrincipalName),
+      endsWithCollectif: userData.mail?.endsWith('@collectif.nyc'),
+      endsWithLegacy: userData.mail?.endsWith('@yourcompany.com'),
+      envVar: process.env.NEXT_PUBLIC_ADMIN_EMAILS
+    });
 
     return {
       id: account.localAccountId,
@@ -103,6 +117,11 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     console.error('Get auth user error:', error);
     // Fallback to basic user if Graph API fails
     const account = msalInstance.getActiveAccount();
+    console.log('Auth Fallback Debug:', {
+      accountEmail: account?.username,
+      accountName: account?.name,
+      isAdmin: false
+    });
     return {
       id: account?.localAccountId || '',
       name: account?.name || '',
