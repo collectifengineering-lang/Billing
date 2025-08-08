@@ -102,6 +102,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   } catch (error) {
     console.error('Get auth user error:', error);
     // Fallback to basic user if Graph API fails
+    const account = msalInstance.getActiveAccount();
     return {
       id: account?.localAccountId || '',
       name: account?.name || '',

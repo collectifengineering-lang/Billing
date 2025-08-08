@@ -277,7 +277,7 @@ export interface PayrollSystem {
   webhookUrl?: string;
 }
 
-// BambooHR specific interfaces
+// SurePayroll specific interfaces
 export interface SurePayrollConfig {
   clientId: string;
   apiKey: string;
