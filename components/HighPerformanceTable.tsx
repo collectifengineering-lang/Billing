@@ -400,7 +400,11 @@ export default function HighPerformanceTable({
 
   const getProjectManagerColor = useCallback((projectId: string) => {
     const managerId = projectAssignmentsData?.[projectId];
-    const manager = projectManagersData?.find((m: ProjectManager) => m.id === managerId);
+    if (!managerId) return undefined;
+    if (projectManagersData && !Array.isArray(projectManagersData)) {
+      return projectManagersData[managerId]?.color;
+    }
+    const manager = (projectManagersData as ProjectManager[] | undefined)?.find((m: ProjectManager) => m.id === managerId);
     return manager?.color;
   }, [projectAssignmentsData, projectManagersData]);
 
@@ -1196,15 +1200,15 @@ export default function HighPerformanceTable({
               <div className="text-xs text-gray-400 italic">No project managers available</div>
             ) : (
               <div className="space-y-1">
-                {Object.values(projectManagersData || {}).map((manager: any) => (
+                {Object.entries(projectManagersData || {}).map(([id, manager]: [string, any]) => (
                   <button
-                    key={manager.id}
+                    key={id}
                     onClick={async () => {
                       try {
                         await fetch('/api/project-assignments', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ projectId: openDropdown, managerId: manager.id }),
+                          body: JSON.stringify({ projectId: openDropdown, managerId: id }),
                         });
                         mutateProjectAssignments();
                         setOpenDropdown(null);
