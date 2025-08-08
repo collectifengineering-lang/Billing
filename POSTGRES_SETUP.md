@@ -338,3 +338,28 @@ If migrations fail:
 1. **Run locally first**: `npx prisma db push` with DIRECT_URL
 2. **Check environment**: Ensure DIRECT_URL is set correctly
 3. **Test connection**: Use the `/api/test-db` endpoint after deployment 
+
+### Migration Troubleshooting
+
+If migration fails but data shows in Supabase:
+
+1. **Check for URL parsing errors**: Encode password special characters (like `@=%40`)
+2. **Set localStorage flag manually**: In browser console, run `localStorage.setItem('db_migrated', 'true')` to skip popups if already done
+3. **Clear migration flags**: Run `localStorage.removeItem('db_migrated')` and `localStorage.removeItem('dataMigrated')` to retry migration
+4. **Check connection timeouts**: Add `connect_timeout=30` to both DATABASE_URL and DIRECT_URL
+
+## API Route Configuration
+
+All API routes now include:
+```typescript
+export const dynamic = 'force-dynamic';
+```
+
+This prevents static generation and ensures routes only run at runtime, avoiding build-time database connection attempts.
+
+## Testing
+
+After deployment, test your database connection:
+- Visit `/api/test-db` to verify the connection works
+- Check Vercel function logs for any connection errors
+- Monitor Supabase dashboard for connection usage 

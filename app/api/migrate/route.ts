@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST() {
   try {
+    console.log('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
     console.log('Attempting migration...');
     
     // Check if data already exists in database
@@ -132,8 +133,20 @@ export async function POST() {
     console.log('Migration completed successfully');
     return NextResponse.json({ success: true, message: 'Migration completed successfully' });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Migration error:', error);
-    return NextResponse.json({ error: 'Failed to migrate: ' + (error as Error).message }, { status: 500 });
+    console.error('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorDetails = {
+      message: errorMessage,
+      type: error instanceof Error ? error.constructor.name : 'Unknown',
+      code: error instanceof Error && 'code' in error ? (error as any).code : undefined
+    };
+    
+    return NextResponse.json({ 
+      error: 'Migration failed: ' + errorMessage,
+      details: errorDetails
+    }, { status: 500 });
   }
 } 

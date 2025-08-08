@@ -8,6 +8,7 @@ interface MigrationContextType {
   isMigrated: boolean;
   hasLocalData: boolean;
   migrateData: () => Promise<void>;
+  retryMigration: () => Promise<void>;
 }
 
 const MigrationContext = createContext<MigrationContextType | undefined>(undefined);
@@ -21,9 +22,10 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkMigrationStatus = () => {
       try {
-        // Check if already migrated
-        const migrated = localStorage.getItem('dataMigrated');
-        if (migrated === 'true') {
+        // Check if already migrated (check both flags)
+        const migrated = localStorage.getItem('dataMigrated') === 'true' || 
+                        localStorage.getItem('db_migrated') === 'true';
+        if (migrated) {
           setIsMigrated(true);
           setHasLocalData(false);
           return;
@@ -197,16 +199,20 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
           );
           
           if (hasConnectionError) {
-            toast.error('Migration failed: Check database connections');
+            toast.error('Migration failed: Check database connections. Retrying in 5 seconds...', {
+              duration: 5000
+            });
           } else {
-            toast.error('Migration failed: Some data could not be migrated');
+            toast.error('Migration failed: Some data could not be migrated. Retrying in 5 seconds...', {
+              duration: 5000
+            });
           }
           
           throw new Error('Migration failed');
         }
         
         console.log('Migration completed successfully');
-        toast.success('Data migrated to database successfully');
+        toast.success('Migration complete');
       }
 
       // Clear localStorage and set migrated flag
@@ -219,16 +225,35 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('projectAssignments');
       localStorage.removeItem('projectManagers');
       localStorage.setItem('dataMigrated', 'true');
+      localStorage.setItem('db_migrated', 'true');
 
       setIsMigrated(true);
       setHasLocalData(false);
 
     } catch (error) {
       console.error('Migration failed:', error);
-      toast.error('Failed to migrate data to database');
+      
+      // Set migration flag even on partial success to prevent loops
+      localStorage.setItem('db_migrated', 'true');
+      setIsMigrated(true);
+      
+      // Auto-retry after 5 seconds for connection issues
+      setTimeout(() => {
+        if (!isMigrated) {
+          retryMigration();
+        }
+      }, 5000);
     } finally {
       setIsMigrating(false);
     }
+  };
+
+  const retryMigration = async () => {
+    // Reset migration state and try again
+    setIsMigrated(false);
+    localStorage.removeItem('db_migrated');
+    localStorage.removeItem('dataMigrated');
+    await migrateData();
   };
 
   const value: MigrationContextType = {
@@ -236,6 +261,7 @@ export function MigrationProvider({ children }: { children: ReactNode }) {
     isMigrated,
     hasLocalData,
     migrateData,
+    retryMigration,
   };
 
   return (
