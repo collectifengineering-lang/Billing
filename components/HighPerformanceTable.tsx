@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { FixedSizeList as List } from 'react-window';
 import { formatCurrency, formatMonth, isCurrentMonth, isPastMonth, getProjectionsMonthRange } from '../lib/utils';
 import { BillingData } from '../lib/types';
-import { User, X, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { User, X, ChevronUp, ChevronDown, Search, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import CSVImportExport from './CSVImportExport';
 import useSWR, { mutate } from 'swr';
@@ -71,8 +71,10 @@ export default function HighPerformanceTable({
   const [editValue, setEditValue] = useState('');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ x: number; y: number } | null>(null);
+  const managerMenuRef = useRef<HTMLDivElement | null>(null);
   const [openMenuCell, setOpenMenuCell] = useState<{ projectId: string; month: string } | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const statusMenuRef = useRef<HTMLDivElement | null>(null);
   const [editingCommentCell, setEditingCommentCell] = useState<{ projectId: string; month: string } | null>(null);
   const [commentValue, setCommentValue] = useState('');
   const [commentPosition, setCommentPosition] = useState<{ x: number; y: number } | null>(null);
@@ -280,6 +282,68 @@ export default function HighPerformanceTable({
       scrollableListRef.current?.removeEventListener('scroll', handleScrollableScroll);
     };
   }, []);
+
+  // Adjust manager dropdown position to avoid viewport overflow
+  useEffect(() => {
+    if (!openDropdown || !dropdownPosition) return;
+    const adjust = () => {
+      const element = managerMenuRef.current;
+      if (!element) return;
+      const { offsetWidth: width, offsetHeight: height } = element;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const margin = 8;
+
+      let newX = dropdownPosition.x;
+      let newY = dropdownPosition.y;
+
+      if (newX + width + margin > viewportWidth) {
+        newX = Math.max(margin, viewportWidth - width - margin);
+      }
+      if (newY + height + margin > viewportHeight) {
+        newY = Math.max(margin, newY - height);
+      }
+
+      if (Math.abs(newX - dropdownPosition.x) > 1 || Math.abs(newY - dropdownPosition.y) > 1) {
+        setDropdownPosition({ x: newX, y: newY });
+      }
+    };
+
+    const id = window.requestAnimationFrame(adjust);
+    return () => window.cancelAnimationFrame(id);
+  }, [openDropdown, dropdownPosition]);
+
+  // Adjust status menu position to avoid viewport overflow
+  useEffect(() => {
+    if (!openMenuCell || !menuPosition) return;
+    const adjust = () => {
+      const element = statusMenuRef.current;
+      if (!element) return;
+      const { offsetWidth: width, offsetHeight: height } = element;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const margin = 8;
+
+      let newX = menuPosition.x;
+      let newY = menuPosition.y;
+
+      if (newX + width + margin > viewportWidth) {
+        newX = Math.max(margin, viewportWidth - width - margin);
+      }
+      if (newY + height + margin > viewportHeight) {
+        // Flip upwards if there isn't enough space below
+        newY = Math.max(margin, newY - height);
+      }
+
+      if (Math.abs(newX - menuPosition.x) > 1 || Math.abs(newY - menuPosition.y) > 1) {
+        setMenuPosition({ x: newX, y: newY });
+      }
+    };
+
+    // Defer until after render so dimensions are correct
+    const id = window.requestAnimationFrame(adjust);
+    return () => window.cancelAnimationFrame(id);
+  }, [openMenuCell, menuPosition]);
 
   // Hide vertical scrollbar on sticky section
   useEffect(() => {
@@ -1186,7 +1250,8 @@ export default function HighPerformanceTable({
       {/* Floating dropdown menu */}
       {openDropdown && dropdownPosition && (
         <div 
-          className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-[9999] min-w-max"
+          ref={managerMenuRef}
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] min-w-[220px] py-2"
           data-dropdown="true"
           style={{
             left: `${dropdownPosition.x}px`,
@@ -1194,85 +1259,92 @@ export default function HighPerformanceTable({
             pointerEvents: 'auto'
           }}
         >
-          <div className="px-3 py-2 border-b border-gray-200">
-            <div className="text-xs font-medium text-gray-500 mb-2">Assign Project Manager</div>
+          <div className="py-1">
+            <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Assign Project Manager</div>
             {(!projectManagersData || Object.keys(projectManagersData).length === 0) && projectManagers.length === 0 ? (
-              <div className="text-xs text-gray-400 italic">No project managers available</div>
+              <div className="px-3 py-2 text-xs text-gray-400 italic">No project managers available</div>
             ) : (
-              <div className="space-y-1">
-                {(projectManagersData && Object.keys(projectManagersData).length > 0
-                  ? Object.entries(projectManagersData)
-                      .map(([id, manager]: [string, any]) => (
-                        <button
-                          key={id}
-                          onClick={async () => {
-                            try {
-                              await fetch('/api/project-assignments', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ projectId: openDropdown, managerId: id }),
-                              });
-                              mutateProjectAssignments();
-                              setOpenDropdown(null);
-                            } catch (error) {
-                              console.error('Error assigning project manager:', error);
-                              toast.error('Failed to assign project manager');
-                            }
-                          }}
-                          className="w-full flex items-center space-x-2 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 rounded"
-                        >
-                          <div 
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: manager.color }}
-                          />
-                          <span>{manager.name}</span>
-                        </button>
-                      ))
-                  : projectManagers.map((manager) => (
+              <div className="space-y-0.5">
+                {(() => {
+                  const assignedId = projectAssignmentsData?.[openDropdown] || projectAssignments[openDropdown];
+                  if (projectManagersData && Object.keys(projectManagersData).length > 0) {
+                    return Object.entries(projectManagersData).map(([id, manager]: [string, any]) => (
                       <button
-                        key={manager.id}
-                        onClick={() => {
-                          const updatedAssignments = { ...projectAssignments, [openDropdown]: manager.id };
-                          setProjectAssignments(updatedAssignments);
-                          localStorage.setItem('projectAssignments', JSON.stringify(updatedAssignments));
-                          setOpenDropdown(null);
+                        key={id}
+                        onClick={async () => {
+                          try {
+                            await fetch('/api/project-assignments', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ projectId: openDropdown, managerId: id }),
+                            });
+                            mutateProjectAssignments();
+                            setOpenDropdown(null);
+                          } catch (error) {
+                            console.error('Error assigning project manager:', error);
+                            toast.error('Failed to assign project manager');
+                          }
                         }}
-                        className="w-full flex items-center space-x-2 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 rounded"
+                        className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 ${assignedId === id ? 'bg-gray-50' : ''}`}
                       >
-                        <div 
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: manager.color }}
-                        />
-                        <span>{manager.name}</span>
+                        <span className="flex items-center space-x-2">
+                          <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: manager.color }} />
+                          <span>{manager.name}</span>
+                        </span>
+                        {assignedId === id && <Check className="h-4 w-4 text-green-600" />}
                       </button>
-                    )))}
+                    ));
+                  }
+                  return projectManagers.map((manager) => (
+                    <button
+                      key={manager.id}
+                      onClick={() => {
+                        const updatedAssignments = { ...projectAssignments, [openDropdown]: manager.id };
+                        setProjectAssignments(updatedAssignments);
+                        localStorage.setItem('projectAssignments', JSON.stringify(updatedAssignments));
+                        setOpenDropdown(null);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 ${assignedId === manager.id ? 'bg-gray-50' : ''}`}
+                    >
+                      <span className="flex items-center space-x-2">
+                        <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: manager.color }} />
+                        <span>{manager.name}</span>
+                      </span>
+                      {assignedId === manager.id && <Check className="h-4 w-4 text-green-600" />}
+                    </button>
+                  ));
+                })()}
               </div>
             )}
           </div>
 
           {(projectAssignmentsData?.[openDropdown] || projectAssignments[openDropdown]) && (
-            <button
-              onClick={async () => {
-                try {
-                  await fetch('/api/project-assignments', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ projectId: openDropdown }),
-                  });
-                  mutateProjectAssignments();
-                  setOpenDropdown(null);
-                } catch (error) {
-                  console.error('Error removing project manager:', error);
-                  toast.error('Failed to remove project manager');
-                }
-              }}
-              className="w-full px-3 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 flex items-center"
-            >
-              <User className="h-4 w-4 mr-2" />
-              Remove Manager
-            </button>
+            <>
+              <div className="my-1 border-t border-gray-200"></div>
+              <button
+                onClick={async () => {
+                  try {
+                    await fetch('/api/project-assignments', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ projectId: openDropdown }),
+                    });
+                    mutateProjectAssignments();
+                    setOpenDropdown(null);
+                  } catch (error) {
+                    console.error('Error removing project manager:', error);
+                    toast.error('Failed to remove project manager');
+                  }
+                }}
+                className="w-full px-3 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 flex items-center"
+              >
+                <User className="h-4 w-4 mr-2" />
+                Remove Manager
+              </button>
+            </>
           )}
 
+          <div className="my-1 border-t border-gray-200"></div>
           <button
             onClick={() => handleProjectClose(openDropdown)}
             className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
@@ -1286,7 +1358,8 @@ export default function HighPerformanceTable({
       {/* Status menu dropdown */}
       {openMenuCell && menuPosition && (
         <div 
-          className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-[9999] min-w-[160px] py-1"
+          ref={statusMenuRef}
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] min-w-[200px] py-2 backdrop-blur-sm"
           data-dropdown="true"
           style={{
             left: `${menuPosition.x}px`,
@@ -1295,26 +1368,49 @@ export default function HighPerformanceTable({
           }}
         >
           {/* Status Section */}
-          <div className="px-3 py-1">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Status</div>
-            <button onClick={() => handleMenuSelect('Confirmed')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50">Confirmed</button>
-            <button onClick={() => handleMenuSelect('Estimate')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50">Estimate</button>
-            <button onClick={() => handleMenuSelect('Billed')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50">Billed</button>
-            <button onClick={() => handleMenuSelect('Other')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50">Other</button>
-            <button onClick={() => handleMenuSelect('Clear')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50">Clear</button>
-          </div>
-          
-          {/* Divider */}
-          <div className="border-t border-gray-200 my-1"></div>
-          
+          {(() => {
+            const currentStatus = getCellStatus(openMenuCell.projectId, openMenuCell.month);
+            const options = ['Confirmed', 'Estimate', 'Billed', 'Other'] as const;
+            return (
+              <div className="py-1">
+                <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Status</div>
+                {options.map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => handleMenuSelect(label)}
+                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 ${currentStatus === label ? 'bg-gray-50' : ''}`}
+                  >
+                    <span>{label}</span>
+                    {currentStatus === label && <Check className="h-4 w-4 text-green-600" />}
+                  </button>
+                ))}
+                <div className="my-1 border-t border-gray-200"></div>
+                <button
+                  onClick={() => handleMenuSelect('Clear')}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Clear
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Comment Section */}
-          <div className="px-3 py-1">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Comment</div>
-            <button onClick={() => handleMenuSelect(getCellComment(openMenuCell.projectId, openMenuCell.month) ? 'EditComment' : 'AddComment')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50">
+          <div className="py-1">
+            <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Comment</div>
+            <button
+              onClick={() => handleMenuSelect(getCellComment(openMenuCell.projectId, openMenuCell.month) ? 'EditComment' : 'AddComment')}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+            >
               {getCellComment(openMenuCell.projectId, openMenuCell.month) ? 'Edit Comment' : 'Add Comment'}
             </button>
             {getCellComment(openMenuCell.projectId, openMenuCell.month) && (
-              <button onClick={() => handleMenuSelect('RemoveComment')} className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50">Remove Comment</button>
+              <button
+                onClick={() => handleMenuSelect('RemoveComment')}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                Remove Comment
+              </button>
             )}
           </div>
         </div>
