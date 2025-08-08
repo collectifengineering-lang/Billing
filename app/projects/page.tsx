@@ -28,7 +28,6 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState<keyof ProjectSummary>('projectName');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [showClosedProjects, setShowClosedProjects] = useState(false);
 
   useEffect(() => {
     fetchProjectsData();
@@ -87,6 +86,14 @@ export default function ProjectsPage() {
     setClosedProjects(newClosedProjects);
     safeLocalStorageSet('closedProjects', Array.from(newClosedProjects));
     toast.success('Project reopened successfully');
+  };
+
+  const handleCloseProject = (projectId: string) => {
+    const newClosedProjects = new Set(closedProjects);
+    newClosedProjects.add(projectId);
+    setClosedProjects(newClosedProjects);
+    safeLocalStorageSet('closedProjects', Array.from(newClosedProjects));
+    toast.success('Project closed successfully');
   };
 
   const activeProjects = projects.filter(project => !closedProjects.has(project.projectId));
@@ -195,14 +202,6 @@ export default function ProjectsPage() {
               </p>
             </div>
             <div className="flex space-x-3">
-              {closedProjectsList.length > 0 && (
-                <button
-                  onClick={() => setShowClosedProjects(!showClosedProjects)}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  {showClosedProjects ? 'Hide' : 'Show'} Closed Projects ({closedProjectsList.length})
-                </button>
-              )}
               <button
                 onClick={exportToCSV}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
@@ -325,6 +324,9 @@ export default function ProjectsPage() {
                       <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -350,6 +352,14 @@ export default function ProjectsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
                       {formatCurrency(project.totalProjected)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                      <button
+                        onClick={() => handleCloseProject(project.projectId)}
+                        className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200"
+                      >
+                        Close
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -358,13 +368,10 @@ export default function ProjectsPage() {
         </div>
 
         {/* Closed Projects Section */}
-        {showClosedProjects && closedProjectsList.length > 0 && (
+        {closedProjectsList.length > 0 && (
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-medium text-gray-900">Closed Projects</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                These projects have been closed and are hidden from the main projections table.
-              </p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">

@@ -93,3 +93,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to update status' }, { status: 500 });
   }
 } 
+
+// DELETE: Remove status
+export async function DELETE(request: Request) {
+  const requestData = await request.json();
+  const { projectId, month } = requestData as { projectId: string; month: string };
+  
+  try {
+    await prisma.status.delete({
+      where: { projectId_month: { projectId, month } },
+    });
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    // If the record doesn't exist, treat as success (idempotent clear)
+    if (error.code === 'P2025') {
+      return NextResponse.json({ success: true });
+    }
+    console.error('Error deleting status:', error);
+    return NextResponse.json({ error: 'Failed to delete status' }, { status: 500 });
+  }
+}

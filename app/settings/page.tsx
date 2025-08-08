@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { toast } from 'react-hot-toast';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 export default function SettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -101,7 +103,23 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-4">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Back to Dashboard
+                  </Link>
+                </div>
+                <h1 className="text-3xl font-bold text-gray-900 mt-2">Settings</h1>
+              </div>
+              <div className="flex space-x-3"></div>
+            </div>
+          </div>
           
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Authentication</h2>

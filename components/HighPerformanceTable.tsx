@@ -1200,51 +1200,52 @@ export default function HighPerformanceTable({
               <div className="text-xs text-gray-400 italic">No project managers available</div>
             ) : (
               <div className="space-y-1">
-                {Object.entries(projectManagersData || {}).map(([id, manager]: [string, any]) => (
-                  <button
-                    key={id}
-                    onClick={async () => {
-                      try {
-                        await fetch('/api/project-assignments', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ projectId: openDropdown, managerId: id }),
-                        });
-                        mutateProjectAssignments();
-                        setOpenDropdown(null);
-                      } catch (error) {
-                        console.error('Error assigning project manager:', error);
-                        toast.error('Failed to assign project manager');
-                      }
-                    }}
-                    className="w-full flex items-center space-x-2 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 rounded"
-                  >
-                    <div 
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: manager.color }}
-                    />
-                    <span>{manager.name}</span>
-                  </button>
-                ))}
-                {/* Fallback to localStorage data */}
-                {projectManagers.map((manager) => (
-                  <button
-                    key={manager.id}
-                    onClick={() => {
-                      const updatedAssignments = { ...projectAssignments, [openDropdown]: manager.id };
-                      setProjectAssignments(updatedAssignments);
-                      localStorage.setItem('projectAssignments', JSON.stringify(updatedAssignments));
-                      setOpenDropdown(null);
-                    }}
-                    className="w-full flex items-center space-x-2 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 rounded"
-                  >
-                    <div 
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: manager.color }}
-                    />
-                    <span>{manager.name}</span>
-                  </button>
-                ))}
+                {(projectManagersData && Object.keys(projectManagersData).length > 0
+                  ? Object.entries(projectManagersData)
+                      .map(([id, manager]: [string, any]) => (
+                        <button
+                          key={id}
+                          onClick={async () => {
+                            try {
+                              await fetch('/api/project-assignments', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ projectId: openDropdown, managerId: id }),
+                              });
+                              mutateProjectAssignments();
+                              setOpenDropdown(null);
+                            } catch (error) {
+                              console.error('Error assigning project manager:', error);
+                              toast.error('Failed to assign project manager');
+                            }
+                          }}
+                          className="w-full flex items-center space-x-2 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 rounded"
+                        >
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: manager.color }}
+                          />
+                          <span>{manager.name}</span>
+                        </button>
+                      ))
+                  : projectManagers.map((manager) => (
+                      <button
+                        key={manager.id}
+                        onClick={() => {
+                          const updatedAssignments = { ...projectAssignments, [openDropdown]: manager.id };
+                          setProjectAssignments(updatedAssignments);
+                          localStorage.setItem('projectAssignments', JSON.stringify(updatedAssignments));
+                          setOpenDropdown(null);
+                        }}
+                        className="w-full flex items-center space-x-2 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 rounded"
+                      >
+                        <div 
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: manager.color }}
+                        />
+                        <span>{manager.name}</span>
+                      </button>
+                    )))}
               </div>
             )}
           </div>
