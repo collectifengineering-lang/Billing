@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, DollarSign, Users, Calendar, Target, PieChart } from 'lucide-react';
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, DollarSign, Users, Calendar, Target, PieChart, Building2, Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -69,13 +69,121 @@ interface DashboardMetrics {
   totalEmployees: number;
 }
 
+interface ProjectMetrics {
+  // Basic Project Info
+  projectId: string;
+  projectName: string;
+  customerName: string;
+  status: string;
+  startDate: string;
+  endDate?: string;
+  
+  // Financial Metrics
+  totalBudget: number;
+  totalBilled: number;
+  totalUnbilled: number;
+  totalCollected: number;
+  outstandingAmount: number;
+  profitMargin: number;
+  grossProfit: number;
+  
+  // Multiplier Analysis
+  currentMultiplier: number;
+  historicalMultipliers: {
+    date: string;
+    multiplier: number;
+    notes?: string;
+  }[];
+  
+  // Hours Analysis
+  totalHours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  efficiency: number;
+  
+  // Employee Analysis
+  employeeBreakdown: {
+    employeeId: string;
+    employeeName: string;
+    totalHours: number;
+    billableHours: number;
+    hourlyRate: number;
+    totalCost: number;
+    billableValue: number;
+    efficiency: number;
+  }[];
+  
+  // Cash vs Accrual
+  cashBasis: {
+    totalCollected: number;
+    outstandingReceivables: number;
+    totalRevenue: number;
+  };
+  
+  accrualBasis: {
+    totalEarned: number;
+    totalExpenses: number;
+    netIncome: number;
+    workInProgress: number;
+  };
+  
+  // Project Health Indicators
+  budgetUtilization: number;
+  schedulePerformance: number;
+  profitabilityTrend: 'improving' | 'declining' | 'stable';
+  riskLevel: 'low' | 'medium' | 'high';
+  
+  // Architectural/Engineering Specific Metrics
+  changeOrders: {
+    count: number;
+    totalValue: number;
+    approvedValue: number;
+    pendingValue: number;
+  };
+  
+  phases: {
+    phaseName: string;
+    budget: number;
+    actualCost: number;
+    hours: number;
+    completion: number;
+  }[];
+  
+  // Forecasting
+  projectedCompletion: string;
+  projectedFinalCost: number;
+  projectedProfit: number;
+  projectedMargin: number;
+}
+
+interface Project {
+  project_id: string;
+  project_name: string;
+  customer_name: string;
+  status: string;
+  budget_amount?: number;
+}
+
 function DashboardPageContent() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [projectMetrics, setProjectMetrics] = useState<ProjectMetrics | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [projectLoading, setProjectLoading] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchProjects();
   }, []);
+
+  useEffect(() => {
+    if (selectedProjectId) {
+      fetchProjectMetrics(selectedProjectId);
+    } else {
+      setProjectMetrics(null);
+    }
+  }, [selectedProjectId]);
 
   const fetchDashboardData = async () => {
     try {
@@ -90,6 +198,35 @@ function DashboardPageContent() {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('/api/projects');
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+      const data = await response.json();
+      setProjects(data.data || []);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    }
+  };
+
+  const fetchProjectMetrics = async (projectId: string) => {
+    try {
+      setProjectLoading(true);
+      const response = await fetch(`/api/dashboard/project/${projectId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch project metrics');
+      }
+      const data = await response.json();
+      setProjectMetrics(data);
+    } catch (error) {
+      console.error('Error fetching project metrics:', error);
+    } finally {
+      setProjectLoading(false);
     }
   };
 
@@ -169,12 +306,41 @@ function DashboardPageContent() {
           </div>
         </div>
 
+        {/* Project Selection */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-4">
+            <label htmlFor="project-select" className="text-sm font-medium text-gray-700">
+              Select Project:
+            </label>
+            <select
+              id="project-select"
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="block w-80 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+            >
+              <option value="">All Projects (Company Overview)</option>
+              {projects.map((project) => (
+                <option key={project.project_id} value={project.project_id}>
+                  {project.project_name} - {project.customer_name}
+                </option>
+              ))}
+            </select>
+            {projectLoading && (
+              <div className="flex items-center text-sm text-gray-500">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                Loading project data...
+              </div>
+            )}
+          </div>
+        </div>
+
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profitability">Profitability</TabsTrigger>
             <TabsTrigger value="cashflow">Cashflow</TabsTrigger>
             <TabsTrigger value="forecasting">Forecasting</TabsTrigger>
+            {selectedProjectId && <TabsTrigger value="project">Project Details</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -415,6 +581,283 @@ function DashboardPageContent() {
               </Card>
             </div>
           </TabsContent>
+
+          {selectedProjectId && projectMetrics && (
+            <TabsContent value="project" className="space-y-6">
+              {/* Project Header */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">{projectMetrics.projectName}</h2>
+                    <p className="text-gray-600">{projectMetrics.customerName}</p>
+                    <div className="flex items-center space-x-4 mt-2">
+                      <Badge variant={projectMetrics.status === 'active' ? 'default' : 'secondary'}>
+                        {projectMetrics.status}
+                      </Badge>
+                      <span className="text-sm text-gray-500">
+                        {new Date(projectMetrics.startDate).toLocaleDateString()}
+                        {projectMetrics.endDate && ` - ${new Date(projectMetrics.endDate).toLocaleDateString()}`}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(projectMetrics.totalBudget)}
+                    </div>
+                    <div className="text-sm text-gray-500">Total Budget</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Key Metrics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Current Multiplier</CardTitle>
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{projectMetrics.currentMultiplier.toFixed(1)}x</div>
+                    <p className="text-xs text-muted-foreground">
+                      {projectMetrics.profitabilityTrend === 'improving' && '↗ Improving'}
+                      {projectMetrics.profitabilityTrend === 'declining' && '↘ Declining'}
+                      {projectMetrics.profitabilityTrend === 'stable' && '→ Stable'}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Efficiency</CardTitle>
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatPercentage(projectMetrics.efficiency)}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {projectMetrics.billableHours}h billable / {projectMetrics.totalHours}h total
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
+                    <PieChart className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatPercentage(projectMetrics.budgetUtilization / 100)}</div>
+                    <Progress value={projectMetrics.budgetUtilization} className="mt-2" />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Risk Level</CardTitle>
+                    {projectMetrics.riskLevel === 'low' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                    {projectMetrics.riskLevel === 'medium' && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
+                    {projectMetrics.riskLevel === 'high' && <XCircle className="h-4 w-4 text-red-600" />}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold capitalize">{projectMetrics.riskLevel}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {projectMetrics.schedulePerformance}% schedule performance
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Financial Overview */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Financial Summary</CardTitle>
+                    <CardDescription>Cash vs Accrual basis</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="font-semibold text-sm text-gray-700 mb-2">Cash Basis</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Total Collected</span>
+                            <span className="font-semibold">{formatCurrency(projectMetrics.cashBasis.totalCollected)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Outstanding</span>
+                            <span className="font-semibold">{formatCurrency(projectMetrics.cashBasis.outstandingReceivables)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm text-gray-700 mb-2">Accrual Basis</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Total Earned</span>
+                            <span className="font-semibold">{formatCurrency(projectMetrics.accrualBasis.totalEarned)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Work in Progress</span>
+                            <span className="font-semibold">{formatCurrency(projectMetrics.accrualBasis.workInProgress)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold">Gross Profit</span>
+                        <span className="text-lg font-bold text-green-600">
+                          {formatCurrency(projectMetrics.grossProfit)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Profit Margin</span>
+                        <span className="text-sm font-semibold">{formatPercentage(projectMetrics.profitMargin)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Employee Analysis</CardTitle>
+                    <CardDescription>Hours and efficiency by employee</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {projectMetrics.employeeBreakdown.map((employee, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm">{employee.employeeName}</div>
+                            <div className="text-xs text-gray-500">
+                              {employee.billableHours}h billable / {employee.totalHours}h total
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">{formatCurrency(employee.billableValue)}</div>
+                            <div className="text-xs text-gray-500">
+                              {formatPercentage(employee.efficiency)} efficient
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Project Phases */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Project Phases</CardTitle>
+                  <CardDescription>Architectural/Engineering phase breakdown</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {projectMetrics.phases.map((phase, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold">{phase.phaseName}</h4>
+                          <Badge variant={phase.completion === 100 ? 'default' : 'secondary'}>
+                            {phase.completion}% Complete
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">Budget:</span>
+                            <div className="font-semibold">{formatCurrency(phase.budget)}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Actual Cost:</span>
+                            <div className="font-semibold">{formatCurrency(phase.actualCost)}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Hours:</span>
+                            <div className="font-semibold">{phase.hours}h</div>
+                          </div>
+                        </div>
+                        <Progress value={phase.completion} className="mt-2" />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Change Orders */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Change Orders</CardTitle>
+                  <CardDescription>Additional scope and value</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{projectMetrics.changeOrders.count}</div>
+                      <div className="text-sm text-gray-600">Total Changes</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{formatCurrency(projectMetrics.changeOrders.totalValue)}</div>
+                      <div className="text-sm text-gray-600">Total Value</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(projectMetrics.changeOrders.approvedValue)}</div>
+                      <div className="text-sm text-gray-600">Approved</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-600">{formatCurrency(projectMetrics.changeOrders.pendingValue)}</div>
+                      <div className="text-sm text-gray-600">Pending</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Forecasting */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Project Forecasting</CardTitle>
+                  <CardDescription>Projected completion and final metrics</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-semibold mb-3">Projected Completion</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>Target Date:</span>
+                          <span className="font-semibold">{new Date(projectMetrics.projectedCompletion).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Projected Final Cost:</span>
+                          <span className="font-semibold">{formatCurrency(projectMetrics.projectedFinalCost)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Projected Profit:</span>
+                          <span className="font-semibold text-green-600">{formatCurrency(projectMetrics.projectedProfit)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Projected Margin:</span>
+                          <span className="font-semibold">{formatPercentage(projectMetrics.projectedMargin)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-3">Historical Multipliers</h4>
+                      <div className="space-y-2">
+                        {projectMetrics.historicalMultipliers.map((multiplier, index) => (
+                          <div key={index} className="flex justify-between items-center">
+                            <div>
+                              <div className="font-semibold">{multiplier.multiplier.toFixed(1)}x</div>
+                              <div className="text-xs text-gray-500">{multiplier.notes}</div>
+                            </div>
+                            <div className="text-xs text-gray-500">{new Date(multiplier.date).toLocaleDateString()}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
