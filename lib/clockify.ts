@@ -138,19 +138,30 @@ interface TokenResponse {
 }
 
 class ClockifyService {
-  private apiKey: string = process.env.CLOCKIFY_API_KEY || 'OTg4NTg3YjMtMmQzYS00ZWE1LThiOTctZmY4NDAwYzRiZjZj';
-  private workspaceId: string | null = process.env.CLOCKIFY_WORKSPACE_ID || null;
+  private apiKey: string | null = null;
+  private workspaceId: string | null = null;
   private baseUrl = 'https://api.clockify.me/api/v1';
+  private isConfigured: boolean = false;
 
   constructor() {
-    // Initialize with the provided API key
-    console.log('Clockify service initialized');
-    if (!this.apiKey || this.apiKey === 'OTg4NTg3YjMtMmQzYS00ZWE1LThiOTctZmY4NDAwYzRiZjZj') {
-      console.warn('Clockify API key not configured, using fallback mode');
+    this.apiKey = process.env.CLOCKIFY_API_KEY || null;
+    this.workspaceId = process.env.CLOCKIFY_WORKSPACE_ID || null;
+    
+    // Check if we have valid credentials
+    if (this.apiKey && this.apiKey !== 'your_clockify_api_key_here' && this.workspaceId && this.workspaceId !== 'your_clockify_workspace_id_here') {
+      this.isConfigured = true;
+      console.log('Clockify service initialized with valid credentials');
+    } else {
+      this.isConfigured = false;
+      console.warn('Clockify service initialized without valid credentials - will use mock data');
+      console.warn('Please set CLOCKIFY_API_KEY and CLOCKIFY_WORKSPACE_ID in your environment variables');
     }
   }
 
   private getHeaders() {
+    if (!this.apiKey) {
+      throw new Error('Clockify API key not configured');
+    }
     return {
       'X-Api-Key': this.apiKey,
       'Content-Type': 'application/json',
@@ -158,372 +169,217 @@ class ClockifyService {
   }
 
   private async makeRequest(endpoint: string, params?: any): Promise<any> {
+    if (!this.isConfigured) {
+      throw new Error('Clockify service not properly configured');
+    }
+
     try {
-      // Check if API key is properly configured
-      if (!this.apiKey || this.apiKey === 'OTg4NTg3YjMtMmQzYS00ZWE1LThiOTctZmY4NDAwYzRiZjZj') {
-        throw new Error('Clockify API key not configured');
+      const url = new URL(`${this.baseUrl}${endpoint}`);
+      if (params) {
+        Object.keys(params).forEach(key => {
+          if (params[key] !== undefined && params[key] !== null) {
+            url.searchParams.append(key, params[key]);
+          }
+        });
       }
 
-      const response = await axios.get(`${this.baseUrl}${endpoint}`, {
+      const response = await fetch(url.toString(), {
+        method: 'GET',
         headers: this.getHeaders(),
-        params,
-        timeout: 10000, // 10 second timeout
       });
-      return response.data;
-    } catch (error: any) {
-      // Handle different types of errors gracefully
-      if (error.code === 'ECONNABORTED') {
-        console.warn('Clockify API request timed out');
-        throw new Error('Clockify API request timed out');
+
+      if (response.status === 401) {
+        throw new Error('Clockify API authentication failed - check your API key');
       }
       
-      if (error.response?.status === 401) {
-        console.warn('Clockify API authentication failed - invalid API key');
-        throw new Error('Clockify API authentication failed');
+      if (response.status === 403) {
+        throw new Error('Clockify API access forbidden - check your workspace ID and permissions');
       }
       
-      if (error.response?.status === 403) {
-        console.warn('Clockify API access forbidden');
-        throw new Error('Clockify API access forbidden');
+      if (response.status === 429) {
+        throw new Error('Clockify API rate limit exceeded - try again later');
       }
       
-      if (error.response?.status >= 500) {
-        console.warn('Clockify API server error');
-        throw new Error('Clockify API server error');
+      if (!response.ok) {
+        throw new Error(`Clockify API error: ${response.status} ${response.statusText}`);
       }
-      
-      console.error('Clockify API error:', error.response?.data || error.message);
-      throw new Error(`Clockify API error: ${error.response?.data?.message || error.message}`);
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Clockify API request failed: ${error}`);
     }
   }
 
-  // Get user information
-  async getUser(): Promise<ClockifyUser> {
+  // Check if the service is properly configured
+  public isServiceConfigured(): boolean {
+    return this.isConfigured;
+  }
+
+  // Get configuration status for debugging
+  public getConfigurationStatus(): { configured: boolean; hasApiKey: boolean; hasWorkspaceId: boolean } {
+    return {
+      configured: this.isConfigured,
+      hasApiKey: !!(this.apiKey && this.apiKey !== 'your_clockify_api_key_here'),
+      hasWorkspaceId: !!(this.workspaceId && this.workspaceId !== 'your_clockify_workspace_id_here')
+    };
+  }
+
+  async getUser(): Promise<any> {
     try {
       return await this.makeRequest('/user');
     } catch (error) {
-      console.warn('Failed to get Clockify user, returning mock data');
-      // Return mock user data to prevent crashes
+      console.error('Failed to get Clockify user:', error);
+      // Return mock user data when Clockify fails
       return {
         id: 'mock-user-id',
-        email: 'user@example.com',
         name: 'Mock User',
-        profilePicture: '',
-        status: 'ACTIVE',
-        activeWorkspace: 'mock-workspace',
-        defaultWorkspace: 'mock-workspace',
-        settings: {},
-        memberships: [],
-        profilePictureUrl: ''
+        email: 'user@example.com',
+        status: 'ACTIVE'
       };
     }
   }
 
-  // Get workspaces
-  async getWorkspaces(): Promise<ClockifyWorkspace[]> {
+  async getWorkspaces(): Promise<any[]> {
     try {
       return await this.makeRequest('/workspaces');
     } catch (error) {
-      console.warn('Failed to get Clockify workspaces, returning mock data');
-      // Return mock workspace data to prevent crashes
-      return [{
-        id: 'mock-workspace-id',
-        name: 'Mock Workspace',
-        profile: 1,
-        premium: false,
-        admin: true,
-        defaultHourlyRate: 100,
-        defaultCurrency: 'USD',
-        onlyAdminsMayCreateProjects: false,
-        onlyAdminsSeeBillableRates: false,
-        onlyAdminsSeeTeamDashboard: false,
-        projectsBillableByDefault: true,
-        rounding: 0,
-        roundingMinutes: 0,
-        logo: '',
-        icalUrl: '',
-        icalEnabled: false,
-        csvUpload: {
-          enabled: false,
-          dateFormat: 'MM/DD/YYYY',
-          timeFormat: 'HH:mm'
-        },
-        subscription: {
-          startDate: '2024-01-01',
-          endDate: '2024-12-31',
-          trial: false,
-          status: 'ACTIVE'
+      console.error('Failed to get Clockify workspaces:', error);
+      // Return mock workspace data when Clockify fails
+      return [
+        {
+          id: 'mock-workspace-id',
+          name: 'Mock Workspace',
+          hourlyRate: { amount: 100, currency: 'USD' }
         }
-      }];
+      ];
     }
   }
 
-  // Get projects for a workspace
-  async getProjects(workspaceId?: string): Promise<ClockifyProject[]> {
+  async getProjects(): Promise<any[]> {
     try {
-      const wsId = workspaceId || this.workspaceId;
-      if (!wsId) {
-        // If no workspace ID is provided, get the first workspace
-        const workspaces = await this.getWorkspaces();
-        if (workspaces.length > 0) {
-          this.workspaceId = workspaces[0].id;
-          console.log(`Using workspace: ${workspaces[0].name} (${workspaces[0].id})`);
-        } else {
-          throw new Error('No workspaces found');
-        }
+      if (!this.workspaceId) {
+        throw new Error('Workspace ID not configured');
       }
       return await this.makeRequest(`/workspaces/${this.workspaceId}/projects`);
     } catch (error) {
-      console.warn('Failed to get Clockify projects, returning mock data');
-      // Return mock project data to prevent crashes
-      return [{
-        id: 'mock-project-id',
-        name: 'Mock Project',
-        workspaceId: 'mock-workspace-id',
-        clientId: 'mock-client-id',
-        clientName: 'Mock Client',
-        isPublic: true,
-        isTemplate: false,
-        color: '#000000',
-        note: 'Mock project for testing',
-        billable: true,
-        public: true,
-        archived: false,
-        estimate: {
-          estimate: 'PT40H',
-          type: 'MANUAL'
+      console.error('Failed to get Clockify projects:', error);
+      // Return mock project data when Clockify fails
+      return [
+        {
+          id: 'mock-project-1',
+          name: 'Mock Project 1',
+          clientId: 'mock-client-1',
+          clientName: 'Mock Client 1',
+          status: 'ACTIVE',
+          billable: true,
+          hourlyRate: { amount: 150, currency: 'USD' }
         },
-        status: 'ACTIVE',
-        duration: 'PT0S',
-        budgetEstimate: 10000,
-        budgetType: 'HOURS',
-        hourlyRate: {
-          amount: 100,
-          currency: 'USD'
-        },
-        costRate: {
-          amount: 50,
-          currency: 'USD'
-        },
-        timeEstimate: 'PT40H',
-        budget: 10000,
-        spent: 'PT0S',
-        progress: 0,
-        rate: 100,
-        rateLastUpdated: '2024-01-01T00:00:00Z',
-        fixedFee: 0,
-        memberships: [],
-        taskCount: {
-          total: 0,
-          estimate: 0
-        },
-        customFields: [],
-        startDate: '2024-01-01',
-        endDate: '2024-12-31'
-      }];
+        {
+          id: 'mock-project-2',
+          name: 'Mock Project 2',
+          clientId: 'mock-client-2',
+          clientName: 'Mock Client 2',
+          status: 'ACTIVE',
+          billable: true,
+          hourlyRate: { amount: 175, currency: 'USD' }
+        }
+      ];
     }
   }
 
-  // Get time entries for a project
-  async getProjectTimeEntries(
-    projectId: string,
-    startDate?: string,
-    endDate?: string,
-    workspaceId?: string
-  ): Promise<ClockifyTimeEntry[]> {
-    const wsId = workspaceId || this.workspaceId;
-    if (!wsId) {
-      throw new Error('Workspace ID not configured');
-    }
-
-    const params: any = {};
-    if (startDate) params['start'] = startDate;
-    if (endDate) params['end'] = endDate;
-
-    return this.makeRequest(`/workspaces/${wsId}/projects/${projectId}/time-entries`, params);
-  }
-
-  // Get time entries for a user
-  async getUserTimeEntries(
-    userId: string,
-    startDate?: string,
-    endDate?: string,
-    workspaceId?: string
-  ): Promise<ClockifyTimeEntry[]> {
-    const wsId = workspaceId || this.workspaceId;
-    if (!wsId) {
-      throw new Error('Workspace ID not configured');
-    }
-
-    const params: any = {};
-    if (startDate) params['start'] = startDate;
-    if (endDate) params['end'] = endDate;
-
-    return this.makeRequest(`/workspaces/${wsId}/user/${userId}/time-entries`, params);
-  }
-
-  // Get all time entries for a workspace
-  async getAllTimeEntries(
-    startDate?: string,
-    endDate?: string,
-    workspaceId?: string
-  ): Promise<ClockifyTimeEntry[]> {
-    const wsId = workspaceId || this.workspaceId;
-    if (!wsId) {
-      throw new Error('Workspace ID not configured');
-    }
-
-    const params: any = {};
-    if (startDate) params['start'] = startDate;
-    if (endDate) params['end'] = endDate;
-
-    return this.makeRequest(`/workspaces/${wsId}/time-entries`, params);
-  }
-
-  // Get detailed time report for a project
-  async getProjectTimeReport(
-    projectId: string,
-    startDate: string,
-    endDate: string,
-    workspaceId?: string
-  ): Promise<ClockifyTimeReport> {
-    const entries = await this.getProjectTimeEntries(projectId, startDate, endDate, workspaceId);
-    const project = await this.getProjectById(projectId, workspaceId);
-
-    let totalHours = 0;
-    let billableHours = 0;
-    let nonBillableHours = 0;
-    let totalAmount = 0;
-    let billableAmount = 0;
-    let nonBillableAmount = 0;
-
-    entries.forEach(entry => {
-      const durationMs = this.parseDuration(entry.timeInterval.duration);
-      const hours = durationMs / (1000 * 60 * 60);
-      totalHours += hours;
-
-      if (entry.billable) {
-        billableHours += hours;
-        billableAmount += entry.costRate?.amount || 0;
-      } else {
-        nonBillableHours += hours;
-        nonBillableAmount += entry.costRate?.amount || 0;
-      }
-      totalAmount += entry.costRate?.amount || 0;
-    });
-
-    return {
-      projectId,
-      projectName: project?.name || 'Unknown Project',
-      totalHours,
-      billableHours,
-      nonBillableHours,
-      totalAmount,
-      billableAmount,
-      nonBillableAmount,
-      entries,
-      period: { start: startDate, end: endDate },
-    };
-  }
-
-  // Get project by ID
-  async getProjectById(projectId: string, workspaceId?: string): Promise<ClockifyProject | null> {
-    const wsId = workspaceId || this.workspaceId;
-    if (!wsId) {
-      throw new Error('Workspace ID not configured');
-    }
-
+  async getTimeEntries(projectId: string, startDate: string, endDate: string): Promise<any[]> {
     try {
-      return await this.makeRequest(`/workspaces/${wsId}/projects/${projectId}`);
-    } catch (error) {
-      console.error(`Project ${projectId} not found`);
-      return null;
-    }
-  }
-
-  // Get time summary for a project
-  async getProjectTimeSummary(
-    projectId: string,
-    startDate: string,
-    endDate: string,
-    workspaceId?: string
-  ) {
-    const report = await this.getProjectTimeReport(projectId, startDate, endDate, workspaceId);
-    return {
-      projectId: report.projectId,
-      projectName: report.projectName,
-      totalHours: report.totalHours,
-      billableHours: report.billableHours,
-      nonBillableHours: report.nonBillableHours,
-      totalAmount: report.totalAmount,
-      billableAmount: report.billableAmount,
-      nonBillableAmount: report.nonBillableAmount,
-      period: report.period,
-    };
-  }
-
-  // Get all projects with time summaries for a date range
-  async getAllProjectsTimeSummary(
-    startDate: string,
-    endDate: string,
-    workspaceId?: string
-  ) {
-    const projects = await this.getProjects(workspaceId);
-    const summaries = [];
-
-    for (const project of projects) {
-      try {
-        const summary = await this.getProjectTimeSummary(
-          project.id,
-          startDate,
-          endDate,
-          workspaceId
-        );
-        summaries.push(summary);
-      } catch (error) {
-        console.error(`Error getting summary for project ${project.id}:`, error);
+      if (!this.workspaceId) {
+        throw new Error('Workspace ID not configured');
       }
+      return await this.makeRequest(`/workspaces/${this.workspaceId}/projects/${projectId}/time-entries`, {
+        start: startDate,
+        end: endDate
+      });
+    } catch (error) {
+      console.error('Failed to get Clockify time entries:', error);
+      // Return mock time entry data when Clockify fails
+      return [
+        {
+          id: 'mock-time-entry-1',
+          description: 'Mock work session',
+          timeInterval: {
+            start: startDate,
+            end: endDate,
+            duration: 'PT2H30M'
+          },
+          billable: true,
+          userId: 'mock-user-id',
+          userName: 'Mock User'
+        }
+      ];
     }
-
-    return summaries;
   }
 
-  // Parse duration string (e.g., "PT2H30M") to milliseconds
-  private parseDuration(duration: string): number {
-    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
-    const match = duration.match(regex);
-    
-    if (!match) return 0;
-    
-    const hours = parseInt(match[1] || '0');
-    const minutes = parseInt(match[2] || '0');
-    const seconds = parseInt(match[3] || '0');
-    
-    return (hours * 3600 + minutes * 60 + seconds) * 1000;
+  async getAllTimeEntries(startDate: string, endDate: string): Promise<any[]> {
+    try {
+      if (!this.workspaceId) {
+        throw new Error('Workspace ID not configured');
+      }
+      return await this.makeRequest(`/workspaces/${this.workspaceId}/time-entries`, {
+        start: startDate,
+        end: endDate
+      });
+    } catch (error) {
+      console.error('Failed to get all Clockify time entries:', error);
+      // Return mock time entry data when Clockify fails
+      return [
+        {
+          id: 'mock-time-entry-1',
+          description: 'Mock work session',
+          timeInterval: {
+            start: startDate,
+            end: endDate,
+            duration: 'PT8H0M'
+          },
+          billable: true,
+          userId: 'mock-user-id',
+          userName: 'Mock User',
+          projectId: 'mock-project-1',
+          projectName: 'Mock Project 1'
+        }
+      ];
+    }
   }
 
-  // Check if service is configured
-  isConfigured(): boolean {
-    return !!this.apiKey;
-  }
-
-  // Get configuration status
-  getConfigStatus(): { apiKey: boolean; workspaceId: boolean; configured: boolean } {
-    return {
-      apiKey: !!this.apiKey,
-      workspaceId: !!this.workspaceId,
-      configured: this.isConfigured(),
-    };
-  }
-
-  // Set workspace ID
-  setWorkspaceId(workspaceId: string) {
-    this.workspaceId = workspaceId;
+  async getUsers(): Promise<any[]> {
+    try {
+      if (!this.workspaceId) {
+        throw new Error('Workspace ID not configured');
+      }
+      return await this.makeRequest(`/workspaces/${this.workspaceId}/users`);
+    } catch (error) {
+      console.error('Failed to get Clockify users:', error);
+      // Return mock user data when Clockify fails
+      return [
+        {
+          id: 'mock-user-1',
+          name: 'Mock User 1',
+          email: 'user1@example.com',
+          status: 'ACTIVE',
+          hourlyRate: { amount: 100, currency: 'USD' }
+        },
+        {
+          id: 'mock-user-2',
+          name: 'Mock User 2',
+          email: 'user2@example.com',
+          status: 'ACTIVE',
+          hourlyRate: { amount: 120, currency: 'USD' }
+        }
+      ];
+    }
   }
 }
 
-// Create singleton instance
-export const clockifyService = new ClockifyService();
+export default new ClockifyService();
 
 // Export convenience functions
 export const fetchClockifyProjects = async () => {
@@ -541,7 +397,7 @@ export const fetchClockifyTimeEntries = async (
   endDate?: string
 ) => {
   try {
-    return await clockifyService.getProjectTimeEntries(projectId, startDate, endDate);
+    return await clockifyService.getTimeEntries(projectId, startDate || '', endDate || '');
   } catch (error) {
     console.error('Error fetching Clockify time entries:', error);
     return [];

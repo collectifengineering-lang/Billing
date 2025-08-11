@@ -1,272 +1,183 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { payrollService } from '../../../lib/payroll';
-import { clockifyService } from '../../../lib/clockify';
-import { zohoService } from '../../../lib/zoho';
-
-interface DashboardMetrics {
-  // Multipliers
-  currentYearMultiplier: number;
-  lastYearMultiplier: number;
-  twoYearsAgoMultiplier: number;
-  
-  // Overhead Rates
-  currentYearOverhead: number;
-  lastYearOverhead: number;
-  twoYearsAgoOverhead: number;
-  
-  // Revenue per Employee
-  currentYearRevenuePerEmployee: number;
-  lastYearRevenuePerEmployee: number;
-  twoYearsAgoRevenuePerEmployee: number;
-  
-  // Cashflow
-  currentCashflow: number;
-  previousMonthCashflow: number;
-  cashflowTrend: 'up' | 'down' | 'stable';
-  
-  // Invoices
-  overdueInvoiceValue: number;
-  totalOutstandingInvoices: number;
-  averageDaysToPayment: number;
-  
-  // Profit Metrics
-  ytdProfit: number;
-  lastYearYtdProfit: number;
-  currentYearGrossMargin: number;
-  lastYearGrossMargin: number;
-  ytdOperatingIncome: number;
-  lastYearYtdOperatingIncome: number;
-  
-  // Trailing 12 Months Data
-  trailing12Months: {
-    month: string;
-    revenue: number;
-    expenses: number;
-    profit: number;
-    profitMargin: number;
-  }[];
-  
-  // Forecast Data
-  forecast: {
-    month: string;
-    projectedRevenue: number;
-    projectedExpenses: number;
-    projectedProfit: number;
-  }[];
-  
-  // Additional Metrics
-  utilizationRate: number;
-  averageProjectSize: number;
-  clientRetentionRate: number;
-  averageBillingRate: number;
-  totalActiveProjects: number;
-  totalEmployees: number;
-}
+import { zohoService } from '@/lib/zoho';
+import clockifyService from '@/lib/clockify';
 
 export async function GET(request: NextRequest) {
-  // Helper function to parse ISO 8601 duration
-  function parseDuration(duration: string): number {
-    const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
-    const match = duration.match(regex);
-    
-    if (!match) return 0;
-    
-    const hours = parseInt(match[1] || '0');
-    const minutes = parseInt(match[2] || '0');
-    const seconds = parseInt(match[3] || '0');
-    
-    return (hours * 3600 + minutes * 60 + seconds) * 1000;
-  }
-
   try {
-    // Get current date info
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
     
-    // Calculate multipliers (this would come from your payroll system)
-    const currentYearMultiplier = 3.2;
-    const lastYearMultiplier = 3.0;
-    const twoYearsAgoMultiplier = 2.8;
+    // Check Clockify service configuration
+    const clockifyConfig = clockifyService.getConfigurationStatus();
+    console.log('Clockify service configuration:', clockifyConfig);
     
-    // Calculate overhead rates (this would come from your financial data)
-    const currentYearOverhead = 0.28;
-    const lastYearOverhead = 0.30;
-    const twoYearsAgoOverhead = 0.32;
-    
-    // Get employee count and revenue data
-    const employees = await payrollService.getAllEmployees();
-    const totalEmployees = employees.length;
-    
-    // Calculate revenue per employee (this would come from your financial system)
-    const currentYearRevenuePerEmployee = 285000;
-    const lastYearRevenuePerEmployee = 265000;
-    const twoYearsAgoRevenuePerEmployee = 245000;
-    
-    // Get project data from Zoho
-    let totalActiveProjects = 0;
-    let averageProjectSize = 125000;
-    let ytdProfit = 425000;
-    let lastYearYtdProfit = 385000;
+    if (!clockifyConfig.configured) {
+      console.warn('Clockify service not configured - using mock data for time tracking metrics');
+    }
+
+    // Get Zoho data for financial metrics
+    let projects: any[] = [];
+    let invoices: any[] = [];
+    let customers: any[] = [];
     
     try {
-      const projects = await zohoService.getProjects();
-      totalActiveProjects = projects.filter(p => p.status === 'active').length;
-      
-      // Calculate average project size (using budget amount as proxy)
-      const projectValues = projects.map(p => p.budget_amount || 0);
-      if (projectValues.length > 0) {
-        averageProjectSize = projectValues.reduce((sum, val) => sum + val, 0) / projectValues.length;
-      }
+      projects = await zohoService.getProjects();
+      invoices = await zohoService.getInvoices();
+      customers = await zohoService.getCustomers();
     } catch (error) {
-      console.log('Using default project data');
+      console.error('Failed to fetch Zoho data:', error);
+      return NextResponse.json(
+        { error: 'Failed to fetch financial data from Zoho' },
+        { status: 500 }
+      );
     }
-    
+
     // Get Clockify data for utilization rate
     let utilizationRate = 0.85;
     let averageBillingRate = 185;
     
     try {
-      const clockifyUser = await clockifyService.getUser();
-      const clockifyProjects = await clockifyService.getProjects();
-      
-      // Calculate utilization rate based on billable hours vs total hours
-      try {
-        const timeEntries = await clockifyService.getAllTimeEntries(
-          new Date(currentYear, 0, 1).toISOString(),
-          now.toISOString()
-        );
+      if (clockifyConfig.configured) {
+        const clockifyUser = await clockifyService.getUser();
+        const clockifyProjects = await clockifyService.getProjects();
         
-        const totalHours = timeEntries.reduce((sum, entry) => sum + (parseDuration(entry.timeInterval.duration) || 0), 0) / 3600000; // Convert from milliseconds
-        const billableHours = timeEntries.filter(entry => entry.billable).reduce((sum, entry) => sum + (parseDuration(entry.timeInterval.duration) || 0), 0) / 3600000;
-        
-        if (totalHours > 0) {
-          utilizationRate = billableHours / totalHours;
+        // Calculate utilization rate based on billable hours vs total hours
+        try {
+          const timeEntries = await clockifyService.getAllTimeEntries(
+            new Date(currentYear, 0, 1).toISOString(),
+            now.toISOString()
+          );
+          
+          const totalHours = timeEntries.reduce((sum, entry) => {
+            const duration = entry.timeInterval?.duration || 'PT0H';
+            const hours = parseDuration(duration);
+            return sum + hours;
+          }, 0);
+          
+          const billableHours = timeEntries.filter(entry => entry.billable).reduce((sum, entry) => {
+            const duration = entry.timeInterval?.duration || 'PT0H';
+            const hours = parseDuration(duration);
+            return sum + hours;
+          }, 0);
+          
+          utilizationRate = totalHours > 0 ? billableHours / totalHours : 0.85;
+          
+          // Calculate average billing rate
+          const billableEntries = timeEntries.filter(entry => entry.billable);
+          if (billableEntries.length > 0) {
+            const totalRate = billableEntries.reduce((sum, entry) => {
+              const rate = entry.hourlyRate?.amount || 150;
+              return sum + rate;
+            }, 0);
+            averageBillingRate = totalRate / billableEntries.length;
+          }
+        } catch (timeError) {
+          console.warn('Failed to calculate utilization rate from Clockify, using defaults:', timeError);
         }
-        
-        // Calculate average billing rate (using default rate for now)
-        if (timeEntries.length > 0) {
-          // For now, use a default billing rate since we don't have amount data
-          averageBillingRate = 185; // Default rate, would be calculated from hourly rates in real implementation
-        }
-      } catch (timeEntryError) {
-        console.warn('Failed to fetch Clockify time entries, using default values:', timeEntryError);
-        // Keep default values
+      } else {
+        console.log('Using mock utilization data due to Clockify not being configured');
       }
     } catch (error) {
-      console.log('Using default Clockify data');
+      console.warn('Failed to fetch Clockify data, using defaults:', error);
     }
+
+    // Calculate financial metrics from Zoho data
+    const activeProjects = projects.filter(p => p.status === 'active');
+    const totalBudget = activeProjects.reduce((sum, p) => sum + (p.budget_amount || 0), 0);
     
-    // Calculate cashflow (this would come from your accounting system)
-    const currentCashflow = 125000;
-    const previousMonthCashflow = 110000;
-    const cashflowTrend: 'up' | 'down' | 'stable' = currentCashflow > previousMonthCashflow ? 'up' : currentCashflow < previousMonthCashflow ? 'down' : 'stable';
+    const paidInvoices = invoices.filter(inv => inv.status === 'paid');
+    const outstandingInvoices = invoices.filter(inv => inv.status === 'sent' || inv.status === 'viewed');
     
-    // Invoice data (this would come from Zoho Books)
-    const overdueInvoiceValue = 45000;
-    const totalOutstandingInvoices = 125000;
-    const averageDaysToPayment = 42;
+    const totalCollected = paidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    const totalOutstanding = outstandingInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
     
-    // Profit margins
-    const currentYearGrossMargin = 0.35;
-    const lastYearGrossMargin = 0.32;
-    const ytdOperatingIncome = 285000;
-    const lastYearYtdOperatingIncome = 245000;
+    // Calculate YTD metrics
+    const currentYearInvoices = invoices.filter(inv => {
+      const invoiceDate = new Date(inv.date);
+      return invoiceDate.getFullYear() === currentYear;
+    });
     
-    // Client retention rate (this would come from your CRM data)
-    const clientRetentionRate = 0.92;
+    const ytdRevenue = currentYearInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    const ytdProfit = ytdRevenue * 0.25; // Assuming 25% profit margin
     
-    // Generate trailing 12 months data
-    const trailing12Months = [];
-    for (let i = 11; i >= 0; i--) {
-      const month = new Date(currentYear, currentMonth - i, 1);
-      const monthName = month.toLocaleDateString('en-US', { month: 'short' });
-      const baseRevenue = 180000 + (i * 15000);
-      const baseExpenses = 120000 + (i * 5000);
-      const profit = baseRevenue - baseExpenses;
-      const profitMargin = profit / baseRevenue;
-      
-      trailing12Months.push({
-        month: monthName,
-        revenue: baseRevenue,
-        expenses: baseExpenses,
-        profit,
-        profitMargin
-      });
-    }
-    
-    // Generate forecast data
-    const forecast = [];
-    for (let i = 1; i <= 6; i++) {
-      const month = new Date(currentYear, currentMonth + i, 1);
-      const monthName = month.toLocaleDateString('en-US', { month: 'short' });
-      const projectedRevenue = 360000 + (i * 15000);
-      const projectedExpenses = 180000 + (i * 5000);
-      const projectedProfit = projectedRevenue - projectedExpenses;
-      
-      forecast.push({
-        month: monthName,
-        projectedRevenue,
-        projectedExpenses,
-        projectedProfit
-      });
-    }
-    
-    const dashboardData: DashboardMetrics = {
-      // Multipliers
-      currentYearMultiplier,
-      lastYearMultiplier,
-      twoYearsAgoMultiplier,
-      
-      // Overhead Rates
-      currentYearOverhead,
-      lastYearOverhead,
-      twoYearsAgoOverhead,
-      
-      // Revenue per Employee
-      currentYearRevenuePerEmployee,
-      lastYearRevenuePerEmployee,
-      twoYearsAgoRevenuePerEmployee,
-      
-      // Cashflow
-      currentCashflow,
-      previousMonthCashflow,
-      cashflowTrend,
-      
-      // Invoices
-      overdueInvoiceValue,
-      totalOutstandingInvoices,
-      averageDaysToPayment,
-      
-      // Profit Metrics
+    // Generate mock data for missing metrics
+    const mockData = {
+      currentYearMultiplier: 2.8,
+      lastYearMultiplier: 2.6,
+      twoYearsAgoMultiplier: 2.4,
+      currentYearOverhead: 0.35,
+      lastYearOverhead: 0.37,
+      twoYearsAgoOverhead: 0.39,
+      currentYearRevenuePerEmployee: 250000,
+      lastYearRevenuePerEmployee: 235000,
+      twoYearsAgoRevenuePerEmployee: 220000,
+      currentCashflow: totalCollected - totalOutstanding,
+      previousMonthCashflow: totalCollected * 0.8 - totalOutstanding * 0.8,
+      cashflowTrend: 'up' as const,
+      overdueInvoiceValue: totalOutstanding * 0.3,
+      totalOutstandingInvoices: totalOutstanding,
+      averageDaysToPayment: 45,
       ytdProfit,
-      lastYearYtdProfit,
-      currentYearGrossMargin,
-      lastYearGrossMargin,
-      ytdOperatingIncome,
-      lastYearYtdOperatingIncome,
-      
-      // Trailing 12 Months
-      trailing12Months,
-      
-      // Forecast
-      forecast,
-      
-      // Additional Metrics
+      lastYearYtdProfit: ytdProfit * 0.9,
+      currentYearGrossMargin: 0.35,
+      lastYearGrossMargin: 0.33,
+      ytdOperatingIncome: ytdProfit * 0.8,
+      lastYearYtdOperatingIncome: ytdProfit * 0.8 * 0.9,
+      trailing12Months: Array.from({ length: 12 }, (_, i) => {
+        const month = new Date(currentYear, i, 1).toLocaleDateString('en-US', { month: 'short' });
+        const revenue = ytdRevenue / 12 * (0.8 + Math.random() * 0.4);
+        const expenses = revenue * 0.65;
+        const profit = revenue - expenses;
+        return {
+          month,
+          revenue: Math.round(revenue),
+          expenses: Math.round(expenses),
+          profit: Math.round(profit),
+          profitMargin: profit / revenue
+        };
+      }),
+      forecast: Array.from({ length: 6 }, (_, i) => {
+        const month = new Date(currentYear, 11 + i, 1).toLocaleDateString('en-US', { month: 'short' });
+        const projectedRevenue = ytdRevenue / 12 * (1.1 + Math.random() * 0.2);
+        const projectedExpenses = projectedRevenue * 0.65;
+        const projectedProfit = projectedRevenue - projectedExpenses;
+        return {
+          month,
+          projectedRevenue: Math.round(projectedRevenue),
+          projectedExpenses: Math.round(projectedExpenses),
+          projectedProfit: Math.round(projectedProfit)
+        };
+      }),
       utilizationRate,
-      averageProjectSize,
-      clientRetentionRate,
+      averageProjectSize: totalBudget / Math.max(activeProjects.length, 1),
+      clientRetentionRate: 0.85,
       averageBillingRate,
-      totalActiveProjects,
-      totalEmployees,
+      totalActiveProjects: activeProjects.length,
+      totalEmployees: 12
     };
-    
-    return NextResponse.json(dashboardData);
-  } catch (error: any) {
-    console.error('Error fetching dashboard data:', error);
+
+    return NextResponse.json(mockData);
+  } catch (error) {
+    console.error('Dashboard API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch dashboard data' },
+      { error: 'Failed to generate dashboard data' },
       { status: 500 }
     );
   }
+}
+
+// Helper function to parse duration strings (e.g., "PT2H30M")
+function parseDuration(duration: string): number {
+  if (!duration) return 0;
+  
+  const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
+  const match = duration.match(regex);
+  
+  if (!match) return 0;
+  
+  const hours = parseInt(match[1] || '0');
+  const minutes = parseInt(match[2] || '0');
+  const seconds = parseInt(match[3] || '0');
+  
+  return hours + (minutes / 60) + (seconds / 3600);
 }
