@@ -71,37 +71,37 @@ ALTER TABLE "ClosedProject" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "ProjectAssignment" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "ProjectManager" ENABLE ROW LEVEL SECURITY;
 
--- Create policies that allow all operations for authenticated users
--- This is a permissive policy - you can make it more restrictive based on your needs
+-- Create optimized policies that prevent re-evaluation of auth functions for each row
+-- This resolves the Supabase performance warnings by using (select auth.role()) instead of auth.role()
 
 -- Projection policies
 CREATE POLICY "Enable all operations for authenticated users" ON "Projection"
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING ((select auth.role()) = 'authenticated');
 
 -- Status policies
 CREATE POLICY "Enable all operations for authenticated users" ON "Status"
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING ((select auth.role()) = 'authenticated');
 
 -- Comment policies
 CREATE POLICY "Enable all operations for authenticated users" ON "Comment"
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING ((select auth.role()) = 'authenticated');
 
 -- SignedFee policies
 CREATE POLICY "Enable all operations for authenticated users" ON "SignedFee"
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING ((select auth.role()) = 'authenticated');
 
 -- AsrFee policies
 CREATE POLICY "Enable all operations for authenticated users" ON "AsrFee"
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING ((select auth.role()) = 'authenticated');
 
 -- ClosedProject policies
 CREATE POLICY "Enable all operations for authenticated users" ON "ClosedProject"
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING ((select auth.role()) = 'authenticated');
 
 -- ProjectAssignment policies
 CREATE POLICY "Enable all operations for authenticated users" ON "ProjectAssignment"
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING ((select auth.role()) = 'authenticated');
 
 -- ProjectManager policies
 CREATE POLICY "Enable all operations for authenticated users" ON "ProjectManager"
-    FOR ALL USING (auth.role() = 'authenticated');
+    FOR ALL USING ((select auth.role()) = 'authenticated');

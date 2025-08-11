@@ -18,7 +18,11 @@
     "db:setup": "prisma generate && prisma db push",
     "db:migrate": "curl -X POST https://billing-collectif-engineering.vercel.app/api/migrate",
     "db:migrate:local": "curl -X POST http://localhost:3000/api/migrate",
-    "test:clockify": "node scripts/test-clockify.js"
+    "test:clockify": "node scripts/test-clockify.js",
+    "fix:database": "node fix-database-issues.js",
+    "db:test": "npx prisma db pull",
+    "db:reset": "npx prisma migrate reset --force",
+    "db:deploy": "npx prisma migrate deploy"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.19.0",

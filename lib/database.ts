@@ -68,4 +68,35 @@ export async function createDatabaseSchema() {
   }
 }
 
+export async function testDatabaseConnection() {
+  try {
+    // Test basic connection
+    await prisma.$connect();
+    console.log('Database connection successful');
+    
+    // Test a simple query
+    const result = await prisma.$queryRaw`SELECT 1 as test`;
+    console.log('Database query test successful:', result);
+    
+    return true;
+  } catch (error: any) {
+    console.error('Database connection test failed:', error);
+    
+    // Provide specific error guidance
+    if (error.message?.includes('ENOTFOUND')) {
+      console.error('Network error: Check your DATABASE_URL and network connectivity');
+    } else if (error.message?.includes('authentication failed')) {
+      console.error('Authentication error: Check your database credentials');
+    } else if (error.message?.includes('does not exist')) {
+      console.error('Database does not exist: Check your database name in the connection URL');
+    } else if (error.message?.includes('connection timeout')) {
+      console.error('Connection timeout: Check your network and database server status');
+    }
+    
+    return false;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 export { prisma };
