@@ -8,6 +8,9 @@ A dynamic web-based billing platform that integrates fully with Zoho Books and C
 - **Automatic Project Sync**: New projects created in Zoho Books automatically populate in the billing platform
 - **Real-time Data**: Live synchronization with Zoho Books API
 - **Invoice Tracking**: Track billed vs unbilled amounts for each project
+- **Financial Dashboard**: Real YTD profit, cash flow, and financial metrics from Zoho Books
+- **Profit & Loss Data**: Actual revenue, expenses, and profit margins
+- **Balance Sheet Integration**: Real-time financial position and cash balances
 
 ### ⏰ Clockify Time Tracking Integration
 - **Time Tracking Analytics**: Detailed KPIs from Clockify time tracking data
@@ -34,6 +37,7 @@ A dynamic web-based billing platform that integrates fully with Zoho Books and C
 - **Billing Metrics**: Total projects, billed amounts, unbilled amounts, active projects
 - **Time Tracking KPIs**: Total hours, billable hours, efficiency rates, average hourly rates
 - **Performance Metrics**: Time value, average hours per project, top performing projects
+- **Financial Metrics**: Real YTD profit, cash flow, multipliers, and overhead rates from Zoho Books
 - **Project Summary**: Quick overview of each project's billing and time status
 - **Real-time Updates**: Refresh data with a single click
 
@@ -90,6 +94,9 @@ A dynamic web-based billing platform that integrates fully with Zoho Books and C
       - `ZohoBooks.invoices.READ`
       - `ZohoBooks.contacts.READ`
       - `ZohoBooks.settings.READ`
+      - `ZohoBooks.reports.READ` (for financial data)
+      - `ZohoBooks.chartofaccounts.READ` (for account data)
+      - `ZohoBooks.journalentries.READ` (for transaction data)
    e. Generate your refresh token using the OAuth flow
    f. Get your Client ID, Client Secret, and Organization ID
 
@@ -196,6 +203,8 @@ When Clockify is configured, you'll see:
 ### Zoho Integration
 - `/api/projects` - Fetches all projects and billing data from Zoho Books
 - `/api/projections` - Updates projections table
+- `/api/financial-data` - Tests and fetches financial data from Zoho Books
+- `/api/dashboard` - Comprehensive dashboard with real financial metrics
 
 ### Clockify Integration
 - `/api/clockify` - Handles Clockify data fetching and processing

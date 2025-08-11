@@ -56,37 +56,60 @@ export function processBillingData(
   const safeInvoices = invoices || [];
   const safeProjections = projections || {};
   
+  // Early return if no projects
+  if (safeProjects.length === 0) {
+    return [];
+  }
+  
+  // Cache month range to avoid recalculation
   const monthRange = getProjectionsMonthRange();
   
+  // Create a map of invoices by project for faster lookup
+  const invoiceMap = new Map<string, ZohoInvoice[]>();
+  safeInvoices.forEach(invoice => {
+    const projectId = invoice.project_id;
+    if (!invoiceMap.has(projectId)) {
+      invoiceMap.set(projectId, []);
+    }
+    invoiceMap.get(projectId)!.push(invoice);
+  });
+  
   return safeProjects.map(project => {
-    const projectInvoices = safeInvoices.filter(invoice => invoice.project_id === project.project_id);
+    const projectInvoices = invoiceMap.get(project.project_id) || [];
+    
+    // Pre-calculate invoice totals to avoid repeated calculations
+    const invoiceTotals = new Map<string, { billed: number; unbilled: number }>();
+    
+    projectInvoices.forEach(invoice => {
+      const month = format(new Date(invoice.date), 'yyyy-MM');
+      const current = invoiceTotals.get(month) || { billed: 0, unbilled: 0 };
+      current.billed += invoice.billed_amount;
+      current.unbilled += invoice.unbilled_amount;
+      invoiceTotals.set(month, current);
+    });
+    
     const monthlyData: MonthlyBillingData[] = monthRange.map(month => {
-      const monthInvoices = projectInvoices.filter(invoice => {
-        const invoiceMonth = format(new Date(invoice.date), 'yyyy-MM');
-        return invoiceMonth === month;
-      });
-
-      const billed = monthInvoices.reduce((sum, invoice) => sum + invoice.billed_amount, 0);
-      const unbilled = monthInvoices.reduce((sum, invoice) => sum + invoice.unbilled_amount, 0);
+      const monthTotals = invoiceTotals.get(month) || { billed: 0, unbilled: 0 };
       const projected = safeProjections[project.project_id]?.months?.[month]?.value || 0;
-      const actual = billed + unbilled;
+      const actual = monthTotals.billed + monthTotals.unbilled;
 
       return {
         month,
-        billed,
-        unbilled,
+        billed: monthTotals.billed,
+        unbilled: monthTotals.unbilled,
         projected,
         actual,
       };
     });
 
+    // Calculate totals efficiently
     const totalBilled = monthlyData.reduce((sum, data) => sum + data.billed, 0);
     const totalUnbilled = monthlyData.reduce((sum, data) => sum + data.unbilled, 0);
     const totalProjected = monthlyData.reduce((sum, data) => sum + data.projected, 0);
 
     return {
       projectId: project.project_id,
-      projectName: project.project_name, // Changed from project.name
+      projectName: project.project_name,
       customerName: project.customer_name,
       signedFee: undefined, // Remove Zoho signed fee, only use user-entered data
       monthlyData,
@@ -131,59 +154,43 @@ export function calculateDashboardStats(
   const projections = monthlyProjections || safeLocalStorageGet('monthlyProjections') || {};
   const statuses = monthlyStatuses || safeLocalStorageGet('monthlyStatuses') || {};
   
-  // Calculate Total Billed YTD (sum of all projections marked as "Billed" for current year)
+  // Optimize calculations by pre-calculating current year and month
   const currentYear = new Date().getFullYear().toString();
-  let totalBilledYTD = 0;
-  
-  Object.keys(projections).forEach(projectId => {
-    const projectProjections = projections[projectId];
-    const projectStatuses = statuses[projectId];
-    
-    if (projectProjections && projectStatuses) {
-      Object.keys(projectProjections).forEach(month => {
-        // Check if month is in current year and status is "Billed"
-        if (month.startsWith(currentYear) && projectStatuses[month] === 'Billed') {
-          totalBilledYTD += projectProjections[month] || 0;
-        }
-      });
-    }
-  });
-  
-  // Calculate Backlog (sum of all projections NOT marked as "Billed" for current and future months)
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
-  let backlog = 0;
   
-  Object.keys(projections).forEach(projectId => {
-    const projectProjections = projections[projectId];
-    const projectStatuses = statuses[projectId];
-    
-    if (projectProjections && projectStatuses) {
-      Object.keys(projectProjections).forEach(month => {
-        // Check if month is current or future and status is NOT "Billed"
-        if (month >= currentMonth && projectStatuses[month] !== 'Billed') {
-          backlog += projectProjections[month] || 0;
-        }
-      });
-    }
-  });
-
-  // Calculate Total Projected (sum of all projections for current and future months)
+  // Batch calculate financial metrics to reduce iterations
+  let totalBilledYTD = 0;
+  let backlog = 0;
   let totalProjected = 0;
   
+  // Single pass through projections for better performance
   Object.keys(projections).forEach(projectId => {
     const projectProjections = projections[projectId];
+    const projectStatuses = statuses[projectId];
     
     if (projectProjections) {
       Object.keys(projectProjections).forEach(month => {
+        const projectionValue = projectProjections[month] || 0;
+        
+        // Check if month is in current year and status is "Billed"
+        if (month.startsWith(currentYear) && projectStatuses?.[month] === 'Billed') {
+          totalBilledYTD += projectionValue;
+        }
+        
+        // Check if month is current or future and status is NOT "Billed"
+        if (month >= currentMonth && projectStatuses?.[month] !== 'Billed') {
+          backlog += projectionValue;
+        }
+        
         // Include all projections for current and future months
         if (month >= currentMonth) {
-          totalProjected += projectProjections[month] || 0;
+          totalProjected += projectionValue;
         }
       });
     }
   });
 
-  // Calculate Clockify KPIs
+  // Calculate Clockify KPIs - optimized single pass
   let totalHours = 0;
   let billableHours = 0;
   let nonBillableHours = 0;
@@ -192,6 +199,7 @@ export function calculateDashboardStats(
   let projectsWithTimeData = 0;
   const projectEfficiencies: { projectId: string; efficiency: number; hours: number }[] = [];
 
+  // Single pass through billing data for time tracking
   billingData.forEach(project => {
     if (project.clockifyData) {
       const timeData = project.clockifyData;
@@ -212,11 +220,12 @@ export function calculateDashboardStats(
     }
   });
 
-  const averageHourlyRate = projectsWithTimeData > 0 ? totalTimeValue / billableHours : 0;
+  // Calculate derived metrics
+  const averageHourlyRate = projectsWithTimeData > 0 && billableHours > 0 ? totalTimeValue / billableHours : 0;
   const efficiency = totalHours > 0 ? billableHours / totalHours : 0;
   const averageHoursPerProject = projectsWithTimeData > 0 ? totalHours / projectsWithTimeData : 0;
 
-  // Get top performing projects (by efficiency and hours)
+  // Get top performing projects (by efficiency and hours) - limit to top 5 for performance
   const topPerformingProjects = projectEfficiencies
     .sort((a, b) => (b.efficiency * b.hours) - (a.efficiency * a.hours))
     .slice(0, 5)

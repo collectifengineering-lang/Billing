@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import { useMigration } from '../lib/migrationContext';
@@ -12,6 +12,7 @@ import DashboardStats from '../components/DashboardStats';
 import EnhancedDashboardStats from '../components/EnhancedDashboardStats';
 import BillingChart from '../components/BillingChart';
 import HighPerformanceTable from '../components/HighPerformanceTable';
+import PerformanceMonitor from '../components/PerformanceMonitor';
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -28,7 +29,6 @@ export default function Dashboard() {
   const [clockifyData, setClockifyData] = useState<any[]>([]);
   const [useEnhancedStats, setUseEnhancedStats] = useState(false);
 
-  
   // Database data for dashboard stats
   const [monthlyProjections, setMonthlyProjections] = useState<Record<string, Record<string, number>>>({});
   const [monthlyStatuses, setMonthlyStatuses] = useState<Record<string, Record<string, string>>>({});
@@ -37,6 +37,37 @@ export default function Dashboard() {
   // Force useDB to true - always use database now
   const useDB = true;
 
+  // Memoize expensive calculations
+  const memoizedProjections = useMemo(() => {
+    if (projects.length > 0) {
+      return initializeProjectionsTable(projects);
+    }
+    return {};
+  }, [projects]);
+
+  const memoizedBillingData = useMemo(() => {
+    if (projects.length > 0 || invoices.length > 0) {
+      return processBillingData(projects, invoices, memoizedProjections);
+    }
+    return [];
+  }, [projects, invoices, memoizedProjections]);
+
+  const memoizedDashboardStats = useMemo(() => {
+    if (memoizedBillingData.length > 0) {
+      return calculateDashboardStats(memoizedBillingData, closedProjects, monthlyProjections, monthlyStatuses);
+    }
+    return null;
+  }, [memoizedBillingData, closedProjects, monthlyProjections, monthlyStatuses]);
+
+  // Memoize enhanced billing data
+  const memoizedEnhancedBillingData = useMemo(() => {
+    if (memoizedBillingData.length > 0 && clockifyData.length > 0) {
+      return enhanceBillingDataWithClockify(memoizedBillingData, clockifyData);
+    }
+    return memoizedBillingData;
+  }, [memoizedBillingData, clockifyData]);
+
+  // Authentication and routing logic
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
@@ -48,7 +79,7 @@ export default function Dashboard() {
     }
   }, [user, loading, router]);
 
-  // Handle migration on mount
+  // Handle migration on mount - only once
   useEffect(() => {
     if (hasLocalData && !isMigrated && !isMigrating) {
       console.log('Dashboard: Found localStorage data, starting migration');
@@ -56,17 +87,15 @@ export default function Dashboard() {
     }
   }, [hasLocalData, isMigrated, isMigrating, migrateData]);
 
+  // Fetch data only when user is authenticated - optimized
   useEffect(() => {
-    console.log('Dashboard: useEffect triggered - user:', !!user, 'isBasic:', user?.isBasic, 'loading:', loading);
-    if (user && user.isBasic) {
+    if (user && user.isBasic && !dataLoading) {
       console.log('Dashboard: User authenticated and authorized, fetching data');
       fetchData();
-    } else {
-      console.log('Dashboard: User not authenticated or not authorized:', { user: !!user, isBasic: user?.isBasic, loading });
     }
-  }, [user]);
+  }, [user, dataLoading]);
 
-  // Update auto-refresh status every second
+  // Update auto-refresh status - optimized to reduce re-renders
   useEffect(() => {
     const updateAutoRefreshStatus = () => {
       const status = zohoService.getAutoRefreshStatus();
@@ -76,13 +105,13 @@ export default function Dashboard() {
     // Update immediately
     updateAutoRefreshStatus();
 
-    // Update every second
-    const interval = setInterval(updateAutoRefreshStatus, 1000);
+    // Update every 5 seconds instead of every second to reduce re-renders
+    const interval = setInterval(updateAutoRefreshStatus, 5000);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch database projections and statuses
+  // Fetch database projections and statuses - optimized
   useEffect(() => {
     const fetchDatabaseData = async () => {
       try {
@@ -105,58 +134,42 @@ export default function Dashboard() {
       }
     };
 
-    if (user && user.isBasic) {
+    if (user && user.isBasic && !dataLoading) {
       fetchDatabaseData();
     }
-  }, [user]);
+  }, [user, dataLoading]);
 
-  // Process billing data when projects or invoices change
+  // Fetch Clockify data on mount - optimized
   useEffect(() => {
-    if (projects.length > 0 || invoices.length > 0) {
-      console.log('Dashboard: Processing data - projects:', projects.length, 'invoices:', invoices.length);
-      console.log('Dashboard: User state:', { user: !!user, isBasic: user?.isBasic, loading });
-      const newProjections = initializeProjectionsTable(projects);
-      setProjections(newProjections);
-      const processedData = processBillingData(projects, invoices, newProjections);
-      console.log('Dashboard: Processed billing data:', processedData.length);
-      console.log('Dashboard: First processed item:', processedData[0]);
-      console.log('Dashboard: Projections initialized:', Object.keys(newProjections).length);
-      setBillingData(processedData);
-    } else {
-      console.log('Dashboard: No projects or invoices to process');
-      console.log('Dashboard: Projects length:', projects.length);
-      console.log('Dashboard: Invoices length:', invoices.length);
-    }
-  }, [projects, invoices, user, loading]);
-
-  // Calculate dashboard stats when data changes
-  useEffect(() => {
-    if (billingData.length > 0) {
-      const stats = calculateDashboardStats(billingData, closedProjects, monthlyProjections, monthlyStatuses);
-      setDashboardStats(stats);
-    }
-  }, [billingData, closedProjects, monthlyProjections, monthlyStatuses]);
-
-  // Fetch Clockify data on mount
-  useEffect(() => {
-    if (user && user.isBasic) {
+    if (user && user.isBasic && clockifyData.length === 0) {
       fetchClockifyData();
     }
-  }, [user]);
+  }, [user, clockifyData.length]);
 
-  // Enhance billing data with Clockify data when available
+  // Update projections when memoized data changes
   useEffect(() => {
-    if (billingData.length > 0 && clockifyData.length > 0) {
-      console.log('Dashboard: Enhancing billing data with Clockify data');
-      const enhancedData = enhanceBillingDataWithClockify(billingData, clockifyData);
-      setBillingData(enhancedData);
+    setProjections(memoizedProjections);
+  }, [memoizedProjections]);
+
+  // Update billing data when memoized data changes
+  useEffect(() => {
+    setBillingData(memoizedEnhancedBillingData);
+  }, [memoizedEnhancedBillingData]);
+
+  // Update dashboard stats when memoized stats change
+  useEffect(() => {
+    setDashboardStats(memoizedDashboardStats);
+  }, [memoizedDashboardStats]);
+
+  // Set enhanced stats flag when Clockify data is available
+  useEffect(() => {
+    if (clockifyData.length > 0) {
       setUseEnhancedStats(true);
     }
-  }, [billingData, clockifyData]);
+  }, [clockifyData.length]);
 
-
-
-  const fetchClockifyData = async () => {
+  // Memoized fetch functions to prevent recreation
+  const fetchClockifyData = useCallback(async () => {
     try {
       console.log('Dashboard: Fetching Clockify data...');
       const startDate = new Date();
@@ -177,9 +190,9 @@ export default function Dashboard() {
       console.error('Dashboard: Error fetching Clockify data:', error);
       setClockifyData([]);
     }
-  };
+  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     console.log('Dashboard: Starting fetchData');
     console.log('Dashboard: User state during fetch:', { user: !!user, isBasic: user?.isBasic, loading });
     setDataLoading(true);
@@ -199,13 +212,11 @@ export default function Dashboard() {
     } finally {
       setDataLoading(false);
     }
-  };
+  }, [user, loading]);
 
-
-
-  const updateProjections = (projectionsData: any) => {
+  const updateProjections = useCallback((projectionsData: any) => {
     setProjections(projectionsData);
-  };
+  }, []);
 
   // Show migration loader
   if (isMigrating) {
@@ -251,12 +262,15 @@ export default function Dashboard() {
       <DashboardHeader cacheInfo={cacheInfo} autoRefreshStatus={autoRefreshStatus} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-
         {useEnhancedStats && dashboardStats ? (
           <EnhancedDashboardStats stats={dashboardStats} />
         ) : (
-          <DashboardStats billingData={billingData} closedProjects={closedProjects} stats={dashboardStats} />
+          <DashboardStats 
+            billingData={billingData} 
+            closedProjects={closedProjects} 
+            stats={dashboardStats}
+            loading={dataLoading || billingData.length === 0}
+          />
         )}
         
         <div className="mt-8">
@@ -277,6 +291,12 @@ export default function Dashboard() {
           />
         </div>
       </div>
+      
+      {/* Performance monitoring in development */}
+      <PerformanceMonitor 
+        componentName="Dashboard" 
+        dataSize={billingData.length} 
+      />
     </div>
   );
 } 

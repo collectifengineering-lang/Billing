@@ -468,11 +468,12 @@ function DashboardPageContent() {
         )}
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profitability">Profitability</TabsTrigger>
             <TabsTrigger value="cashflow">Cashflow</TabsTrigger>
             <TabsTrigger value="forecasting">Forecasting</TabsTrigger>
+            <TabsTrigger value="financial-data">Financial Data</TabsTrigger>
             {selectedProjectId && <TabsTrigger value="project">Project Details</TabsTrigger>}
           </TabsList>
 
@@ -709,6 +710,117 @@ function DashboardPageContent() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="financial-data" className="space-y-6">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Zoho Financial Data Integration</CardTitle>
+                  <CardDescription>
+                    Test and verify the connection to Zoho Books for accurate financial metrics
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={async () => {
+                          try {
+                            setError(null);
+                            const response = await fetch('/api/financial-data');
+                            const result = await response.json();
+                            if (result.success) {
+                              console.log('Financial data test result:', result);
+                              alert(`Financial data test completed!\n\nSuccessful endpoints: ${result.summary.successfulEndpoints}/${result.summary.totalEndpoints}\nErrors: ${result.summary.failedEndpoints}\n\nCheck browser console for detailed results.`);
+                            } else {
+                              throw new Error(result.error);
+                            }
+                          } catch (error) {
+                            console.error('Financial data test failed:', error);
+                            setError(`Financial data test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                          }
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                      >
+                        Test Zoho Financial Integration
+                      </button>
+                      <span className="text-sm text-gray-600">
+                        Click to test all Zoho financial endpoints and verify data accuracy
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <h4 className="font-semibold text-sm text-gray-700 mb-2">Current Data Sources</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>YTD Profit:</span>
+                            <span className="font-semibold">
+                              {metrics?.ytdProfit ? '✅ Real Zoho Data' : '❌ Mock Data'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Cash Flow:</span>
+                            <span className="font-semibold">
+                              {metrics?.currentCashflow && metrics.currentCashflow !== 0 ? '✅ Real Zoho Data' : '❌ Mock Data'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Revenue:</span>
+                            <span className="font-semibold">
+                              {metrics?.trailing12Months?.[0]?.revenue ? '✅ Real Zoho Data' : '❌ Mock Data'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Expenses:</span>
+                            <span className="font-semibold">
+                              {metrics?.trailing12Months?.[0]?.expenses ? '✅ Real Zoho Data' : '❌ Mock Data'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <h4 className="font-semibold text-sm text-gray-700 mb-2">Integration Status</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Zoho API:</span>
+                            <span className="font-semibold text-green-600">✅ Connected</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Financial Reports:</span>
+                            <span className="font-semibold text-blue-600">🔄 Testing Required</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Data Accuracy:</span>
+                            <span className="font-semibold text-yellow-600">⚠️ Verify Required</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-semibold text-sm text-blue-800 mb-2">How to Verify Data Accuracy</h4>
+                      <div className="text-sm text-blue-700 space-y-1">
+                        <p>1. <strong>Click "Test Zoho Financial Integration"</strong> above</p>
+                        <p>2. <strong>Check browser console</strong> for detailed API responses</p>
+                        <p>3. <strong>Compare dashboard metrics</strong> with your Zoho Books reports</p>
+                        <p>4. <strong>Verify YTD Profit</strong> matches your P&L statement</p>
+                        <p>5. <strong>Check Cash Flow</strong> matches your cash flow statement</p>
+                      </div>
+                    </div>
+
+                    {error && (
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <h4 className="font-semibold text-sm text-red-800 mb-2">Integration Error</h4>
+                        <p className="text-sm text-red-700">{error}</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

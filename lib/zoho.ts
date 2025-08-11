@@ -406,6 +406,128 @@ class ZohoService {
     }
   }
 
+  // New method to get Profit & Loss statement
+  async getProfitAndLoss(startDate: string, endDate: string): Promise<any> {
+    try {
+      const data = await this.makeRequest(`reports/profitandloss?from_date=${startDate}&to_date=${endDate}`);
+      console.log('Profit & Loss data:', JSON.stringify(data, null, 2));
+      return data;
+    } catch (error) {
+      console.error('Error fetching Profit & Loss:', error);
+      return null;
+    }
+  }
+
+  // New method to get Cash Flow statement
+  async getCashFlow(startDate: string, endDate: string): Promise<any> {
+    try {
+      const data = await this.makeRequest(`reports/cashflow?from_date=${startDate}&to_date=${endDate}`);
+      console.log('Cash Flow data:', JSON.stringify(data, null, 2));
+      return data;
+    } catch (error) {
+      console.error('Error fetching Cash Flow:', error);
+      return null;
+    }
+  }
+
+  // New method to get Balance Sheet
+  async getBalanceSheet(date: string): Promise<any> {
+    try {
+      const data = await this.makeRequest(`reports/balancesheet?date=${date}`);
+      console.log('Balance Sheet data:', JSON.stringify(data, null, 2));
+      return data;
+    } catch (error) {
+      console.error('Error fetching Balance Sheet:', error);
+      return null;
+    }
+  }
+
+  // New method to get Chart of Accounts
+  async getChartOfAccounts(): Promise<any[]> {
+    try {
+      const data = await this.makeRequest('chartofaccounts');
+      console.log('Chart of Accounts data:', JSON.stringify(data, null, 2));
+      return data.chartofaccounts || [];
+    } catch (error) {
+      console.error('Error fetching Chart of Accounts:', error);
+      return [];
+    }
+  }
+
+  // New method to get Journal Entries for a date range
+  async getJournalEntries(startDate: string, endDate: string): Promise<any[]> {
+    try {
+      const data = await this.makeRequest(`journalentries?from_date=${startDate}&to_date=${endDate}`);
+      console.log('Journal Entries data:', JSON.stringify(data, null, 2));
+      return data.journalentries || [];
+    } catch (error) {
+      console.error('Error fetching Journal Entries:', error);
+      return [];
+    }
+  }
+
+  // New method to get comprehensive financial metrics
+  async getFinancialMetrics(startDate: string, endDate: string): Promise<{
+    revenue: number;
+    expenses: number;
+    grossProfit: number;
+    netProfit: number;
+    operatingIncome: number;
+    cashFlow: number;
+    accountsReceivable: number;
+    accountsPayable: number;
+    cashBalance: number;
+  }> {
+    try {
+      const [plData, cfData, bsData] = await Promise.all([
+        this.getProfitAndLoss(startDate, endDate),
+        this.getCashFlow(startDate, endDate),
+        this.getBalanceSheet(endDate)
+      ]);
+
+      // Extract financial metrics from the responses
+      const revenue = plData?.revenue?.total || 0;
+      const expenses = plData?.expenses?.total || 0;
+      const grossProfit = revenue - expenses;
+      
+      // Calculate net profit (may need adjustment based on actual Zoho response structure)
+      const netProfit = grossProfit - (plData?.operating_expenses?.total || 0);
+      const operatingIncome = grossProfit - (plData?.operating_expenses?.total || 0);
+      
+      // Extract cash flow data
+      const cashFlow = cfData?.net_cash_flow || 0;
+      const accountsReceivable = bsData?.current_assets?.accounts_receivable || 0;
+      const accountsPayable = bsData?.current_liabilities?.accounts_payable || 0;
+      const cashBalance = bsData?.current_assets?.cash_and_bank || 0;
+
+      return {
+        revenue,
+        expenses,
+        grossProfit,
+        netProfit,
+        operatingIncome,
+        cashFlow,
+        accountsReceivable,
+        accountsPayable,
+        cashBalance
+      };
+    } catch (error) {
+      console.error('Error fetching financial metrics:', error);
+      // Return default values if API calls fail
+      return {
+        revenue: 0,
+        expenses: 0,
+        grossProfit: 0,
+        netProfit: 0,
+        operatingIncome: 0,
+        cashFlow: 0,
+        accountsReceivable: 0,
+        accountsPayable: 0,
+        cashBalance: 0
+      };
+    }
+  }
+
   // Method to manually refresh token (for testing)
   async forceRefreshToken(): Promise<void> {
     this.accessToken = null;

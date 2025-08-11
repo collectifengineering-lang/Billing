@@ -2,6 +2,7 @@ import { RefreshCw, Database, List, Settings, Clock, BarChart3 } from 'lucide-re
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
+import { memo } from 'react';
 
 interface DashboardHeaderProps {
   cacheInfo?: any;
@@ -11,7 +12,7 @@ interface DashboardHeaderProps {
   };
 }
 
-export default function DashboardHeader({ cacheInfo, autoRefreshStatus }: DashboardHeaderProps) {
+const DashboardHeader = memo(function DashboardHeader({ cacheInfo, autoRefreshStatus }: DashboardHeaderProps) {
   const { user } = useAuth();
   
   const formatTimeRemaining = (ms: number): string => {
@@ -96,4 +97,6 @@ export default function DashboardHeader({ cacheInfo, autoRefreshStatus }: Dashbo
       </div>
     </div>
   );
-} 
+});
+
+export default DashboardHeader; 
