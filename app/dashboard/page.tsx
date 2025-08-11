@@ -113,6 +113,17 @@ interface ProjectMetrics {
     efficiency: number;
   }[];
   
+  // Time Tracking
+  timeEntries: {
+    date: string;
+    employeeName: string;
+    hours: number;
+    billableHours: number;
+    description?: string;
+    hourlyRate: number;
+    totalValue: number;
+  }[];
+  
   // Cash vs Accrual
   cashBasis: {
     totalCollected: number;
@@ -710,21 +721,21 @@ function DashboardPageContent() {
               <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">{projectMetrics.projectName}</h2>
-                    <p className="text-gray-600">{projectMetrics.customerName}</p>
+                    <h2 className="text-2xl font-bold text-gray-900">{projectMetrics?.projectName || 'Unknown Project'}</h2>
+                    <p className="text-gray-600">{projectMetrics?.customerName || 'Unknown Customer'}</p>
                     <div className="flex items-center space-x-4 mt-2">
-                      <Badge variant={projectMetrics.status === 'active' ? 'default' : 'secondary'}>
-                        {projectMetrics.status}
+                      <Badge variant={projectMetrics?.status === 'active' ? 'default' : 'secondary'}>
+                        {projectMetrics?.status || 'unknown'}
                       </Badge>
                       <span className="text-sm text-gray-500">
-                        {new Date(projectMetrics.startDate).toLocaleDateString()}
-                        {projectMetrics.endDate && ` - ${new Date(projectMetrics.endDate).toLocaleDateString()}`}
+                        {projectMetrics?.startDate ? new Date(projectMetrics.startDate).toLocaleDateString() : 'Unknown Date'}
+                        {projectMetrics?.endDate && ` - ${new Date(projectMetrics.endDate).toLocaleDateString()}`}
                       </span>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(projectMetrics.totalBudget)}
+                      {formatCurrency(projectMetrics?.totalBudget || 0)}
                     </div>
                     <div className="text-sm text-gray-500">Total Budget</div>
                   </div>
@@ -739,11 +750,11 @@ function DashboardPageContent() {
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{projectMetrics.currentMultiplier.toFixed(1)}x</div>
+                    <div className="text-2xl font-bold">{(projectMetrics?.currentMultiplier || 0).toFixed(1)}x</div>
                     <p className="text-xs text-muted-foreground">
-                      {projectMetrics.profitabilityTrend === 'improving' && '↗ Improving'}
-                      {projectMetrics.profitabilityTrend === 'declining' && '↘ Declining'}
-                      {projectMetrics.profitabilityTrend === 'stable' && '→ Stable'}
+                      {projectMetrics?.profitabilityTrend === 'improving' && '↗ Improving'}
+                      {projectMetrics?.profitabilityTrend === 'declining' && '↘ Declining'}
+                      {projectMetrics?.profitabilityTrend === 'stable' && '→ Stable'}
                     </p>
                   </CardContent>
                 </Card>
@@ -754,9 +765,9 @@ function DashboardPageContent() {
                     <Target className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{formatPercentage(projectMetrics.efficiency)}</div>
+                    <div className="text-2xl font-bold">{formatPercentage(projectMetrics?.efficiency || 0)}</div>
                     <p className="text-xs text-muted-foreground">
-                      {projectMetrics.billableHours}h billable / {projectMetrics.totalHours}h total
+                      {projectMetrics?.billableHours || 0}h billable / {projectMetrics?.totalHours || 0}h total
                     </p>
                   </CardContent>
                 </Card>
@@ -767,22 +778,22 @@ function DashboardPageContent() {
                     <PieChart className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{formatPercentage(projectMetrics.budgetUtilization / 100)}</div>
-                    <Progress value={projectMetrics.budgetUtilization} className="mt-2" />
+                    <div className="text-2xl font-bold">{formatPercentage((projectMetrics?.budgetUtilization || 0) / 100)}</div>
+                    <Progress value={projectMetrics?.budgetUtilization || 0} className="mt-2" />
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Risk Level</CardTitle>
-                    {projectMetrics.riskLevel === 'low' && <CheckCircle className="h-4 w-4 text-green-600" />}
-                    {projectMetrics.riskLevel === 'medium' && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
-                    {projectMetrics.riskLevel === 'high' && <XCircle className="h-4 w-4 text-red-600" />}
+                    {projectMetrics?.riskLevel === 'low' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                    {projectMetrics?.riskLevel === 'medium' && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
+                    {projectMetrics?.riskLevel === 'high' && <XCircle className="h-4 w-4 text-red-600" />}
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold capitalize">{projectMetrics.riskLevel}</div>
+                    <div className="text-2xl font-bold capitalize">{projectMetrics?.riskLevel || 'unknown'}</div>
                     <p className="text-xs text-muted-foreground">
-                      {projectMetrics.schedulePerformance}% schedule performance
+                      {projectMetrics?.schedulePerformance || 0}% schedule performance
                     </p>
                   </CardContent>
                 </Card>
@@ -802,11 +813,11 @@ function DashboardPageContent() {
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span>Total Collected</span>
-                            <span className="font-semibold">{formatCurrency(projectMetrics.cashBasis.totalCollected)}</span>
+                            <span className="font-semibold">{formatCurrency(projectMetrics?.cashBasis?.totalCollected || 0)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Outstanding</span>
-                            <span className="font-semibold">{formatCurrency(projectMetrics.cashBasis.outstandingReceivables)}</span>
+                            <span className="font-semibold">{formatCurrency(projectMetrics?.cashBasis?.outstandingReceivables || 0)}</span>
                           </div>
                         </div>
                       </div>
@@ -815,11 +826,11 @@ function DashboardPageContent() {
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span>Total Earned</span>
-                            <span className="font-semibold">{formatCurrency(projectMetrics.accrualBasis.totalEarned)}</span>
+                            <span className="font-semibold">{formatCurrency(projectMetrics?.accrualBasis?.totalEarned || 0)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span>Work in Progress</span>
-                            <span className="font-semibold">{formatCurrency(projectMetrics.accrualBasis.workInProgress)}</span>
+                            <span className="font-semibold">{formatCurrency(projectMetrics?.accrualBasis?.workInProgress || 0)}</span>
                           </div>
                         </div>
                       </div>
@@ -828,12 +839,12 @@ function DashboardPageContent() {
                       <div className="flex justify-between items-center">
                         <span className="font-semibold">Gross Profit</span>
                         <span className="text-lg font-bold text-green-600">
-                          {formatCurrency(projectMetrics.grossProfit)}
+                          {formatCurrency(projectMetrics?.grossProfit || 0)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Profit Margin</span>
-                        <span className="text-sm font-semibold">{formatPercentage(projectMetrics.profitMargin)}</span>
+                        <span className="text-sm font-semibold">{formatPercentage(projectMetrics?.profitMargin || 0)}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -846,22 +857,27 @@ function DashboardPageContent() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {projectMetrics.employeeBreakdown.map((employee, index) => (
+                      {projectMetrics?.employeeBreakdown?.map((employee, index) => (
                         <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex-1">
-                            <div className="font-semibold text-sm">{employee.employeeName}</div>
+                            <div className="font-semibold text-sm">{employee?.employeeName || 'Unknown Employee'}</div>
                             <div className="text-xs text-gray-500">
-                              {employee.billableHours}h billable / {employee.totalHours}h total
+                              {employee?.billableHours || 0}h billable / {employee?.totalHours || 0}h total
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold">{formatCurrency(employee.billableValue)}</div>
+                            <div className="font-semibold">{formatCurrency(employee?.billableValue || 0)}</div>
                             <div className="text-xs text-gray-500">
-                              {formatPercentage(employee.efficiency)} efficient
+                              {formatPercentage(employee?.efficiency || 0)} efficient
                             </div>
                           </div>
                         </div>
                       ))}
+                      {(!projectMetrics?.employeeBreakdown || projectMetrics.employeeBreakdown.length === 0) && (
+                        <div className="text-center text-gray-500 py-4">
+                          No employee data available
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -875,31 +891,36 @@ function DashboardPageContent() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {projectMetrics.phases.map((phase, index) => (
+                    {projectMetrics?.phases?.map((phase, index) => (
                       <div key={index} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">{phase.phaseName}</h4>
-                          <Badge variant={phase.completion === 100 ? 'default' : 'secondary'}>
-                            {phase.completion}% Complete
+                          <h4 className="font-semibold">{phase?.phaseName || 'Unknown Phase'}</h4>
+                          <Badge variant={(phase?.completion || 0) === 100 ? 'default' : 'secondary'}>
+                            {phase?.completion || 0}% Complete
                           </Badge>
                         </div>
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div>
                             <span className="text-gray-600">Budget:</span>
-                            <div className="font-semibold">{formatCurrency(phase.budget)}</div>
+                            <div className="font-semibold">{formatCurrency(phase?.budget || 0)}</div>
                           </div>
                           <div>
                             <span className="text-gray-600">Actual Cost:</span>
-                            <div className="font-semibold">{formatCurrency(phase.actualCost)}</div>
+                            <div className="font-semibold">{formatCurrency(phase?.actualCost || 0)}</div>
                           </div>
                           <div>
                             <span className="text-gray-600">Hours:</span>
-                            <div className="font-semibold">{phase.hours}h</div>
+                            <div className="font-semibold">{phase?.hours || 0}h</div>
                           </div>
                         </div>
-                        <Progress value={phase.completion} className="mt-2" />
+                        <Progress value={phase?.completion || 0} className="mt-2" />
                       </div>
                     ))}
+                    {(!projectMetrics?.phases || projectMetrics.phases.length === 0) && (
+                      <div className="text-center text-gray-500 py-4">
+                        No phase data available
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -913,19 +934,19 @@ function DashboardPageContent() {
                 <CardContent>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="text-center">
-                      <div className="text-2xl font-bold">{projectMetrics.changeOrders.count}</div>
+                      <div className="text-2xl font-bold">{projectMetrics?.changeOrders?.count || 0}</div>
                       <div className="text-sm text-gray-600">Total Changes</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold">{formatCurrency(projectMetrics.changeOrders.totalValue)}</div>
+                      <div className="text-2xl font-bold">{formatCurrency(projectMetrics?.changeOrders?.totalValue || 0)}</div>
                       <div className="text-sm text-gray-600">Total Value</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{formatCurrency(projectMetrics.changeOrders.approvedValue)}</div>
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(projectMetrics?.changeOrders?.approvedValue || 0)}</div>
                       <div className="text-sm text-gray-600">Approved</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-600">{formatCurrency(projectMetrics.changeOrders.pendingValue)}</div>
+                      <div className="text-2xl font-bold text-yellow-600">{formatCurrency(projectMetrics?.changeOrders?.pendingValue || 0)}</div>
                       <div className="text-sm text-gray-600">Pending</div>
                     </div>
                   </div>
@@ -945,34 +966,39 @@ function DashboardPageContent() {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span>Target Date:</span>
-                          <span className="font-semibold">{new Date(projectMetrics.projectedCompletion).toLocaleDateString()}</span>
+                          <span className="font-semibold">{projectMetrics?.projectedCompletion ? new Date(projectMetrics.projectedCompletion).toLocaleDateString() : 'Unknown Date'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Projected Final Cost:</span>
-                          <span className="font-semibold">{formatCurrency(projectMetrics.projectedFinalCost)}</span>
+                          <span className="font-semibold">{formatCurrency(projectMetrics?.projectedFinalCost || 0)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Projected Profit:</span>
-                          <span className="font-semibold text-green-600">{formatCurrency(projectMetrics.projectedProfit)}</span>
+                          <span className="font-semibold text-green-600">{formatCurrency(projectMetrics?.projectedProfit || 0)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Projected Margin:</span>
-                          <span className="font-semibold">{formatPercentage(projectMetrics.projectedMargin)}</span>
+                          <span className="font-semibold">{formatPercentage(projectMetrics?.projectedMargin || 0)}</span>
                         </div>
                       </div>
                     </div>
                     <div>
                       <h4 className="font-semibold mb-3">Historical Multipliers</h4>
                       <div className="space-y-2">
-                        {projectMetrics.historicalMultipliers.map((multiplier, index) => (
+                        {projectMetrics?.historicalMultipliers?.map((multiplier, index) => (
                           <div key={index} className="flex justify-between items-center">
                             <div>
-                              <div className="font-semibold">{multiplier.multiplier.toFixed(1)}x</div>
-                              <div className="text-xs text-gray-500">{multiplier.notes}</div>
+                              <div className="font-semibold">{(multiplier?.multiplier || 0).toFixed(1)}x</div>
+                              <div className="text-xs text-gray-500">{multiplier?.notes || 'No notes'}</div>
                             </div>
-                            <div className="text-xs text-gray-500">{new Date(multiplier.date).toLocaleDateString()}</div>
+                            <div className="text-xs text-gray-500">{multiplier?.date ? new Date(multiplier.date).toLocaleDateString() : 'Unknown Date'}</div>
                           </div>
                         ))}
+                        {(!projectMetrics?.historicalMultipliers || projectMetrics.historicalMultipliers.length === 0) && (
+                          <div className="text-center text-gray-500 py-2">
+                            No historical multiplier data available
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
