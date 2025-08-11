@@ -7,7 +7,6 @@ import { useMigration } from '../lib/migrationContext';
 import { Project, Invoice, BillingData } from '../lib/types';
 import { processBillingData, initializeProjectionsTable, enhanceBillingDataWithClockify, calculateDashboardStats } from '../lib/utils';
 import { fetchProjects, fetchInvoices, zohoService } from '../lib/zoho';
-import { fetchAllClockifyTimeSummaries } from '../lib/clockify';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardStats from '../components/DashboardStats';
 import EnhancedDashboardStats from '../components/EnhancedDashboardStats';
@@ -195,12 +194,16 @@ export default function Dashboard() {
       startDate.setMonth(startDate.getMonth() - 12); // Last 12 months
       const endDate = new Date();
       
-      const clockifySummaries = await fetchAllClockifyTimeSummaries(
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0]
-      );
-      setClockifyData(clockifySummaries);
-      console.log('Dashboard: Clockify data fetched:', clockifySummaries.length);
+      const response = await fetch(`/api/clockify?action=time-summaries&startDate=${startDate.toISOString().split('T')[0]}&endDate=${endDate.toISOString().split('T')[0]}`);
+      const data = await response.json();
+      
+      if (data.timeSummaries) {
+        setClockifyData(data.timeSummaries);
+        console.log('Dashboard: Clockify data fetched:', data.timeSummaries.length);
+      } else {
+        console.error('Dashboard: Invalid Clockify response structure:', data);
+        setClockifyData([]);
+      }
     } catch (error) {
       console.error('Dashboard: Error fetching Clockify data:', error);
       setClockifyData([]);
