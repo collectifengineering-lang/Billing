@@ -2,6 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { clockifyService, fetchAllClockifyTimeSummaries } from '../../../lib/clockify';
 import { enhanceBillingDataWithClockify } from '../../../lib/utils';
 
+// Helper function to provide configuration recommendations
+function getConfigRecommendations(configStatus: any, envVars: any) {
+  const recommendations = [];
+  
+  if (!envVars.hasApiKey) {
+    recommendations.push('Set CLOCKIFY_API_KEY environment variable');
+  }
+  
+  if (!envVars.hasWorkspaceId) {
+    recommendations.push('Set CLOCKIFY_WORKSPACE_ID environment variable');
+  }
+  
+  if (envVars.apiKeyLength < 20) {
+    recommendations.push('CLOCKIFY_API_KEY appears to be too short - verify it\'s correct');
+  }
+  
+  if (envVars.workspaceIdLength < 20) {
+    recommendations.push('CLOCKIFY_WORKSPACE_ID appears to be too short - verify it\'s correct');
+  }
+  
+  if (envVars.hasApiKey && envVars.hasWorkspaceId && !configStatus.configured) {
+    recommendations.push('Check if API key and workspace ID are valid and accessible');
+  }
+  
+  if (recommendations.length === 0) {
+    recommendations.push('Configuration appears correct - check Clockify API status');
+  }
+  
+  return recommendations;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -62,6 +93,25 @@ export async function GET(request: NextRequest) {
             error: error.message 
           }, { status: 400 });
         }
+
+      case 'validate-config':
+        const configStatus = clockifyService.getConfigStatus();
+        const envVars = {
+          hasApiKey: !!process.env.CLOCKIFY_API_KEY,
+          hasWorkspaceId: !!process.env.CLOCKIFY_WORKSPACE_ID,
+          apiKeyLength: process.env.CLOCKIFY_API_KEY?.length || 0,
+          workspaceIdLength: process.env.CLOCKIFY_WORKSPACE_ID?.length || 0,
+          apiKeyPreview: process.env.CLOCKIFY_API_KEY ? 
+            `${process.env.CLOCKIFY_API_KEY.substring(0, 8)}...` : 'Not set',
+          workspaceIdPreview: process.env.CLOCKIFY_WORKSPACE_ID ? 
+            `${process.env.CLOCKIFY_WORKSPACE_ID.substring(0, 8)}...` : 'Not set'
+        };
+        
+        return NextResponse.json({
+          configStatus,
+          environmentVariables: envVars,
+          recommendations: getConfigRecommendations(configStatus, envVars)
+        });
 
       default:
         return NextResponse.json({

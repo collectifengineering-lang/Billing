@@ -13,6 +13,11 @@ function SettingsPageContent() {
   const [newManagerId, setNewManagerId] = useState('');
   const [newManagerName, setNewManagerName] = useState('');
   const [newManagerColor, setNewManagerColor] = useState('#6366f1');
+  const [clockifyStatus, setClockifyStatus] = useState<{
+    configured: boolean;
+    error?: string;
+    workspaces?: any[];
+  }>({ configured: false });
   
   const { data: tokenStatus, error } = useSWR('/api/auth/status', async (url: string) => {
     const response = await fetch(url);
@@ -36,6 +41,39 @@ function SettingsPageContent() {
     } catch (_) {}
     return data as Record<string, { name: string; color: string }>;
   });
+
+  // Test Clockify connection on mount
+  useEffect(() => {
+    testClockifyConnection();
+  }, []);
+
+  const testClockifyConnection = async () => {
+    try {
+      console.log('Settings: Testing Clockify connection...');
+      const response = await fetch('/api/clockify?action=test-connection');
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('Settings: Clockify connection successful');
+        setClockifyStatus({
+          configured: true,
+          workspaces: data.workspaces
+        });
+      } else {
+        console.log('Settings: Clockify connection failed:', data.error);
+        setClockifyStatus({
+          configured: false,
+          error: data.error
+        });
+      }
+    } catch (error) {
+      console.error('Settings: Error testing Clockify connection:', error);
+      setClockifyStatus({
+        configured: false,
+        error: 'Failed to connect to Clockify'
+      });
+    }
+  };
 
   const handleRefreshToken = async () => {
     setIsRefreshing(true);
@@ -115,7 +153,7 @@ function SettingsPageContent() {
                     className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
                   >
                     <ArrowLeft className="h-4 w-4 mr-1" />
-                    Back to Dashboard
+                    Back to Home
                   </Link>
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900 mt-2">Settings</h1>
@@ -219,6 +257,71 @@ function SettingsPageContent() {
                   </ul>
                 ) : (
                   <div className="text-sm text-gray-500">No managers yet</div>
+                )}
+              </div>
+            </div>
+
+            {/* Clockify Integration */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Clockify Integration</h2>
+              <div className="space-y-4">
+                {/* Clockify Status Indicator */}
+                {clockifyStatus.configured ? (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-green-800">
+                          Clockify Integration Active
+                        </p>
+                        <p className="text-xs text-green-600">
+                          Time tracking data will be included in dashboard metrics
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-yellow-800">
+                          Clockify Integration Not Configured
+                        </p>
+                        <p className="text-xs text-yellow-600">
+                          {clockifyStatus.error || 'Please configure Clockify API credentials'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Connection Test Button */}
+                <div>
+                  <button
+                    onClick={testClockifyConnection}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Test Connection
+                  </button>
+                </div>
+
+                {/* Workspace Information */}
+                {clockifyStatus.workspaces && clockifyStatus.workspaces.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Available Workspaces</h3>
+                    <ul className="space-y-2">
+                      {clockifyStatus.workspaces.map((workspace: any) => (
+                        <li key={workspace.id} className="text-sm text-gray-600">
+                          {workspace.name} ({workspace.id})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             </div>

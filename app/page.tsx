@@ -27,11 +27,7 @@ export default function Dashboard() {
   const [closedProjects, setClosedProjects] = useState<Set<string>>(new Set());
   const [clockifyData, setClockifyData] = useState<any[]>([]);
   const [useEnhancedStats, setUseEnhancedStats] = useState(false);
-  const [clockifyStatus, setClockifyStatus] = useState<{
-    configured: boolean;
-    error?: string;
-    workspaces?: any[];
-  }>({ configured: false });
+
   
   // Database data for dashboard stats
   const [monthlyProjections, setMonthlyProjections] = useState<Record<string, Record<string, number>>>({});
@@ -141,6 +137,13 @@ export default function Dashboard() {
     }
   }, [billingData, closedProjects, monthlyProjections, monthlyStatuses]);
 
+  // Fetch Clockify data on mount
+  useEffect(() => {
+    if (user && user.isBasic) {
+      fetchClockifyData();
+    }
+  }, [user]);
+
   // Enhance billing data with Clockify data when available
   useEffect(() => {
     if (billingData.length > 0 && clockifyData.length > 0) {
@@ -151,41 +154,7 @@ export default function Dashboard() {
     }
   }, [billingData, clockifyData]);
 
-  // Test Clockify connection on mount
-  useEffect(() => {
-    testClockifyConnection();
-  }, []);
 
-  const testClockifyConnection = async () => {
-    try {
-      console.log('Dashboard: Testing Clockify connection...');
-      const response = await fetch('/api/clockify?action=test-connection');
-      const data = await response.json();
-      
-      if (data.success) {
-        console.log('Dashboard: Clockify connection successful');
-        setClockifyStatus({
-          configured: true,
-          workspaces: data.workspaces
-        });
-        
-        // Fetch Clockify data if connection is successful
-        await fetchClockifyData();
-      } else {
-        console.log('Dashboard: Clockify connection failed:', data.error);
-        setClockifyStatus({
-          configured: false,
-          error: data.error
-        });
-      }
-    } catch (error) {
-      console.error('Dashboard: Error testing Clockify connection:', error);
-      setClockifyStatus({
-        configured: false,
-        error: 'Failed to connect to Clockify'
-      });
-    }
-  };
 
   const fetchClockifyData = async () => {
     try {
@@ -282,24 +251,7 @@ export default function Dashboard() {
       <DashboardHeader cacheInfo={cacheInfo} autoRefreshStatus={autoRefreshStatus} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Clockify Status Indicator */}
-        {clockifyStatus.configured && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-md p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-green-800">
-                  Clockify Integration Active
-                </p>
-                <p className="text-xs text-green-600">
-                  Time tracking data will be included in dashboard metrics
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {useEnhancedStats && dashboardStats ? (
           <EnhancedDashboardStats stats={dashboardStats} />

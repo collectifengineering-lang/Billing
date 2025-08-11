@@ -183,10 +183,15 @@ class ClockifyService {
         });
       }
 
+      console.log(`🔍 Clockify API Request: ${url.toString()}`);
+      console.log(`   Headers: ${JSON.stringify(this.getHeaders())}`);
+
       const response = await fetch(url.toString(), {
         method: 'GET',
         headers: this.getHeaders(),
       });
+
+      console.log(`📡 Clockify API Response: ${response.status} ${response.statusText}`);
 
       if (response.status === 401) {
         throw new Error('Clockify API authentication failed - check your API key');
@@ -196,17 +201,30 @@ class ClockifyService {
         throw new Error('Clockify API access forbidden - check your workspace ID and permissions');
       }
       
+      if (response.status === 404) {
+        const errorDetails = `Endpoint not found: ${endpoint}`;
+        console.error(`❌ 404 Error Details: ${errorDetails}`);
+        console.error(`   Full URL: ${url.toString()}`);
+        console.error(`   Workspace ID: ${this.workspaceId}`);
+        console.error(`   API Key configured: ${!!this.apiKey}`);
+        throw new Error(`Clockify API error: 404 Not Found - ${errorDetails}`);
+      }
+      
       if (response.status === 429) {
         throw new Error('Clockify API rate limit exceeded - try again later');
       }
       
       if (!response.ok) {
-        throw new Error(`Clockify API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Clockify API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log(`✅ Clockify API Success: ${endpoint}`);
+      return data;
     } catch (error) {
       if (error instanceof Error) {
+        console.error(`❌ Clockify API Error in ${endpoint}:`, error.message);
         throw error;
       }
       throw new Error(`Clockify API request failed: ${error}`);

@@ -383,7 +383,7 @@ function DashboardPageContent() {
                   className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
                 >
                   <ArrowLeft className="h-4 w-4 mr-1" />
-                  Back to Dashboard
+                  Back to Home
                 </Link>
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mt-2">Financial Dashboard</h1>
