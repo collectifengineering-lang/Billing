@@ -70,21 +70,23 @@ export default function HomePage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topProjects, setTopProjects] = useState<ProjectData[]>([]);
   const [selectedTab, setSelectedTab] = useState('projections-table');
-  const [isLoading, setIsLoading] = useState(true);
+  const [selectedProject, setSelectedProject] = useState<ProjectDetails | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [billingData, setBillingData] = useState<any[]>([]);
+  const [projections, setProjections] = useState<any>({});
 
-  // Fetch dashboard data
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        const [dashboardResponse, topProjectsResponse] = await Promise.all([
+        const [dashboardResponse, topProjectsResponse, projectsResponse] = await Promise.all([
           fetch('/api/homepage-dashboard'),
-          fetch('/api/top-projects')
+          fetch('/api/top-projects'),
+          fetch('/api/projects')
         ]);
 
         if (!dashboardResponse.ok) {
@@ -95,11 +97,39 @@ export default function HomePage() {
           throw new Error('Failed to fetch top projects data');
         }
 
+        if (!projectsResponse.ok) {
+          throw new Error('Failed to fetch projects data');
+        }
+
         const dashboardData = await dashboardResponse.json();
         const topProjectsData = await topProjectsResponse.json();
+        const projectsData = await projectsResponse.json();
 
         setStats(dashboardData);
         setTopProjects(topProjectsData.data || []);
+        
+        // Transform Zoho projects to billing data format
+        if (projectsData.success && projectsData.data) {
+          const transformedBillingData = projectsData.data.map((project: any) => ({
+            projectId: project.project_id,
+            projectName: project.project_name,
+            customerName: project.customer_name,
+            signedFee: project.signed_fee || 0,
+            monthlyData: [], // Empty array for now, will be populated by projections
+            totalBilled: 0,
+            totalUnbilled: 0,
+            totalProjected: 0,
+            isClosed: false,
+            projectManagerId: undefined,
+            clockifyData: undefined,
+            totalHours: 0,
+            billableHours: 0,
+            nonBillableHours: 0,
+            hourlyRate: 0,
+            efficiency: 0
+          }));
+          setBillingData(transformedBillingData);
+        }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
@@ -134,6 +164,10 @@ export default function HomePage() {
       setSelectedProject(project);
       setIsModalOpen(true);
     }
+  };
+
+  const handleUpdateProjections = (newProjections: any) => {
+    setProjections(newProjections);
   };
 
   const tabVariants = {
@@ -743,9 +777,9 @@ export default function HomePage() {
                     </CardHeader>
                     <CardContent>
                       <HighPerformanceTable 
-                        billingData={[]}
-                        projections={{}}
-                        onUpdateProjections={() => {}}
+                        billingData={billingData}
+                        projections={projections}
+                        onUpdateProjections={handleUpdateProjections}
                       />
                     </CardContent>
                   </Card>
