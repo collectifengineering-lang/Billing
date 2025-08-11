@@ -18,12 +18,10 @@ export async function GET(request: NextRequest) {
     // Get Zoho data for financial metrics
     let projects: any[] = [];
     let invoices: any[] = [];
-    let customers: any[] = [];
     
     try {
       projects = await zohoService.getProjects();
       invoices = await zohoService.getInvoices();
-      customers = await zohoService.getCustomers();
     } catch (error) {
       console.error('Failed to fetch Zoho data:', error);
       return NextResponse.json(

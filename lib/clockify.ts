@@ -141,7 +141,7 @@ class ClockifyService {
   private apiKey: string | null = null;
   private workspaceId: string | null = null;
   private baseUrl = 'https://api.clockify.me/api/v1';
-  private isConfigured: boolean = false;
+  private _isConfigured: boolean = false;
 
   constructor() {
     this.apiKey = process.env.CLOCKIFY_API_KEY || null;
@@ -149,10 +149,10 @@ class ClockifyService {
     
     // Check if we have valid credentials
     if (this.apiKey && this.apiKey !== 'your_clockify_api_key_here' && this.workspaceId && this.workspaceId !== 'your_clockify_workspace_id_here') {
-      this.isConfigured = true;
+      this._isConfigured = true;
       console.log('Clockify service initialized with valid credentials');
     } else {
-      this.isConfigured = false;
+      this._isConfigured = false;
       console.warn('Clockify service initialized without valid credentials - will use mock data');
       console.warn('Please set CLOCKIFY_API_KEY and CLOCKIFY_WORKSPACE_ID in your environment variables');
     }
@@ -169,7 +169,7 @@ class ClockifyService {
   }
 
   private async makeRequest(endpoint: string, params?: any): Promise<any> {
-    if (!this.isConfigured) {
+    if (!this._isConfigured) {
       throw new Error('Clockify service not properly configured');
     }
 
@@ -214,17 +214,30 @@ class ClockifyService {
   }
 
   // Check if the service is properly configured
-  public isServiceConfigured(): boolean {
-    return this.isConfigured;
+  public isConfigured(): boolean {
+    return this._isConfigured;
   }
 
   // Get configuration status for debugging
   public getConfigurationStatus(): { configured: boolean; hasApiKey: boolean; hasWorkspaceId: boolean } {
     return {
-      configured: this.isConfigured,
+      configured: this._isConfigured,
       hasApiKey: !!(this.apiKey && this.apiKey !== 'your_clockify_api_key_here'),
       hasWorkspaceId: !!(this.workspaceId && this.workspaceId !== 'your_clockify_workspace_id_here')
     };
+  }
+
+  // Alias for getConfigurationStatus to match API usage
+  public getConfigStatus(): { configured: boolean; hasApiKey: boolean; hasWorkspaceId: boolean } {
+    return this.getConfigurationStatus();
+  }
+
+  // Method to set workspace ID dynamically
+  public setWorkspaceId(workspaceId: string): void {
+    this.workspaceId = workspaceId;
+    if (this.apiKey && this.apiKey !== 'your_clockify_api_key_here') {
+      this._isConfigured = true;
+    }
   }
 
   async getUser(): Promise<any> {
@@ -377,9 +390,98 @@ class ClockifyService {
       ];
     }
   }
+
+  async getProjectTimeReport(projectId: string, startDate: string, endDate: string): Promise<ClockifyTimeReport | null> {
+    try {
+      if (!this.workspaceId) {
+        throw new Error('Workspace ID not configured');
+      }
+      
+      const timeEntries = await this.getTimeEntries(projectId, startDate, endDate);
+      const project = await this.getProjects().then(projects => 
+        projects.find(p => p.id === projectId)
+      );
+      
+      if (!project) {
+        throw new Error('Project not found');
+      }
+
+      const totalHours = timeEntries.reduce((sum, entry) => {
+        const duration = entry.timeInterval.duration;
+        const hours = this.parseDuration(duration);
+        return sum + hours;
+      }, 0);
+
+      const billableHours = timeEntries
+        .filter(entry => entry.billable)
+        .reduce((sum, entry) => {
+          const duration = entry.timeInterval.duration;
+          const hours = this.parseDuration(duration);
+          return sum + hours;
+        }, 0);
+
+      const nonBillableHours = totalHours - billableHours;
+
+      return {
+        projectId,
+        projectName: project.name,
+        totalHours,
+        billableHours,
+        nonBillableHours,
+        totalAmount: totalHours * (project.hourlyRate?.amount || 0),
+        billableAmount: billableHours * (project.hourlyRate?.amount || 0),
+        nonBillableAmount: nonBillableHours * (project.hourlyRate?.amount || 0),
+        entries: timeEntries,
+        period: { start: startDate, end: endDate }
+      };
+    } catch (error) {
+      console.error('Failed to get project time report:', error);
+      return null;
+    }
+  }
+
+  async getAllProjectsTimeSummary(startDate: string, endDate: string): Promise<ClockifyTimeReport[]> {
+    try {
+      if (!this.workspaceId) {
+        throw new Error('Workspace ID not configured');
+      }
+      
+      const projects = await this.getProjects();
+      const reports: ClockifyTimeReport[] = [];
+      
+      for (const project of projects) {
+        const report = await this.getProjectTimeReport(project.id, startDate, endDate);
+        if (report) {
+          reports.push(report);
+        }
+      }
+      
+      return reports;
+    } catch (error) {
+      console.error('Failed to get all projects time summary:', error);
+      return [];
+    }
+  }
+
+  // Helper method to parse ISO 8601 duration to hours
+  private parseDuration(duration: string): number {
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return 0;
+    
+    const hours = parseInt(match[1] || '0');
+    const minutes = parseInt(match[2] || '0');
+    const seconds = parseInt(match[3] || '0');
+    
+    return hours + (minutes / 60) + (seconds / 3600);
+  }
 }
 
-export default new ClockifyService();
+// Create the service instance
+const clockifyService = new ClockifyService();
+
+// Export the service instance as both default and named export
+export default clockifyService;
+export { clockifyService };
 
 // Export convenience functions
 export const fetchClockifyProjects = async () => {
