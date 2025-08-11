@@ -83,6 +83,19 @@ export default function HomePage() {
         setIsLoading(true);
         setError(null);
         
+        // First, ensure database is set up
+        try {
+          console.log('Setting up database schema...');
+          const setupResponse = await fetch('/api/setup-database', { method: 'POST' });
+          if (setupResponse.ok) {
+            console.log('Database setup completed');
+          } else {
+            console.log('Database setup failed, continuing with existing schema');
+          }
+        } catch (setupError) {
+          console.log('Database setup error, continuing with existing schema:', setupError);
+        }
+        
         const [dashboardResponse, topProjectsResponse, projectsResponse] = await Promise.all([
           fetch('/api/homepage-dashboard'),
           fetch('/api/top-projects'),
@@ -285,42 +298,42 @@ export default function HomePage() {
           <TabsList className="grid w-full grid-cols-6 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-xl p-1 shadow-lg">
             <TabsTrigger 
               value="projections-table" 
-              className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
+              className="text-white data-[state=active]:bg-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
             >
               <Target className="h-5 w-5 mr-2" />
               Projections Table
             </TabsTrigger>
             <TabsTrigger 
               value="billing" 
-              className="data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
+              className="text-white data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
             >
               <DollarSign className="h-5 w-5 mr-2" />
               Billing Overview
             </TabsTrigger>
             <TabsTrigger 
               value="time-tracking" 
-              className="data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
+              className="text-white data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
             >
               <Clock className="h-5 w-5 mr-2" />
               Time Tracking KPIs
             </TabsTrigger>
             <TabsTrigger 
               value="performance" 
-              className="data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
+              className="text-white data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
             >
               <BarChart3 className="h-5 w-5 mr-2" />
               Performance Metrics
             </TabsTrigger>
             <TabsTrigger 
               value="top-projects" 
-              className="data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
+              className="text-white data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
             >
               <Award className="h-5 w-5 mr-2" />
               Top Projects
             </TabsTrigger>
             <TabsTrigger 
               value="bottom-projects" 
-              className="data-[state=active]:bg-red-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
+              className="text-white data-[state=active]:bg-red-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
             >
               <AlertTriangle className="h-5 w-5 mr-2" />
               Bottom Projects

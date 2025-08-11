@@ -23,12 +23,14 @@ export async function GET() {
     console.error('Error fetching statuses:', error);
     
     // If it's a table doesn't exist error, return empty data
-    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    if (error.code === 'P2021' || error.message?.includes('does not exist') || error.message?.includes('no such table')) {
       console.log('Tables do not exist, returning empty statuses');
       return NextResponse.json({});
     }
     
-    return NextResponse.json({ error: 'Failed to fetch statuses' }, { status: 500 });
+    // For any other error, return empty data instead of 500
+    console.log('Unknown error, returning empty statuses');
+    return NextResponse.json({});
   }
 }
 

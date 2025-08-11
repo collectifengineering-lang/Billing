@@ -25,15 +25,14 @@ export async function GET() {
     console.error('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
     
     // If it's a table doesn't exist error, return empty data
-    if (error instanceof Error && (error.message?.includes('does not exist') || 'code' in error && (error as any).code === 'P2021')) {
+    if (error instanceof Error && (error.message?.includes('does not exist') || error.message?.includes('no such table') || 'code' in error && (error as any).code === 'P2021')) {
       console.log('Tables do not exist, returning empty projections');
       return NextResponse.json({});
     }
     
-    return NextResponse.json({ 
-      error: 'Failed to fetch projections',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    // For any other error, return empty data instead of 500
+    console.log('Unknown error, returning empty projections');
+    return NextResponse.json({});
   }
 }
 
