@@ -286,89 +286,152 @@ export default function HighPerformanceTable({
   // Adjust manager dropdown position to avoid viewport overflow
   useEffect(() => {
     if (!openDropdown || !dropdownPosition) return;
-    const adjust = () => {
-      const element = managerMenuRef.current;
-      if (!element) return;
-      const { offsetWidth: width, offsetHeight: height } = element;
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const margin = 8;
+    
+    // Add a small delay to ensure the dropdown is fully rendered
+    const timeoutId = setTimeout(() => {
+      const adjust = () => {
+        const element = managerMenuRef.current;
+        if (!element) return;
+        const { offsetWidth: width, offsetHeight: height } = element;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const margin = 8;
 
-      let newX = dropdownPosition.x;
-      let newY = dropdownPosition.y;
+        let newX = dropdownPosition.x;
+        let newY = dropdownPosition.y;
 
-      // Ensure dropdown doesn't go off the right edge
-      if (newX + width + margin > viewportWidth) {
-        newX = Math.max(margin, viewportWidth - width - margin);
-      }
-      
-      // Ensure dropdown doesn't go off the bottom edge
-      if (newY + height + margin > viewportHeight) {
-        newY = Math.max(margin, dropdownPosition.y - height - 10);
-      }
+        // Ensure dropdown doesn't go off the right edge
+        if (newX + width + margin > viewportWidth) {
+          newX = Math.max(margin, viewportWidth - width - margin);
+        }
+        
+        // Ensure dropdown doesn't go off the bottom edge
+        if (newY + height + margin > viewportHeight) {
+          newY = Math.max(margin, dropdownPosition.y - height - 10);
+        }
 
-      // Ensure dropdown doesn't go off the left edge
-      if (newX < margin) {
-        newX = margin;
-      }
+        // Ensure dropdown doesn't go off the left edge
+        if (newX < margin) {
+          newX = margin;
+        }
 
-      // Ensure dropdown doesn't go off the top edge
-      if (newY < margin) {
-        newY = margin;
-      }
+        // Ensure dropdown doesn't go off the top edge
+        if (newY < margin) {
+          newY = margin;
+        }
 
-      if (Math.abs(newX - dropdownPosition.x) > 1 || Math.abs(newY - dropdownPosition.y) > 1) {
-        setDropdownPosition({ x: newX, y: newY });
-      }
-    };
+        if (Math.abs(newX - dropdownPosition.x) > 1 || Math.abs(newY - dropdownPosition.y) > 1) {
+          setDropdownPosition({ x: newX, y: newY });
+        }
+      };
 
-    const id = window.requestAnimationFrame(adjust);
-    return () => window.cancelAnimationFrame(id);
+      const id = window.requestAnimationFrame(adjust);
+      return () => window.cancelAnimationFrame(id);
+    }, 50); // 50ms delay
+
+    return () => clearTimeout(timeoutId);
   }, [openDropdown, dropdownPosition]);
 
   // Adjust status menu position to avoid viewport overflow
   useEffect(() => {
     if (!openMenuCell || !menuPosition) return;
-    const adjust = () => {
-      const element = statusMenuRef.current;
-      if (!element) return;
-      const { offsetWidth: width, offsetHeight: height } = element;
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const margin = 8;
+    
+    // Add a small delay to ensure the dropdown is fully rendered
+    const timeoutId = setTimeout(() => {
+      const adjust = () => {
+        const element = statusMenuRef.current;
+        if (!element) return;
+        const { offsetWidth: width, offsetHeight: height } = element;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const margin = 8;
 
-      let newX = menuPosition.x;
-      let newY = menuPosition.y;
+        let newX = menuPosition.x;
+        let newY = menuPosition.y;
 
-      // Ensure menu doesn't go off the right edge
-      if (newX + width + margin > viewportWidth) {
-        newX = Math.max(margin, viewportWidth - width - margin);
+        // Ensure menu doesn't go off the right edge
+        if (newX + width + margin > viewportWidth) {
+          newX = Math.max(margin, viewportWidth - width - margin);
+        }
+        
+        // Ensure menu doesn't go off the bottom edge
+        if (newY + height + margin > viewportHeight) {
+          newY = Math.max(margin, menuPosition.y - height - 10);
+        }
+
+        // Ensure menu doesn't go off the left edge
+        if (newX < margin) {
+          newX = margin;
+        }
+
+        // Ensure menu doesn't go off the top edge
+        if (newY < margin) {
+          newY = margin;
+        }
+
+        if (Math.abs(newX - menuPosition.x) > 1 || Math.abs(newY - menuPosition.y) > 1) {
+          setMenuPosition({ x: newX, y: newY });
+        }
+      };
+
+      // Defer until after render so dimensions are correct
+      const id = window.requestAnimationFrame(adjust);
+      return () => window.cancelAnimationFrame(id);
+    }, 50); // 50ms delay
+
+    return () => clearTimeout(timeoutId);
+  }, [openMenuCell, menuPosition]);
+
+  // Close dropdowns when scrolling to prevent positioning issues
+  useEffect(() => {
+    const handleScroll = () => {
+      if (openDropdown) {
+        setOpenDropdown(null);
+        setDropdownPosition(null);
       }
-      
-      // Ensure menu doesn't go off the bottom edge
-      if (newY + height + margin > viewportHeight) {
-        newY = Math.max(margin, menuPosition.y - height - 10);
-      }
-
-      // Ensure menu doesn't go off the left edge
-      if (newX < margin) {
-        newX = margin;
-      }
-
-      // Ensure menu doesn't go off the top edge
-      if (newY < margin) {
-        newY = margin;
-      }
-
-      if (Math.abs(newX - menuPosition.x) > 1 || Math.abs(newY - menuPosition.y) > 1) {
-        setMenuPosition({ x: newX, y: newY });
+      if (openMenuCell) {
+        setOpenMenuCell(null);
+        setMenuPosition(null);
       }
     };
 
-    // Defer until after render so dimensions are correct
-    const id = window.requestAnimationFrame(adjust);
-    return () => window.cancelAnimationFrame(id);
-  }, [openMenuCell, menuPosition]);
+    // Listen to scroll events on both sticky and scrollable sections
+    const stickyElement = stickyListRef.current;
+    const scrollableElement = scrollableListRef.current;
+
+    if (stickyElement) {
+      stickyElement.addEventListener('scroll', handleScroll);
+    }
+    if (scrollableElement) {
+      scrollableElement.addEventListener('scroll', handleScroll);
+    }
+
+    return () => {
+      if (stickyElement) {
+        stickyElement.removeEventListener('scroll', handleScroll);
+      }
+      if (scrollableElement) {
+        scrollableElement.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [openDropdown, openMenuCell]);
+
+  // Close dropdowns when window is resized to prevent positioning issues
+  useEffect(() => {
+    const handleResize = () => {
+      if (openDropdown) {
+        setOpenDropdown(null);
+        setDropdownPosition(null);
+      }
+      if (openMenuCell) {
+        setOpenMenuCell(null);
+        setMenuPosition(null);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [openDropdown, openMenuCell]);
 
   // Hide vertical scrollbar on sticky section
   useEffect(() => {
@@ -1040,13 +1103,50 @@ export default function HighPerformanceTable({
                             e.preventDefault();
                             e.stopPropagation();
                             const rect = e.currentTarget.getBoundingClientRect();
-                            setOpenDropdown(project.projectId);
-                            setDropdownPosition({ 
-                              x: rect.left, 
+                            const buttonWidth = rect.width;
+                            
+                            // Validate that the button is visible in the viewport
+                            if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+                              console.warn('Button is outside viewport, skipping dropdown positioning:', {
+                                projectId: project.projectId,
+                                rect,
+                                viewport: { width: window.innerWidth, height: window.innerHeight }
+                              });
+                              return;
+                            }
+                            
+                            // Position dropdown to the left of the button if there's not enough space on the right
+                            let x = rect.left;
+                            if (rect.left + 220 > window.innerWidth) { // 220px is approximate dropdown width
+                              x = rect.right - 220;
+                            }
+                            
+                            const position = { 
+                              x: Math.max(8, x), // Ensure minimum left margin
                               y: rect.bottom + 5 
+                            };
+                            
+                            // Validate final position
+                            if (position.x < 0 || position.y < 0 || position.x > window.innerWidth || position.y > window.innerHeight) {
+                              console.warn('Calculated position is outside viewport:', {
+                                projectId: project.projectId,
+                                position,
+                                viewport: { width: window.innerWidth, height: window.innerHeight }
+                              });
+                              return;
+                            }
+                            
+                            console.log('HighPerformanceTable dropdown positioning:', {
+                              projectId: project.projectId,
+                              rect: { left: rect.left, right: rect.right, bottom: rect.bottom },
+                              window: { width: window.innerWidth, height: window.innerHeight },
+                              calculated: position
                             });
+                            
+                            setOpenDropdown(project.projectId);
+                            setDropdownPosition(position);
                           }}
-                          className="ml-2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
+                          className="ml-2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200 dropdown-trigger"
                         >
                           <User className="h-4 w-4" />
                         </button>
@@ -1242,16 +1342,56 @@ export default function HighPerformanceTable({
                               </span>
                             )}
                             <button
-                              className="absolute top-1 right-1 text-gray-400 hover:text-gray-600 text-xs"
+                              className="absolute top-1 right-1 text-gray-400 hover:text-gray-600 text-xs dropdown-trigger"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation(); // Prevent cell edit
                                 const rect = e.currentTarget.getBoundingClientRect();
-                                setOpenMenuCell({ projectId: project.projectId, month });
-                                setMenuPosition({ 
-                                  x: rect.left, 
+                                const buttonWidth = rect.width;
+                                
+                                // Validate that the button is visible in the viewport
+                                if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+                                  console.warn('Status button is outside viewport, skipping dropdown positioning:', {
+                                    projectId: project.projectId,
+                                    month,
+                                    rect,
+                                    viewport: { width: window.innerWidth, height: window.innerHeight }
+                                  });
+                                  return;
+                                }
+                                
+                                // Position dropdown to the left of the button if there's not enough space on the right
+                                let x = rect.left;
+                                if (rect.left + 200 > window.innerWidth) { // 200px is approximate dropdown width
+                                  x = rect.right - 200;
+                                }
+                                
+                                const position = { 
+                                  x: Math.max(8, x), // Ensure minimum left margin
                                   y: rect.bottom + 5 
+                                };
+                                
+                                // Validate final position
+                                if (position.x < 0 || position.y < 0 || position.x > window.innerWidth || position.y > window.innerHeight) {
+                                  console.warn('Calculated status position is outside viewport:', {
+                                    projectId: project.projectId,
+                                    month,
+                                    position,
+                                    viewport: { width: window.innerWidth, height: window.innerHeight }
+                                  });
+                                  return;
+                                }
+                                
+                                console.log('HighPerformanceTable status dropdown positioning:', {
+                                  projectId: project.projectId,
+                                  month,
+                                  rect: { left: rect.left, right: rect.right, bottom: rect.bottom },
+                                  window: { width: window.innerWidth, height: window.innerHeight },
+                                  calculated: position
                                 });
+                                
+                                setOpenMenuCell({ projectId: project.projectId, month });
+                                setMenuPosition(position);
                               }}
                             >
                               ⋯
@@ -1395,7 +1535,7 @@ export default function HighPerformanceTable({
         </div>
       )}
 
-      {/* Status menu dropdown */}
+      {/* Status menu */}
       {openMenuCell && menuPosition && (
         <div 
           ref={statusMenuRef}

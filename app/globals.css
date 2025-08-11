@@ -106,7 +106,73 @@
 
   .projections-table-container .flex > div:last-child th {
     height: 60px; /* Slightly taller headers */
-    vertical-align: middle;
+  }
+
+  /* Ensure dropdowns are properly positioned and visible */
+  [data-dropdown="true"] {
+    position: fixed !important;
+    z-index: 9999 !important;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    contain: layout style paint;
+    will-change: transform;
+    animation: dropdownFadeIn 0.15s ease-out;
+  }
+
+  /* Prevent dropdowns from being cut off by parent containers */
+  .projections-table-container {
+    overflow: visible !important;
+  }
+
+  .projections-table-container .flex > div {
+    overflow: visible !important;
+  }
+
+  /* Prevent text selection in dropdowns */
+  [data-dropdown="true"] * {
+    user-select: none;
+  }
+
+  @keyframes dropdownFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Improve dropdown button positioning */
+  .dropdown-trigger {
+    position: relative;
+    z-index: 1;
+    cursor: pointer;
+  }
+
+  .dropdown-trigger:hover {
+    z-index: 2;
+  }
+
+  /* Ensure dropdowns appear above table headers and other elements */
+  .table-header {
+    z-index: 10;
+  }
+
+  /* Ensure dropdowns appear above all table elements */
+  .projections-table-container,
+  .high-performance-table {
+    position: relative;
+  }
+
+  /* Prevent dropdowns from being affected by table scrolling */
+  .projections-table-container [data-dropdown="true"],
+  .high-performance-table [data-dropdown="true"] {
+    position: fixed !important;
+    z-index: 9999 !important;
+    pointer-events: auto;
   }
 
   /* Make frozen table rows 72px as well */

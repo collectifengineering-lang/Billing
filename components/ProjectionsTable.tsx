@@ -31,6 +31,7 @@ export default function ProjectionsTable({
   const [asrFees, setAsrFees] = useState<Record<string, number>>({});
   const [monthlyProjections, setMonthlyProjections] = useState<Record<string, Record<string, number>>>({});
   const tableRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const monthRange = getProjectionsMonthRange();
 
   // Load project managers and assignments from localStorage
@@ -419,10 +420,53 @@ export default function ProjectionsTable({
       setOpenDropdown(projectId);
       if (event) {
         const rect = event.currentTarget.getBoundingClientRect();
-        setDropdownPosition({
-          x: rect.right,
-          y: rect.bottom
+        const buttonWidth = rect.width;
+        const tableElement = tableRef.current;
+        const tableScrollLeft = tableElement?.scrollLeft || 0;
+        const tableScrollTop = tableElement?.scrollTop || 0;
+        
+        // Validate that the button is visible in the viewport
+        if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+          console.warn('Button is outside viewport, skipping dropdown positioning:', {
+            projectId,
+            rect,
+            viewport: { width: window.innerWidth, height: window.innerHeight }
+          });
+          return;
+        }
+        
+        // Position dropdown to the left of the button if there's not enough space on the right
+        let x = rect.left;
+        if (rect.left + 220 > window.innerWidth) { // 220px is approximate dropdown width
+          x = rect.right - 220;
+        }
+        
+        const position = {
+          x: Math.max(8, x), // Ensure minimum left margin
+          y: rect.bottom + 5
+        };
+        
+        // Validate final position
+        if (position.x < 0 || position.y < 0 || position.x > window.innerWidth || position.y > window.innerHeight) {
+          console.warn('Calculated position is outside viewport:', {
+            projectId,
+            position,
+            viewport: { width: window.innerWidth, height: window.innerHeight }
+          });
+          return;
+        }
+        
+        console.log('Dropdown positioning:', {
+          projectId,
+          rect: { left: rect.left, right: rect.right, bottom: rect.bottom },
+          window: { width: window.innerWidth, height: window.innerHeight },
+          tableScroll: { left: tableScrollLeft, top: tableScrollTop },
+          calculated: position,
+          buttonElement: event.currentTarget,
+          tableElement: tableElement
         });
+        
+        setDropdownPosition(position);
       }
     }
   };
@@ -430,14 +474,104 @@ export default function ProjectionsTable({
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (openDropdown && !(event.target as Element).closest('.dropdown-container')) {
-        setOpenDropdown(null);
-        setDropdownPosition(null);
+      if (openDropdown && dropdownPosition) {
+        const target = event.target as Element;
+        // Check if the click is outside the dropdown
+        const dropdownElement = dropdownRef.current;
+        if (dropdownElement && !dropdownElement.contains(target)) {
+          setOpenDropdown(null);
+          setDropdownPosition(null);
+        }
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openDropdown, dropdownPosition]);
+
+  // Adjust dropdown position to avoid viewport overflow
+  useEffect(() => {
+    if (!openDropdown || !dropdownPosition) return;
+    
+    // Add a small delay to ensure the dropdown is fully rendered
+    const timeoutId = setTimeout(() => {
+      const adjust = () => {
+        const dropdownElement = dropdownRef.current;
+        if (!dropdownElement) return;
+        
+        const { offsetWidth: width, offsetHeight: height } = dropdownElement as HTMLElement;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const margin = 8;
+
+        let newX = dropdownPosition.x;
+        let newY = dropdownPosition.y;
+
+        // Ensure dropdown doesn't go off the right edge
+        if (newX + width + margin > viewportWidth) {
+          newX = Math.max(margin, viewportWidth - width - margin);
+        }
+        
+        // Ensure dropdown doesn't go off the bottom edge
+        if (newY + height + margin > viewportHeight) {
+          newY = Math.max(margin, dropdownPosition.y - height - 10);
+        }
+
+        // Ensure dropdown doesn't go off the left edge
+        if (newX < margin) {
+          newX = margin;
+        }
+
+        // Ensure dropdown doesn't go off the top edge
+        if (newY < margin) {
+          newY = margin;
+        }
+
+        if (Math.abs(newX - dropdownPosition.x) > 1 || Math.abs(newY - dropdownPosition.y) > 1) {
+          console.log('Adjusting dropdown position:', {
+            original: dropdownPosition,
+            adjusted: { x: newX, y: newY },
+            dropdownSize: { width, height },
+            viewport: { width: viewportWidth, height: viewportHeight }
+          });
+          setDropdownPosition({ x: newX, y: newY });
+        }
+      };
+
+      const id = window.requestAnimationFrame(adjust);
+      return () => window.cancelAnimationFrame(id);
+    }, 50); // 50ms delay
+
+    return () => clearTimeout(timeoutId);
+  }, [openDropdown, dropdownPosition]);
+
+  // Close dropdown when scrolling to prevent positioning issues
+  useEffect(() => {
+    const handleScroll = () => {
+      if (openDropdown) {
+        setOpenDropdown(null);
+        setDropdownPosition(null);
+      }
+    };
+
+    const tableElement = tableRef.current;
+    if (tableElement) {
+      tableElement.addEventListener('scroll', handleScroll);
+      return () => tableElement.removeEventListener('scroll', handleScroll);
+    }
+  }, [openDropdown]);
+
+  // Close dropdown when window is resized to prevent positioning issues
+  useEffect(() => {
+    const handleResize = () => {
+      if (openDropdown) {
+        setOpenDropdown(null);
+        setDropdownPosition(null);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [openDropdown]);
 
   const getCellValue = (projectId: string, month: string) => {
@@ -603,13 +737,10 @@ export default function ProjectionsTable({
                           </div>
                           <div className="relative dropdown-container flex-shrink-0 ml-1">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleDropdown(project.projectId, e);
-                              }}
-                              className="p-1 hover:bg-gray-100 rounded"
+                              onClick={(e) => toggleDropdown(project.projectId, e)}
+                              className="ml-2 p-1 text-gray-400 hover:text-gray-600 transition-colors duration-200 dropdown-trigger"
                             >
-                              <ChevronDown className="h-4 w-4 text-gray-400" />
+                              <User className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
@@ -780,7 +911,9 @@ export default function ProjectionsTable({
       {/* Floating dropdown menu */}
       {openDropdown && dropdownPosition && (
         <div 
+          ref={dropdownRef}
           className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-[9999] min-w-max"
+          data-dropdown="true"
           style={{
             left: `${dropdownPosition.x}px`,
             top: `${dropdownPosition.y}px`,

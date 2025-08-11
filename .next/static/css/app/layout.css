@@ -694,7 +694,103 @@ video {
   }
 .projections-table-container .flex > div:last-child th {
     height: 60px; /* Slightly taller headers */
-    vertical-align: middle;
+  }
+/* Ensure dropdowns are properly positioned and visible */
+[data-dropdown="true"] {
+    position: fixed !important;
+    z-index: 9999 !important;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+/* Prevent dropdowns from being cut off by parent containers */
+.projections-table-container {
+    overflow: visible !important;
+  }
+.projections-table-container .flex > div {
+    overflow: visible !important;
+  }
+/* Additional dropdown positioning improvements */
+.fixed[data-dropdown="true"] {
+    position: fixed !important;
+    z-index: 9999 !important;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+/* Ensure dropdowns are above all other elements */
+[data-dropdown="true"] {
+    position: fixed !important;
+    z-index: 9999 !important;
+  }
+/* Prevent text selection in dropdowns */
+[data-dropdown="true"] * {
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+  }
+/* Smooth dropdown animations */
+[data-dropdown="true"] {
+    animation: dropdownFadeIn 0.15s ease-out;
+  }
+@keyframes dropdownFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+/* Ensure dropdowns are properly contained and don't overflow */
+[data-dropdown="true"] {
+    contain: layout style paint;
+    will-change: transform;
+  }
+/* Improve dropdown button positioning */
+.dropdown-trigger {
+    position: relative;
+    z-index: 1;
+  }
+/* Ensure dropdowns appear above table headers and other elements */
+.table-header {
+    z-index: 10;
+  }
+[data-dropdown="true"] {
+    z-index: 9999 !important;
+  }
+/* Prevent dropdowns from being affected by table scrolling */
+.projections-table-container [data-dropdown="true"],
+  .high-performance-table [data-dropdown="true"] {
+    position: fixed !important;
+    transform: translateZ(0);
+  }
+/* Ensure dropdowns are properly positioned relative to viewport */
+[data-dropdown="true"] {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    transform: translate(var(--dropdown-x, 0), var(--dropdown-y, 0));
+  }
+/* Improve dropdown positioning accuracy */
+.dropdown-trigger {
+    position: relative;
+    z-index: 1;
+    cursor: pointer;
+  }
+.dropdown-trigger:hover {
+    z-index: 2;
+  }
+/* Ensure dropdowns appear above all table elements */
+.projections-table-container,
+  .high-performance-table {
+    position: relative;
+  }
+.projections-table-container [data-dropdown="true"],
+  .high-performance-table [data-dropdown="true"] {
+    position: fixed !important;
+    z-index: 9999 !important;
+    pointer-events: auto;
   }
 /* Make frozen table rows 72px as well */
 .projections-table-container .flex > div:first-child tr {
@@ -1131,6 +1227,9 @@ video {
 }
 .cursor-pointer {
   cursor: pointer;
+}
+.resize {
+  resize: both;
 }
 .list-inside {
   list-style-position: inside;
