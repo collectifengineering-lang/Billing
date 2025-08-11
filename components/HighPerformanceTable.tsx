@@ -221,7 +221,7 @@ export default function HighPerformanceTable({
       if (openDropdown && dropdownPosition) {
         const target = event.target as HTMLElement;
         // Check if the click is outside the dropdown
-        const dropdownElement = document.querySelector('[data-dropdown="true"]');
+        const dropdownElement = managerMenuRef.current;
         if (dropdownElement && !dropdownElement.contains(target)) {
           setOpenDropdown(null);
           setDropdownPosition(null);
@@ -231,7 +231,7 @@ export default function HighPerformanceTable({
       if (openMenuCell && menuPosition) {
         const target = event.target as HTMLElement;
         // Check if the click is outside the status menu
-        const menuElement = document.querySelector('[data-dropdown="true"]');
+        const menuElement = statusMenuRef.current;
         if (menuElement && !menuElement.contains(target)) {
           setOpenMenuCell(null);
           setMenuPosition(null);
@@ -297,11 +297,24 @@ export default function HighPerformanceTable({
       let newX = dropdownPosition.x;
       let newY = dropdownPosition.y;
 
+      // Ensure dropdown doesn't go off the right edge
       if (newX + width + margin > viewportWidth) {
         newX = Math.max(margin, viewportWidth - width - margin);
       }
+      
+      // Ensure dropdown doesn't go off the bottom edge
       if (newY + height + margin > viewportHeight) {
-        newY = Math.max(margin, newY - height);
+        newY = Math.max(margin, dropdownPosition.y - height - 10);
+      }
+
+      // Ensure dropdown doesn't go off the left edge
+      if (newX < margin) {
+        newX = margin;
+      }
+
+      // Ensure dropdown doesn't go off the top edge
+      if (newY < margin) {
+        newY = margin;
       }
 
       if (Math.abs(newX - dropdownPosition.x) > 1 || Math.abs(newY - dropdownPosition.y) > 1) {
@@ -327,12 +340,24 @@ export default function HighPerformanceTable({
       let newX = menuPosition.x;
       let newY = menuPosition.y;
 
+      // Ensure menu doesn't go off the right edge
       if (newX + width + margin > viewportWidth) {
         newX = Math.max(margin, viewportWidth - width - margin);
       }
+      
+      // Ensure menu doesn't go off the bottom edge
       if (newY + height + margin > viewportHeight) {
-        // Flip upwards if there isn't enough space below
-        newY = Math.max(margin, newY - height);
+        newY = Math.max(margin, menuPosition.y - height - 10);
+      }
+
+      // Ensure menu doesn't go off the left edge
+      if (newX < margin) {
+        newX = margin;
+      }
+
+      // Ensure menu doesn't go off the top edge
+      if (newY < margin) {
+        newY = margin;
       }
 
       if (Math.abs(newX - menuPosition.x) > 1 || Math.abs(newY - menuPosition.y) > 1) {
@@ -1012,8 +1037,14 @@ export default function HighPerformanceTable({
                         </div>
                         <button
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
                             setOpenDropdown(project.projectId);
-                            setDropdownPosition({ x: e.clientX, y: e.clientY });
+                            setDropdownPosition({ 
+                              x: rect.left, 
+                              y: rect.bottom + 5 
+                            });
                           }}
                           className="ml-2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
                         >
@@ -1213,9 +1244,14 @@ export default function HighPerformanceTable({
                             <button
                               className="absolute top-1 right-1 text-gray-400 hover:text-gray-600 text-xs"
                               onClick={(e) => {
+                                e.preventDefault();
                                 e.stopPropagation(); // Prevent cell edit
+                                const rect = e.currentTarget.getBoundingClientRect();
                                 setOpenMenuCell({ projectId: project.projectId, month });
-                                setMenuPosition({ x: e.clientX, y: e.clientY });
+                                setMenuPosition({ 
+                                  x: rect.left, 
+                                  y: rect.bottom + 5 
+                                });
                               }}
                             >
                               ⋯
