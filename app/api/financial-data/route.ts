@@ -10,7 +10,18 @@ export async function GET(request: NextRequest) {
     console.log(`Fetching financial data from ${startDate} to ${endDate}`);
     
     // Test all financial data endpoints
-    const results = {
+    const results: {
+      timestamp: string;
+      dateRange: { startDate: string; endDate: string };
+      profitAndLoss: any;
+      cashFlow: any;
+      balanceSheet: any;
+      chartOfAccounts: any;
+      journalEntries: any;
+      comprehensiveMetrics: any;
+      errors: string[];
+      zohoStatus?: any;
+    } = {
       timestamp: new Date().toISOString(),
       dateRange: { startDate, endDate },
       profitAndLoss: null,
