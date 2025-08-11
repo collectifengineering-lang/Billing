@@ -841,41 +841,43 @@ export default function HighPerformanceTable({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
+    <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
+      <div className="px-6 py-6 border-b border-gray-200 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-lg font-medium text-gray-900">Projections Table</h3>
-            <p className="text-sm text-gray-600">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+              Projections Table
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
               Virtualized table with {filteredProjects.length} active projects - click any cell to edit
             </p>
           </div>
         </div>
         
         {/* Filter Section */}
-        <div className="mb-4">
+        <div className="mb-6">
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400 dark:text-gray-500" />
             </div>
             <input
               type="text"
               placeholder="Filter projects by name..."
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="block w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-slate-600 rounded-xl leading-5 bg-white dark:bg-slate-700 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 sm:text-sm text-gray-900 dark:text-white transition-all duration-200"
             />
             {filterText && (
               <button
                 onClick={() => setFilterText('')}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
               >
-                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                <X className="h-5 w-5" />
               </button>
             )}
           </div>
           {filterText && (
-            <div className="mt-2 text-sm text-gray-600">
+            <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
               Showing {filteredProjects.length} of {activeProjects.length} projects
             </div>
           )}
@@ -895,70 +897,70 @@ export default function HighPerformanceTable({
       {/* Main table container with proper scroll handling */}
       <div className="relative table-container">
         {/* Sticky columns container */}
-        <div className="absolute left-0 top-0 z-30 bg-white flex flex-col" style={{ width: '776px', height: '600px' }}>
+        <div className="absolute left-0 top-0 z-30 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm flex flex-col" style={{ width: '776px', height: '600px' }}>
           {/* Sticky header */}
-          <div className="flex bg-gray-50 border-b border-gray-200 sticky-header">
-            <div className="flex-shrink-0 w-[264px] bg-gray-50 border-r border-gray-200">
+          <div className="flex bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-b border-gray-200 dark:border-slate-600 sticky-header">
+            <div className="flex-shrink-0 w-[264px] bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div 
-                className="h-18 px-4 py-3 flex items-center justify-start cursor-pointer hover:bg-gray-100 transition-colors group"
+                className="h-18 px-4 py-3 flex items-center justify-start cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors group"
                 onClick={() => handleSort('projectName')}
               >
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-800 dark:group-hover:text-gray-100">
                   Project
                 </span>
-                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                <div className="ml-1 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400">
                   {getSortIcon('projectName')}
                 </div>
               </div>
             </div>
-            <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
+            <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div 
-                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 transition-colors group"
+                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors group"
                 onClick={() => handleSort('signedFee')}
               >
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-800 dark:group-hover:text-gray-100">
                   Signed Fee
                 </span>
-                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                <div className="ml-1 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400">
                   {getSortIcon('signedFee')}
                 </div>
               </div>
             </div>
-            <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
+            <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div 
-                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 transition-colors group"
+                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors group"
                 onClick={() => handleSort('asrFee')}
               >
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-800 dark:group-hover:text-gray-100">
                   Total ASR Fee
                 </span>
-                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                <div className="ml-1 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400">
                   {getSortIcon('asrFee')}
                 </div>
               </div>
             </div>
-            <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
+            <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div 
-                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 transition-colors group"
+                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors group"
                 onClick={() => handleSort('totalFee')}
               >
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-800 dark:group-hover:text-gray-100">
                   Total Fee
                 </span>
-                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                <div className="ml-1 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400">
                   {getSortIcon('totalFee')}
                 </div>
               </div>
             </div>
-            <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
+            <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div 
-                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 transition-colors group"
+                className="h-18 px-4 py-3 flex items-center justify-end cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors group"
                 onClick={() => handleSort('projected')}
               >
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-800 dark:group-hover:text-gray-100">
                   Projected
                 </span>
-                <div className="ml-1 text-gray-400 group-hover:text-gray-600">
+                <div className="ml-1 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400">
                   {getSortIcon('projected')}
                 </div>
               </div>
@@ -987,23 +989,23 @@ export default function HighPerformanceTable({
                 const assignedManager = projectManagersData?.[managerId] || projectManagers.find(m => m.id === managerId);
 
                 return (
-                  <div style={style} className="flex border-b border-gray-200 sticky-column">
-                    <div className="flex-shrink-0 w-[264px] bg-gray-50 border-r border-gray-200">
+                  <div style={style} className="flex border-b border-gray-200 dark:border-slate-600 sticky-column">
+                    <div className="flex-shrink-0 w-[264px] bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
                       <div className="flex items-center h-18 px-4">
                         <div className="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
                           <div className="flex items-center">
                             {assignedManager && (
                               <div 
-                                className="w-3 h-3 rounded-full mr-2"
+                                className="w-3 h-3 rounded-full mr-2 shadow-sm"
                                 style={{ backgroundColor: assignedManager.color }}
                               />
                             )}
-                            <span className="text-xs font-medium text-gray-900 truncate" title={project.projectName}>
+                            <span className="text-xs font-medium text-gray-900 dark:text-white truncate" title={project.projectName}>
                               {project.projectName}
                             </span>
                           </div>
                           {assignedManager && (
-                            <span className="text-xs text-gray-500 italic truncate">
+                            <span className="text-xs text-gray-500 dark:text-gray-400 italic truncate">
                               {assignedManager.name}
                             </span>
                           )}
@@ -1013,14 +1015,14 @@ export default function HighPerformanceTable({
                             setOpenDropdown(project.projectId);
                             setDropdownPosition({ x: e.clientX, y: e.clientY });
                           }}
-                          className="ml-2 p-1 text-gray-400 hover:text-gray-600"
+                          className="ml-2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200"
                         >
                           <User className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
+                    <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
                       <div className="h-18 px-4 py-2 text-center">
                         {editingSignedFee === project.projectId ? (
                           <input
@@ -1029,7 +1031,7 @@ export default function HighPerformanceTable({
                             onChange={(e) => setEditValue(e.target.value)}
                             onBlur={handleSignedFeeSave}
                             onKeyDown={(e) => e.key === 'Enter' && handleSignedFeeSave()}
-                            className="w-full px-2 py-1 border border-blue-300 rounded text-sm"
+                            className="w-full px-2 py-1 border border-blue-300 dark:border-blue-400 rounded text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                             autoFocus
                           />
                         ) : (
@@ -1044,7 +1046,7 @@ export default function HighPerformanceTable({
                             
                             return (
                               <div 
-                                className="text-sm cursor-pointer hover:bg-gray-100 p-1 rounded"
+                                className="text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200"
                                 onClick={() => {
                                   setEditingSignedFee(project.projectId);
                                   setEditValue(displayValue.toString());
@@ -1058,7 +1060,7 @@ export default function HighPerformanceTable({
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
+                    <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
                       <div className="h-18 px-4 py-2 text-center">
                         {isEditingAsrFee ? (
                           <input
@@ -1067,12 +1069,12 @@ export default function HighPerformanceTable({
                             onChange={(e) => setEditValue(e.target.value)}
                             onBlur={handleAsrFeeSave}
                             onKeyDown={(e) => e.key === 'Enter' && handleAsrFeeSave()}
-                            className="w-full px-2 py-1 border border-blue-300 rounded text-sm"
+                            className="w-full px-2 py-1 border border-blue-300 dark:border-blue-400 rounded text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                             autoFocus
                           />
                         ) : (
                           <div 
-                            className="text-sm cursor-pointer hover:bg-gray-100 p-1 rounded"
+                            className="text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200"
                             onClick={() => {
                               setEditingAsrFee(project.projectId);
                               setEditValue(asrFee.toString());
@@ -1084,14 +1086,14 @@ export default function HighPerformanceTable({
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-                      <div className="h-18 px-4 py-2 text-center text-sm font-medium">
+                    <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+                      <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
                         {formatCurrency(totalFee)}
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-                      <div className="h-18 px-4 py-2 text-center text-sm font-medium">
+                    <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+                      <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
                         {formatCurrency(totalProjected)}
                       </div>
                     </div>
@@ -1102,14 +1104,14 @@ export default function HighPerformanceTable({
           </div>
 
           {/* Sticky footer for first 5 columns */}
-          <div className="flex bg-gray-50 border-t border-gray-200">
-            <div className="flex-shrink-0 w-[264px] bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-2 text-left text-sm font-medium text-gray-900">
+          <div className="flex bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-t border-gray-200 dark:border-slate-600">
+            <div className="flex-shrink-0 w-[264px] bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+              <div className="h-18 px-4 py-2 text-left text-sm font-medium text-gray-900 dark:text-white">
                 Totals
               </div>
             </div>
-            <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900">
+            <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+              <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
                 {formatCurrency(safeBillingData.reduce((sum, project) => {
                   const userSignedFee = signedFees[project.projectId];
                   const apiSignedFee = signedFeesData?.[project.projectId];
@@ -1119,18 +1121,18 @@ export default function HighPerformanceTable({
                 }, 0))}
               </div>
             </div>
-            <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900">
+            <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+              <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
                 {formatCurrency(safeBillingData.reduce((sum, project) => sum + getAsrFee(project.projectId), 0))}
               </div>
             </div>
-            <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900">
+            <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+              <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
                 {formatCurrency(safeBillingData.reduce((sum, project) => sum + getTotalFee(project), 0))}
               </div>
             </div>
-            <div className="flex-shrink-0 w-32 bg-gray-50 border-r border-gray-200">
-              <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900">
+            <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+              <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
                 {formatCurrency(safeBillingData.reduce((sum, project) => sum + getTotalProjected(project.projectId), 0))}
               </div>
             </div>
@@ -1143,20 +1145,20 @@ export default function HighPerformanceTable({
           <div style={{ width: `${monthRange.length * 128}px`, height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Scrollable header */}
             <div ref={scrollableHeaderRef} className="scrollable-header">
-              <div className="flex bg-gray-50 border-b border-gray-200 sticky-header header-flex">
+              <div className="flex bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-b border-gray-200 dark:border-slate-600 sticky-header header-flex">
                 {monthRange.map((month) => {
                   return (
                     <div
                       key={month}
-                      className="flex-shrink-0 w-32 flex items-center justify-center px-4 py-3 border-r border-gray-200 h-18 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors group"
+                      className="flex-shrink-0 w-32 flex items-center justify-center px-4 py-3 border-r border-gray-200 dark:border-slate-600 h-18 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors group"
                       onClick={() => handleSort(month)}
                       title={`Click to sort by ${formatMonth(month)} projections`}
                     >
-                      <div className="flex flex-col items-center group-hover:text-gray-700">
-                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-700">
+                      <div className="flex flex-col items-center group-hover:text-gray-700 dark:group-hover:text-gray-200">
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider leading-none whitespace-nowrap group-hover:text-gray-800 dark:group-hover:text-gray-100">
                           {formatMonth(month)}
                         </span>
-                        <div className="text-gray-400 mt-0.5 group-hover:text-gray-600">
+                        <div className="text-gray-400 dark:text-gray-500 mt-0.5 group-hover:text-gray-600 dark:group-hover:text-gray-400">
                           {getMonthSortIcon(month)}
                         </div>
                       </div>
@@ -1189,7 +1191,7 @@ export default function HighPerformanceTable({
                         return (
                           <div
                             key={month}
-                            className={`flex-shrink-0 w-32 h-18 px-4 py-2 text-center text-sm border-r border-gray-200 cursor-pointer relative ${getCellClass(getCellStatus(project.projectId, month)) || 'bg-white'}`}
+                            className={`flex-shrink-0 w-32 h-18 px-4 py-2 text-center text-sm border-r border-gray-200 dark:border-slate-600 cursor-pointer relative ${getCellClass(getCellStatus(project.projectId, month)) || 'bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm'}`}
                             onClick={() => handleCellClick(project.projectId, month, currentValue)}
                             title={getCellComment(project.projectId, month)}
                           >
@@ -1200,11 +1202,13 @@ export default function HighPerformanceTable({
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onBlur={handleCellSave}
                                 onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                                className="w-full px-2 py-1 border border-blue-300 rounded text-sm"
+                                className="w-full px-2 py-1 border border-blue-300 dark:border-blue-400 rounded text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                                 autoFocus
                               />
                             ) : (
-                              formatCurrency(currentValue)
+                              <span className="text-gray-900 dark:text-white">
+                                {formatCurrency(currentValue)}
+                              </span>
                             )}
                             <button
                               className="absolute top-1 right-1 text-gray-400 hover:text-gray-600 text-xs"
@@ -1227,7 +1231,7 @@ export default function HighPerformanceTable({
 
             {/* Scrollable footer */}
             <div ref={scrollableFooterRef} className="scrollable-footer">
-              <div className="flex bg-gray-50 border-t border-gray-200 footer-flex">
+              <div className="flex bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-t border-gray-200 dark:border-slate-600 footer-flex">
                 {monthRange.map((month, index) => {
                   const totals = monthRange.map(month => 
                     safeBillingData.reduce((sum, project) => sum + getCellValue(project.projectId, month), 0)
@@ -1235,7 +1239,7 @@ export default function HighPerformanceTable({
                   return (
                     <div
                       key={month}
-                      className="flex-shrink-0 w-32 h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 border-r border-gray-200 bg-gray-50"
+                      className="flex-shrink-0 w-32 h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white border-r border-gray-200 dark:border-slate-600 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm"
                     >
                       {formatCurrency(totals[index])}
                     </div>
@@ -1251,7 +1255,7 @@ export default function HighPerformanceTable({
       {openDropdown && dropdownPosition && (
         <div 
           ref={managerMenuRef}
-          className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] min-w-[220px] py-2"
+          className="fixed bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl z-[9999] min-w-[220px] py-2"
           data-dropdown="true"
           style={{
             left: `${dropdownPosition.x}px`,
@@ -1260,9 +1264,9 @@ export default function HighPerformanceTable({
           }}
         >
           <div className="py-1">
-            <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Assign Project Manager</div>
+            <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assign Project Manager</div>
             {(!projectManagersData || Object.keys(projectManagersData).length === 0) && projectManagers.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-gray-400 italic">No project managers available</div>
+              <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500 italic">No project managers available</div>
             ) : (
               <div className="space-y-0.5">
                 {(() => {
@@ -1285,13 +1289,13 @@ export default function HighPerformanceTable({
                             toast.error('Failed to assign project manager');
                           }
                         }}
-                        className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 ${assignedId === id ? 'bg-gray-50' : ''}`}
+                        className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white ${assignedId === id ? 'bg-gray-50 dark:bg-slate-700' : ''}`}
                       >
                         <span className="flex items-center space-x-2">
-                          <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: manager.color }} />
+                          <span className="w-3 h-3 rounded-full inline-block shadow-sm" style={{ backgroundColor: manager.color }} />
                           <span>{manager.name}</span>
                         </span>
-                        {assignedId === id && <Check className="h-4 w-4 text-green-600" />}
+                        {assignedId === id && <Check className="h-4 w-4 text-green-600 dark:text-green-400" />}
                       </button>
                     ));
                   }
@@ -1304,13 +1308,13 @@ export default function HighPerformanceTable({
                         localStorage.setItem('projectAssignments', JSON.stringify(updatedAssignments));
                         setOpenDropdown(null);
                       }}
-                      className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 ${assignedId === manager.id ? 'bg-gray-50' : ''}`}
+                      className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white ${assignedId === manager.id ? 'bg-gray-50 dark:bg-slate-700' : ''}`}
                     >
                       <span className="flex items-center space-x-2">
-                        <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: manager.color }} />
+                        <span className="w-3 h-3 rounded-full inline-block shadow-sm" style={{ backgroundColor: manager.color }} />
                         <span>{manager.name}</span>
                       </span>
-                      {assignedId === manager.id && <Check className="h-4 w-4 text-green-600" />}
+                      {assignedId === manager.id && <Check className="h-4 w-4 text-green-600 dark:text-green-400" />}
                     </button>
                   ));
                 })()}
@@ -1320,7 +1324,7 @@ export default function HighPerformanceTable({
 
           {(projectAssignmentsData?.[openDropdown] || projectAssignments[openDropdown]) && (
             <>
-              <div className="my-1 border-t border-gray-200"></div>
+              <div className="my-1 border-t border-gray-200 dark:border-slate-600"></div>
               <button
                 onClick={async () => {
                   try {
@@ -1336,7 +1340,7 @@ export default function HighPerformanceTable({
                     toast.error('Failed to remove project manager');
                   }
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 flex items-center"
+                className="w-full px-3 py-2 text-left text-sm text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center transition-colors duration-200"
               >
                 <User className="h-4 w-4 mr-2" />
                 Remove Manager

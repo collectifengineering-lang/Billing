@@ -238,31 +238,53 @@ function DashboardPageContent() {
 
   const fetchDashboardData = async () => {
     try {
+      console.log('🔄 Starting dashboard data fetch...');
       setLoading(true);
-      const response = await fetch('/api/dashboard');
+      setError(null);
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      const response = await fetch('/api/dashboard', {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+      
       const data = await response.json();
+      console.log('✅ Dashboard data received:', data);
       setMetrics(data);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please check your connection and try again.');
+    } catch (error: any) {
+      console.error('❌ Error fetching dashboard data:', error);
+      
+      if (error.name === 'AbortError') {
+        setError('Dashboard data request timed out. Please try again.');
+      } else {
+        setError('Failed to load dashboard data. Please check your connection and try again.');
+      }
     } finally {
+      console.log('🏁 Dashboard data fetch completed, setting loading to false');
       setLoading(false);
     }
   };
 
   const fetchProjects = async () => {
     try {
+      console.log('🔄 Starting projects fetch...');
       const response = await fetch('/api/projects');
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const data = await response.json();
+      console.log('✅ Projects received:', data.data?.length || 0, 'projects');
       setProjects(data.data || []);
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      console.error('❌ Error fetching projects:', error);
       setError('Failed to load projects. Please check your connection and try again.');
     }
   };
@@ -410,9 +432,34 @@ function DashboardPageContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        <div className="text-center max-w-md">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">
+            Fetching financial data from Zoho and Clockify...
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+            <p className="text-sm text-blue-800 mb-2">
+              <strong>What's happening:</strong>
+            </p>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Connecting to Zoho Books API</li>
+              <li>• Fetching financial metrics (may take 10-20 seconds)</li>
+              <li>• Loading project data</li>
+              <li>• Calculating performance indicators</li>
+            </ul>
+            <p className="text-xs text-blue-600 mt-3">
+              This process includes rate limiting to respect API limits.
+            </p>
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+            >
+              Refresh if stuck
+            </button>
+          </div>
         </div>
       </div>
     );

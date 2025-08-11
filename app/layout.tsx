@@ -4,7 +4,11 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '../lib/AuthContext'
 import { MigrationProvider } from '../lib/migrationContext'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter'
+})
 
 export const metadata = {
   title: 'Billing Platform',
@@ -17,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} font-sans`}>
         <AuthProvider>
           <MigrationProvider>
             <Toaster position="top-right" />

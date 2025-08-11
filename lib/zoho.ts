@@ -144,23 +144,41 @@ class ZohoService {
       
       const token = await this.getAccessToken();
       
-      const response = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        params: {
-          organization_id: process.env.ZOHO_ORGANIZATION_ID,
-        },
-        timeout: 30000, // 30 second timeout
-      });
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      try {
+        const response = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          params: {
+            organization_id: process.env.ZOHO_ORGANIZATION_ID,
+          },
+          timeout: 15000, // 15 second timeout
+          signal: controller.signal,
+        });
 
-      // Reset retry count on success
-      this.retryCount = 0;
-      this.requestCount++;
-      this.lastRequestTime = Date.now();
+        clearTimeout(timeoutId);
+        
+        // Reset retry count on success
+        this.retryCount = 0;
+        this.requestCount++;
+        this.lastRequestTime = Date.now();
 
-      return response.data;
+        return response.data;
+      } catch (axiosError: any) {
+        clearTimeout(timeoutId);
+        
+        // Handle timeout specifically
+        if (axiosError.code === 'ECONNABORTED' || axiosError.message?.includes('timeout')) {
+          throw new Error(`Zoho API request timed out for ${endpoint}`);
+        }
+        
+        throw axiosError;
+      }
     } catch (error: any) {
       // Handle rate limiting (400 with specific error message)
       if (error.response?.status === 400 && 
@@ -200,7 +218,7 @@ class ZohoService {
             params: {
               organization_id: process.env.ZOHO_ORGANIZATION_ID,
             },
-            timeout: 30000,
+            timeout: 15000,
           });
           
           console.log('Request retry successful after token refresh');

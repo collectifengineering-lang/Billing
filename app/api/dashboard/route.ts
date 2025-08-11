@@ -7,11 +7,20 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('🚀 Dashboard API called - starting data collection...');
+    
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentYearStart = new Date(currentYear, 0, 1);
     const lastYearStart = new Date(currentYear - 1, 0, 1);
     const twoYearsAgoStart = new Date(currentYear - 2, 0, 1);
+    
+    console.log('📅 Date ranges calculated:', {
+      currentYear,
+      currentYearStart: currentYearStart.toISOString(),
+      lastYearStart: lastYearStart.toISOString(),
+      twoYearsAgoStart: twoYearsAgoStart.toISOString()
+    });
     
     // Check Clockify service configuration
     const clockifyConfig = clockifyService.getConfigurationStatus();
@@ -28,54 +37,87 @@ export async function GET(request: NextRequest) {
     let lastYearFinancials: any = null;
     let twoYearsAgoFinancials: any = null;
     
+    console.log('🔄 Starting Zoho data fetch...');
+    
     try {
       // Fetch projects and invoices
+      console.log('📊 Fetching projects and invoices...');
       [projects, invoices] = await Promise.all([
         zohoService.getProjects(),
         zohoService.getInvoices()
       ]);
+      console.log('✅ Projects and invoices fetched:', { projectsCount: projects.length, invoicesCount: invoices.length });
 
-      // Fetch real financial data from Zoho Books
-      console.log('Fetching real financial data from Zoho Books...');
+      // Fetch real financial data from Zoho Books with individual error handling
+      console.log('💰 Fetching real financial data from Zoho Books...');
       
-      [currentYearFinancials, lastYearFinancials, twoYearsAgoFinancials] = await Promise.all([
-        zohoService.getFinancialMetrics(
+      // Try to fetch each financial metric individually to handle partial failures
+      try {
+        console.log('📈 Fetching current year financials...');
+        currentYearFinancials = await zohoService.getFinancialMetrics(
           currentYearStart.toISOString().split('T')[0],
           now.toISOString().split('T')[0]
-        ),
-        zohoService.getFinancialMetrics(
+        );
+        console.log('✅ Current year financials loaded successfully:', currentYearFinancials);
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch current year financials, using defaults:', error);
+        currentYearFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
+      }
+      
+      try {
+        console.log('📈 Fetching last year financials...');
+        lastYearFinancials = await zohoService.getFinancialMetrics(
           lastYearStart.toISOString().split('T')[0],
           new Date(currentYear - 1, 11, 31).toISOString().split('T')[0]
-        ),
-        zohoService.getFinancialMetrics(
+        );
+        console.log('✅ Last year financials loaded successfully:', lastYearFinancials);
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch last year financials, using defaults:', error);
+        lastYearFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
+      }
+      
+      try {
+        console.log('📈 Fetching two years ago financials...');
+        twoYearsAgoFinancials = await zohoService.getFinancialMetrics(
           twoYearsAgoStart.toISOString().split('T')[0],
           new Date(currentYear - 2, 11, 31).toISOString().split('T')[0]
-        )
-      ]);
+        );
+        console.log('✅ Two years ago financials loaded successfully:', twoYearsAgoFinancials);
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch two years ago financials, using defaults:', error);
+        twoYearsAgoFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
+      }
 
-      console.log('Current year financials:', currentYearFinancials);
-      console.log('Last year financials:', lastYearFinancials);
-      console.log('Two years ago financials:', twoYearsAgoFinancials);
+      console.log('📊 Financial data summary:');
+      console.log('- Current year:', currentYearFinancials);
+      console.log('- Last year:', lastYearFinancials);
+      console.log('- Two years ago:', twoYearsAgoFinancials);
 
     } catch (error) {
-      console.error('Failed to fetch Zoho data:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch financial data from Zoho' },
-        { status: 500 }
-      );
+      console.error('❌ Failed to fetch basic Zoho data (projects/invoices):', error);
+      // Don't return error, continue with default values
+      projects = [];
+      invoices = [];
+      currentYearFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
+      lastYearFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
+      twoYearsAgoFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
     }
 
+    console.log('🔄 Starting Clockify data fetch...');
+    
     // Get Clockify data for utilization rate
     let utilizationRate = 0.85;
     let averageBillingRate = 185;
     
     try {
       if (clockifyConfig.configured) {
+        console.log('⏰ Clockify configured, fetching real data...');
         const clockifyUser = await clockifyService.getUser();
         const clockifyProjects = await clockifyService.getProjects();
         
         // Calculate utilization rate based on billable hours vs total hours
         try {
+          console.log('⏰ Fetching Clockify time entries...');
           const timeEntries = await clockifyService.getAllTimeEntries(
             new Date(currentYear, 0, 1).toISOString(),
             now.toISOString()
@@ -104,16 +146,20 @@ export async function GET(request: NextRequest) {
             }, 0);
             averageBillingRate = totalRate / billableEntries.length;
           }
+          
+          console.log('✅ Clockify utilization data calculated:', { utilizationRate, averageBillingRate, totalHours, billableHours });
         } catch (timeError) {
-          console.warn('Failed to calculate utilization rate from Clockify, using defaults:', timeError);
+          console.warn('⚠️ Failed to calculate utilization rate from Clockify, using defaults:', timeError);
         }
       } else {
-        console.log('Using mock utilization data due to Clockify not being configured');
+        console.log('🎭 Using mock utilization data due to Clockify not being configured');
       }
     } catch (error) {
-      console.warn('Failed to fetch Clockify data, using defaults:', error);
+      console.warn('⚠️ Failed to fetch Clockify data, using defaults:', error);
     }
 
+    console.log('🧮 Starting financial calculations...');
+    
     // Calculate financial metrics from Zoho data
     const activeProjects = projects.filter(p => p.status === 'active');
     const totalBudget = activeProjects.reduce((sum, p) => sum + (p.budget_amount || 0), 0);
@@ -184,6 +230,8 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    console.log('🏗️ Building final dashboard data...');
+    
     // Build comprehensive dashboard data using real financial metrics
     const dashboardData = {
       // Multipliers (real calculations)
@@ -234,11 +282,12 @@ export async function GET(request: NextRequest) {
       totalEmployees: 12
     };
 
-    console.log('Dashboard data generated with real financial metrics:', dashboardData);
+    console.log('✅ Dashboard data generated with real financial metrics:', dashboardData);
+    console.log('🚀 Returning dashboard data to client...');
 
     return NextResponse.json(dashboardData);
   } catch (error) {
-    console.error('Dashboard API error:', error);
+    console.error('❌ Dashboard API error:', error);
     return NextResponse.json(
       { error: 'Failed to generate dashboard data' },
       { status: 500 }

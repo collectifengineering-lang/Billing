@@ -6,10 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider     = "postgresql"
-  url          = env("DATABASE_URL")  // Pooled URL for runtime queries
-  directUrl    = env("DIRECT_URL")    // Direct URL for migrations and Prisma Studio
-  relationMode = "prisma" // Helps with connection efficiency in Supabase
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model Projection {

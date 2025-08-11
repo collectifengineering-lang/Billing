@@ -10,17 +10,17 @@ exports.id = "vendor-chunks/mime-db";
 exports.ids = ["vendor-chunks/mime-db"];
 exports.modules = {
 
-/***/ "(ssr)/./node_modules/mime-db/index.js":
+/***/ "(rsc)/./node_modules/mime-db/index.js":
 /*!***************************************!*\
   !*** ./node_modules/mime-db/index.js ***!
   \***************************************/
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-eval("/*!\n * mime-db\n * Copyright(c) 2014 Jonathan Ong\n * Copyright(c) 2015-2022 Douglas Christopher Wilson\n * MIT Licensed\n */\n\n/**\n * Module exports.\n */\n\nmodule.exports = __webpack_require__(/*! ./db.json */ \"(ssr)/./node_modules/mime-db/db.json\")\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHNzcikvLi9ub2RlX21vZHVsZXMvbWltZS1kYi9pbmRleC5qcyIsIm1hcHBpbmdzIjoiQUFBQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBOztBQUVBLDZGQUFxQyIsInNvdXJjZXMiOlsid2VicGFjazovL3pvaG8tYmlsbGluZy1wbGF0Zm9ybS8uL25vZGVfbW9kdWxlcy9taW1lLWRiL2luZGV4LmpzPzM2MmMiXSwic291cmNlc0NvbnRlbnQiOlsiLyohXG4gKiBtaW1lLWRiXG4gKiBDb3B5cmlnaHQoYykgMjAxNCBKb25hdGhhbiBPbmdcbiAqIENvcHlyaWdodChjKSAyMDE1LTIwMjIgRG91Z2xhcyBDaHJpc3RvcGhlciBXaWxzb25cbiAqIE1JVCBMaWNlbnNlZFxuICovXG5cbi8qKlxuICogTW9kdWxlIGV4cG9ydHMuXG4gKi9cblxubW9kdWxlLmV4cG9ydHMgPSByZXF1aXJlKCcuL2RiLmpzb24nKVxuIl0sIm5hbWVzIjpbXSwic291cmNlUm9vdCI6IiJ9\n//# sourceURL=webpack-internal:///(ssr)/./node_modules/mime-db/index.js\n");
+eval("/*!\n * mime-db\n * Copyright(c) 2014 Jonathan Ong\n * Copyright(c) 2015-2022 Douglas Christopher Wilson\n * MIT Licensed\n */\n\n/**\n * Module exports.\n */\n\nmodule.exports = __webpack_require__(/*! ./db.json */ \"(rsc)/./node_modules/mime-db/db.json\")\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9ub2RlX21vZHVsZXMvbWltZS1kYi9pbmRleC5qcyIsIm1hcHBpbmdzIjoiQUFBQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBOztBQUVBLDZGQUFxQyIsInNvdXJjZXMiOlsid2VicGFjazovL3pvaG8tYmlsbGluZy1wbGF0Zm9ybS8uL25vZGVfbW9kdWxlcy9taW1lLWRiL2luZGV4LmpzPzU4NDYiXSwic291cmNlc0NvbnRlbnQiOlsiLyohXG4gKiBtaW1lLWRiXG4gKiBDb3B5cmlnaHQoYykgMjAxNCBKb25hdGhhbiBPbmdcbiAqIENvcHlyaWdodChjKSAyMDE1LTIwMjIgRG91Z2xhcyBDaHJpc3RvcGhlciBXaWxzb25cbiAqIE1JVCBMaWNlbnNlZFxuICovXG5cbi8qKlxuICogTW9kdWxlIGV4cG9ydHMuXG4gKi9cblxubW9kdWxlLmV4cG9ydHMgPSByZXF1aXJlKCcuL2RiLmpzb24nKVxuIl0sIm5hbWVzIjpbXSwic291cmNlUm9vdCI6IiJ9\n//# sourceURL=webpack-internal:///(rsc)/./node_modules/mime-db/index.js\n");
 
 /***/ }),
 
-/***/ "(ssr)/./node_modules/mime-db/db.json":
+/***/ "(rsc)/./node_modules/mime-db/db.json":
 /*!**************************************!*\
   !*** ./node_modules/mime-db/db.json ***!
   \**************************************/
