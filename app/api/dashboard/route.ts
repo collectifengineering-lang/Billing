@@ -131,22 +131,27 @@ export async function GET(request: NextRequest) {
       const clockifyProjects = await clockifyService.getProjects();
       
       // Calculate utilization rate based on billable hours vs total hours
-      const timeEntries = await clockifyService.getAllTimeEntries(
-        new Date(currentYear, 0, 1).toISOString(),
-        now.toISOString()
-      );
-      
-      const totalHours = timeEntries.reduce((sum, entry) => sum + (parseDuration(entry.timeInterval.duration) || 0), 0) / 3600000; // Convert from milliseconds
-      const billableHours = timeEntries.filter(entry => entry.billable).reduce((sum, entry) => sum + (parseDuration(entry.timeInterval.duration) || 0), 0) / 3600000;
-      
-      if (totalHours > 0) {
-        utilizationRate = billableHours / totalHours;
-      }
-      
-      // Calculate average billing rate (using default rate for now)
-      if (timeEntries.length > 0) {
-        // For now, use a default billing rate since we don't have amount data
-        averageBillingRate = 185; // Default rate, would be calculated from hourly rates in real implementation
+      try {
+        const timeEntries = await clockifyService.getAllTimeEntries(
+          new Date(currentYear, 0, 1).toISOString(),
+          now.toISOString()
+        );
+        
+        const totalHours = timeEntries.reduce((sum, entry) => sum + (parseDuration(entry.timeInterval.duration) || 0), 0) / 3600000; // Convert from milliseconds
+        const billableHours = timeEntries.filter(entry => entry.billable).reduce((sum, entry) => sum + (parseDuration(entry.timeInterval.duration) || 0), 0) / 3600000;
+        
+        if (totalHours > 0) {
+          utilizationRate = billableHours / totalHours;
+        }
+        
+        // Calculate average billing rate (using default rate for now)
+        if (timeEntries.length > 0) {
+          // For now, use a default billing rate since we don't have amount data
+          averageBillingRate = 185; // Default rate, would be calculated from hourly rates in real implementation
+        }
+      } catch (timeEntryError) {
+        console.warn('Failed to fetch Clockify time entries, using default values:', timeEntryError);
+        // Keep default values
       }
     } catch (error) {
       console.log('Using default Clockify data');

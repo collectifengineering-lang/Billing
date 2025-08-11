@@ -171,10 +171,23 @@ function DashboardPageContent() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [projectLoading, setProjectLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchDashboardData();
-    fetchProjects();
+    const initializeDashboard = async () => {
+      try {
+        setError(null);
+        await Promise.all([
+          fetchDashboardData(),
+          fetchProjects()
+        ]);
+      } catch (error) {
+        console.error('Failed to initialize dashboard:', error);
+        setError('Failed to initialize dashboard. Please refresh the page.');
+      }
+    };
+    
+    initializeDashboard();
   }, []);
 
   useEffect(() => {
@@ -190,12 +203,13 @@ function DashboardPageContent() {
       setLoading(true);
       const response = await fetch('/api/dashboard');
       if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const data = await response.json();
       setMetrics(data);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -205,12 +219,13 @@ function DashboardPageContent() {
     try {
       const response = await fetch('/api/projects');
       if (!response.ok) {
-        throw new Error('Failed to fetch projects');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       const data = await response.json();
       setProjects(data.data || []);
     } catch (error) {
       console.error('Error fetching projects:', error);
+      setError('Failed to load projects. Please check your connection and try again.');
     }
   };
 
@@ -219,12 +234,63 @@ function DashboardPageContent() {
       setProjectLoading(true);
       const response = await fetch(`/api/dashboard/project/${projectId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch project metrics');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
       const data = await response.json();
       setProjectMetrics(data);
     } catch (error) {
       console.error('Error fetching project metrics:', error);
+      setError('Failed to load project metrics. Please try selecting a different project.');
+      // Set a default project metrics object to prevent crashes
+      setProjectMetrics({
+        projectId,
+        projectName: 'Unknown Project',
+        customerName: 'Unknown Customer',
+        status: 'unknown',
+        startDate: new Date().toISOString().split('T')[0],
+        totalBudget: 0,
+        totalBilled: 0,
+        totalUnbilled: 0,
+        totalCollected: 0,
+        outstandingAmount: 0,
+        profitMargin: 0,
+        grossProfit: 0,
+        currentMultiplier: 0,
+        historicalMultipliers: [],
+        totalHours: 0,
+        billableHours: 0,
+        nonBillableHours: 0,
+        efficiency: 0,
+        employeeBreakdown: [],
+        timeEntries: [],
+        cashBasis: {
+          totalCollected: 0,
+          outstandingReceivables: 0,
+          totalRevenue: 0
+        },
+        accrualBasis: {
+          totalEarned: 0,
+          totalExpenses: 0,
+          netIncome: 0,
+          workInProgress: 0
+        },
+        budgetUtilization: 0,
+        schedulePerformance: 0,
+        profitabilityTrend: 'stable' as const,
+        riskLevel: 'low' as const,
+        changeOrders: {
+          count: 0,
+          totalValue: 0,
+          approvedValue: 0,
+          pendingValue: 0
+        },
+        phases: [],
+        projectedCompletion: new Date().toISOString().split('T')[0],
+        projectedFinalCost: 0,
+        projectedProfit: 0,
+        projectedMargin: 0
+      });
     } finally {
       setProjectLoading(false);
     }
@@ -253,6 +319,23 @@ function DashboardPageContent() {
         return <Minus className="h-4 w-4 text-gray-600" />;
     }
   };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-900 mb-4">Dashboard Error</h1>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -315,13 +398,24 @@ function DashboardPageContent() {
             <select
               id="project-select"
               value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
+              onChange={(e) => {
+                try {
+                  const newProjectId = e.target.value;
+                  console.log('Project selection changed to:', newProjectId);
+                  setSelectedProjectId(newProjectId);
+                } catch (error) {
+                  console.error('Error in project selection change:', error);
+                  // Reset to safe state
+                  setSelectedProjectId('');
+                  setProjectMetrics(null);
+                }
+              }}
               className="block w-80 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             >
               <option value="">All Projects (Company Overview)</option>
-              {projects.map((project) => (
-                <option key={project.project_id} value={project.project_id}>
-                  {project.project_name} - {project.customer_name}
+              {Array.isArray(projects) && projects.map((project) => (
+                <option key={project?.project_id || 'unknown'} value={project?.project_id || ''}>
+                  {project?.project_name || 'Unknown Project'} - {project?.customer_name || 'Unknown Customer'}
                 </option>
               ))}
             </select>
@@ -333,6 +427,34 @@ function DashboardPageContent() {
             )}
           </div>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Dashboard Error</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{error}</p>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      setError(null);
+                      window.location.reload();
+                    }}
+                    className="bg-red-100 text-red-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-red-200"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
@@ -352,9 +474,9 @@ function DashboardPageContent() {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{formatCurrency(metrics.ytdProfit)}</div>
+                  <div className="text-2xl font-bold">{formatCurrency(metrics?.ytdProfit || 0)}</div>
                   <p className="text-xs text-muted-foreground">
-                    vs {formatCurrency(metrics.lastYearYtdProfit)} last year
+                    vs {formatCurrency(metrics?.lastYearYtdProfit || 0)} last year
                   </p>
                 </CardContent>
               </Card>
@@ -365,9 +487,9 @@ function DashboardPageContent() {
                   <PieChart className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{formatPercentage(metrics.currentYearGrossMargin)}</div>
+                  <div className="text-2xl font-bold">{formatPercentage(metrics?.currentYearGrossMargin || 0)}</div>
                   <p className="text-xs text-muted-foreground">
-                    vs {formatPercentage(metrics.lastYearGrossMargin)} last year
+                    vs {formatPercentage(metrics?.lastYearGrossMargin || 0)} last year
                   </p>
                 </CardContent>
               </Card>
@@ -378,8 +500,8 @@ function DashboardPageContent() {
                   <Target className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{formatPercentage(metrics.utilizationRate)}</div>
-                  <Progress value={metrics.utilizationRate * 100} className="mt-2" />
+                  <div className="text-2xl font-bold">{formatPercentage(metrics?.utilizationRate || 0)}</div>
+                  <Progress value={(metrics?.utilizationRate || 0) * 100} className="mt-2" />
                 </CardContent>
               </Card>
 
@@ -389,9 +511,9 @@ function DashboardPageContent() {
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{metrics.totalActiveProjects}</div>
+                  <div className="text-2xl font-bold">{metrics?.totalActiveProjects || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    {metrics.totalEmployees} employees
+                    {metrics?.totalEmployees || 0} employees
                   </p>
                 </CardContent>
               </Card>
@@ -407,15 +529,15 @@ function DashboardPageContent() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Current Year</span>
-                    <Badge variant="default">{metrics.currentYearMultiplier.toFixed(1)}x</Badge>
+                    <Badge variant="default">{metrics?.currentYearMultiplier.toFixed(1) || 'N/A'}x</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Last Year</span>
-                    <Badge variant="secondary">{metrics.lastYearMultiplier.toFixed(1)}x</Badge>
+                    <Badge variant="secondary">{metrics?.lastYearMultiplier.toFixed(1) || 'N/A'}x</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Two Years Ago</span>
-                    <Badge variant="outline">{metrics.twoYearsAgoMultiplier.toFixed(1)}x</Badge>
+                    <Badge variant="outline">{metrics?.twoYearsAgoMultiplier.toFixed(1) || 'N/A'}x</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -428,15 +550,15 @@ function DashboardPageContent() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Current Year</span>
-                    <Badge variant="default">{formatPercentage(metrics.currentYearOverhead)}</Badge>
+                    <Badge variant="default">{formatPercentage(metrics?.currentYearOverhead || 0)}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Last Year</span>
-                    <Badge variant="secondary">{formatPercentage(metrics.lastYearOverhead)}</Badge>
+                    <Badge variant="secondary">{formatPercentage(metrics?.lastYearOverhead || 0)}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Two Years Ago</span>
-                    <Badge variant="outline">{formatPercentage(metrics.twoYearsAgoOverhead)}</Badge>
+                    <Badge variant="outline">{formatPercentage(metrics?.twoYearsAgoOverhead || 0)}</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -453,15 +575,15 @@ function DashboardPageContent() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>YTD Operating Income</span>
-                    <span className="font-semibold">{formatCurrency(metrics.ytdOperatingIncome)}</span>
+                    <span className="font-semibold">{formatCurrency(metrics?.ytdOperatingIncome || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Last Year YTD Operating Income</span>
-                    <span className="font-semibold">{formatCurrency(metrics.lastYearYtdOperatingIncome)}</span>
+                    <span className="font-semibold">{formatCurrency(metrics?.lastYearYtdOperatingIncome || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Revenue per Employee</span>
-                    <span className="font-semibold">{formatCurrency(metrics.currentYearRevenuePerEmployee)}</span>
+                    <span className="font-semibold">{formatCurrency(metrics?.currentYearRevenuePerEmployee || 0)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -474,15 +596,15 @@ function DashboardPageContent() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Client Retention Rate</span>
-                    <Badge variant="default">{formatPercentage(metrics.clientRetentionRate)}</Badge>
+                    <Badge variant="default">{formatPercentage(metrics?.clientRetentionRate || 0)}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Average Project Size</span>
-                    <span className="font-semibold">{formatCurrency(metrics.averageProjectSize)}</span>
+                    <span className="font-semibold">{formatCurrency(metrics?.averageProjectSize || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Average Billing Rate</span>
-                    <span className="font-semibold">{formatCurrency(metrics.averageBillingRate)}/hr</span>
+                    <span className="font-semibold">{formatCurrency(metrics?.averageBillingRate || 0)}/hr</span>
                   </div>
                 </CardContent>
               </Card>
@@ -500,13 +622,13 @@ function DashboardPageContent() {
                   <div className="flex justify-between items-center">
                     <span>Current Cashflow</span>
                     <div className="flex items-center space-x-2">
-                      <span className="font-semibold">{formatCurrency(metrics.currentCashflow)}</span>
-                      {getTrendIcon(metrics.cashflowTrend)}
+                      <span className="font-semibold">{formatCurrency(metrics?.currentCashflow || 0)}</span>
+                      {getTrendIcon(metrics?.cashflowTrend || 'stable')}
                     </div>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Previous Month</span>
-                    <span className="font-semibold">{formatCurrency(metrics.previousMonthCashflow)}</span>
+                    <span className="font-semibold">{formatCurrency(metrics?.previousMonthCashflow || 0)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -519,15 +641,15 @@ function DashboardPageContent() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Overdue Invoices</span>
-                    <span className="font-semibold text-red-600">{formatCurrency(metrics.overdueInvoiceValue)}</span>
+                    <span className="font-semibold text-red-600">{formatCurrency(metrics?.overdueInvoiceValue || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Total Outstanding</span>
-                    <span className="font-semibold">{formatCurrency(metrics.totalOutstandingInvoices)}</span>
+                    <span className="font-semibold">{formatCurrency(metrics?.totalOutstandingInvoices || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Avg Days to Payment</span>
-                    <span className="font-semibold">{metrics.averageDaysToPayment} days</span>
+                    <span className="font-semibold">{metrics?.averageDaysToPayment || 0} days</span>
                   </div>
                 </CardContent>
               </Card>
@@ -543,7 +665,7 @@ function DashboardPageContent() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {metrics.trailing12Months.slice(-6).map((month, index) => (
+                    {metrics?.trailing12Months?.slice(-6).map((month, index) => (
                       <div key={index} className="flex justify-between items-center text-sm">
                         <span>{month.month}</span>
                         <div className="flex items-center space-x-4">
@@ -565,7 +687,7 @@ function DashboardPageContent() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {metrics.forecast.map((month, index) => (
+                    {metrics?.forecast?.map((month, index) => (
                       <div key={index} className="flex justify-between items-center text-sm">
                         <span>{month.month}</span>
                         <div className="flex items-center space-x-4">
