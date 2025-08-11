@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { clockifyService, fetchAllClockifyTimeSummaries } from '../../../lib/clockify';
 import { enhanceBillingDataWithClockify } from '../../../lib/utils';
 
+// Force dynamic rendering to prevent static generation errors
+export const dynamic = 'force-dynamic';
+
 // Helper function to provide configuration recommendations
 function getConfigRecommendations(configStatus: any, envVars: any) {
   const recommendations = [];

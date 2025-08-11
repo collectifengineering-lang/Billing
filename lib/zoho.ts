@@ -129,9 +129,9 @@ class ZohoService {
   }
 
   private async makeRequest(endpoint: string): Promise<any> {
-    const token = await this.getAccessToken();
-    
     try {
+      const token = await this.getAccessToken();
+      
       const response = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -147,23 +147,37 @@ class ZohoService {
       // If we get a 401, try refreshing the token once
       if (error.response?.status === 401) {
         console.log('Token expired, refreshing...');
+        
+        // Clear the current token and force a refresh
         this.accessToken = null;
         this.tokenExpiry = 0;
         
-        const newToken = await this.getAccessToken();
-        
-        // Retry the request with the new token
-        const retryResponse = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
-          headers: {
-            'Authorization': `Bearer ${newToken}`,
-            'Content-Type': 'application/json',
-          },
-          params: {
-            organization_id: process.env.ZOHO_ORGANIZATION_ID,
-          },
-        });
-        
-        return retryResponse.data;
+        try {
+          const newToken = await this.forceRefreshToken();
+          
+          // Retry the request with the new token
+          const retryResponse = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
+            headers: {
+              'Authorization': `Bearer ${newToken}`,
+              'Content-Type': 'application/json',
+            },
+            params: {
+              organization_id: process.env.ZOHO_ORGANIZATION_ID,
+            },
+          });
+          
+          console.log('Request retry successful after token refresh');
+          return retryResponse.data;
+        } catch (refreshError) {
+          console.error('Failed to refresh token or retry request:', refreshError);
+          throw new Error(`Zoho API authentication failed after token refresh: ${endpoint}`);
+        }
+      }
+      
+      // Handle other HTTP errors
+      if (error.response?.status) {
+        console.error(`Zoho API error ${error.response.status} for ${endpoint}:`, error.response.data);
+        throw new Error(`Zoho API error ${error.response.status}: ${error.response.data?.message || 'Unknown error'}`);
       }
       
       console.error(`Error making Zoho request to ${endpoint}:`, error);

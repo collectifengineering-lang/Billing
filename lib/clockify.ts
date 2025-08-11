@@ -355,10 +355,62 @@ class ClockifyService {
       if (!this.workspaceId) {
         throw new Error('Workspace ID not configured');
       }
-      return await this.makeRequest(`/workspaces/${this.workspaceId}/time-entries`, {
-        start: startDate,
-        end: endDate
+      
+      // Clockify API requires POST for filtered time entries with date parameters
+      const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/time-entries`);
+      
+      console.log(`🔍 Clockify API Request: ${url.toString()}`);
+      console.log(`   Method: POST`);
+      console.log(`   Headers: ${JSON.stringify(this.getHeaders())}`);
+      console.log(`   Body: ${JSON.stringify({ start: startDate, end: endDate })}`);
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start: startDate,
+          end: endDate
+        }),
       });
+
+      console.log(`📡 Clockify API Response: ${response.status} ${response.statusText}`);
+
+      if (response.status === 401) {
+        throw new Error('Clockify API authentication failed - check your API key');
+      }
+      
+      if (response.status === 403) {
+        throw new Error('Clockify API access forbidden - check your workspace ID and permissions');
+      }
+      
+      if (response.status === 404) {
+        const errorDetails = `Endpoint not found: /workspaces/${this.workspaceId}/time-entries`;
+        console.error(`❌ 404 Error Details: ${errorDetails}`);
+        console.error(`   Full URL: ${url.toString()}`);
+        console.error(`   Workspace ID: ${this.workspaceId}`);
+        console.error(`   API Key configured: ${!!this.apiKey}`);
+        throw new Error(`Clockify API error: 404 Not Found - ${errorDetails}`);
+      }
+      
+      if (response.status === 405) {
+        throw new Error('Clockify API method not allowed - this endpoint requires POST method');
+      }
+      
+      if (response.status === 429) {
+        throw new Error('Clockify API rate limit exceeded - try again later');
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Clockify API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Clockify API Success: /workspaces/${this.workspaceId}/time-entries`);
+      return data;
     } catch (error) {
       console.error('Failed to get all Clockify time entries:', error);
       // Return mock time entry data when Clockify fails
