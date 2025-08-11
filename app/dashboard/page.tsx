@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, DollarSign, Users, Calendar, Target, PieChart, Building2, Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -183,6 +183,10 @@ function DashboardPageContent() {
   const [loading, setLoading] = useState(true);
   const [projectLoading, setProjectLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use ref to prevent unnecessary API calls
+  const currentProjectIdRef = useRef<string>('');
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -202,11 +206,34 @@ function DashboardPageContent() {
   }, []);
 
   useEffect(() => {
-    if (selectedProjectId) {
-      fetchProjectMetrics(selectedProjectId);
-    } else {
-      setProjectMetrics(null);
+    // Clear any existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
+    
+    console.log('Project selection changed:', selectedProjectId, 'Current ref:', currentProjectIdRef.current);
+    
+    // Set a new timer to debounce the API call
+    debounceTimerRef.current = setTimeout(() => {
+      if (selectedProjectId && selectedProjectId !== currentProjectIdRef.current) {
+        console.log('Fetching project metrics for:', selectedProjectId);
+        currentProjectIdRef.current = selectedProjectId;
+        fetchProjectMetrics(selectedProjectId);
+      } else if (!selectedProjectId) {
+        console.log('Clearing project metrics');
+        currentProjectIdRef.current = '';
+        setProjectMetrics(null);
+      }
+    }, 300); // 300ms debounce delay
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      // Cancel any ongoing requests by clearing the ref
+      currentProjectIdRef.current = '';
+    };
   }, [selectedProjectId]);
 
   const fetchDashboardData = async () => {
@@ -241,69 +268,101 @@ function DashboardPageContent() {
   };
 
   const fetchProjectMetrics = async (projectId: string) => {
+    console.log('fetchProjectMetrics called with:', projectId, 'Loading:', projectLoading, 'Current ref:', currentProjectIdRef.current);
+    
+    // Prevent duplicate requests for the same project
+    if (projectLoading || (projectMetrics && projectMetrics.projectId === projectId)) {
+      console.log('Skipping request - already loading or same project');
+      return;
+    }
+    
+    // Prevent multiple simultaneous requests
+    if (currentProjectIdRef.current !== projectId) {
+      console.log('Skipping request - project ID mismatch');
+      return;
+    }
+    
     try {
       setProjectLoading(true);
+      setError(null); // Clear any previous errors
+      
+      console.log('Making API request for project:', projectId);
       const response = await fetch(`/api/dashboard/project/${projectId}`);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
       const data = await response.json();
-      setProjectMetrics(data);
+      
+      // Only update if this is still the current project
+      if (currentProjectIdRef.current === projectId) {
+        console.log('Setting project metrics for:', projectId);
+        setProjectMetrics(data);
+      } else {
+        console.log('Project changed, not setting metrics');
+      }
     } catch (error) {
       console.error('Error fetching project metrics:', error);
-      setError('Failed to load project metrics. Please try selecting a different project.');
-      // Set a default project metrics object to prevent crashes
-      setProjectMetrics({
-        projectId,
-        projectName: 'Unknown Project',
-        customerName: 'Unknown Customer',
-        status: 'unknown',
-        startDate: new Date().toISOString().split('T')[0],
-        totalBudget: 0,
-        totalBilled: 0,
-        totalUnbilled: 0,
-        totalCollected: 0,
-        outstandingAmount: 0,
-        profitMargin: 0,
-        grossProfit: 0,
-        currentMultiplier: 0,
-        historicalMultipliers: [],
-        totalHours: 0,
-        billableHours: 0,
-        nonBillableHours: 0,
-        efficiency: 0,
-        employeeBreakdown: [],
-        timeEntries: [],
-        cashBasis: {
+      
+      // Only show error if this is still the current project
+      if (currentProjectIdRef.current === projectId) {
+        setError('Failed to load project metrics. Please try selecting a different project.');
+        // Set a default project metrics object to prevent crashes
+        setProjectMetrics({
+          projectId,
+          projectName: 'Unknown Project',
+          customerName: 'Unknown Customer',
+          status: 'unknown',
+          startDate: new Date().toISOString().split('T')[0],
+          totalBudget: 0,
+          totalBilled: 0,
+          totalUnbilled: 0,
           totalCollected: 0,
-          outstandingReceivables: 0,
-          totalRevenue: 0
-        },
-        accrualBasis: {
-          totalEarned: 0,
-          totalExpenses: 0,
-          netIncome: 0,
-          workInProgress: 0
-        },
-        budgetUtilization: 0,
-        schedulePerformance: 0,
-        profitabilityTrend: 'stable' as const,
-        riskLevel: 'low' as const,
-        changeOrders: {
-          count: 0,
-          totalValue: 0,
-          approvedValue: 0,
-          pendingValue: 0
-        },
-        phases: [],
-        projectedCompletion: new Date().toISOString().split('T')[0],
-        projectedFinalCost: 0,
-        projectedProfit: 0,
-        projectedMargin: 0
-      });
+          outstandingAmount: 0,
+          profitMargin: 0,
+          grossProfit: 0,
+          currentMultiplier: 0,
+          historicalMultipliers: [],
+          totalHours: 0,
+          billableHours: 0,
+          nonBillableHours: 0,
+          efficiency: 0,
+          employeeBreakdown: [],
+          timeEntries: [],
+          cashBasis: {
+            totalCollected: 0,
+            outstandingReceivables: 0,
+            totalRevenue: 0
+          },
+          accrualBasis: {
+            totalEarned: 0,
+            totalExpenses: 0,
+            netIncome: 0,
+            workInProgress: 0
+          },
+          budgetUtilization: 0,
+          schedulePerformance: 0,
+          profitabilityTrend: 'stable' as const,
+          riskLevel: 'low' as const,
+          changeOrders: {
+            count: 0,
+            totalValue: 0,
+            approvedValue: 0,
+            pendingValue: 0
+          },
+          phases: [],
+          projectedCompletion: new Date().toISOString().split('T')[0],
+          projectedFinalCost: 0,
+          projectedProfit: 0,
+          projectedMargin: 0
+        });
+      }
     } finally {
-      setProjectLoading(false);
+      // Only update loading state if this is still the current project
+      if (currentProjectIdRef.current === projectId) {
+        console.log('Setting loading to false for project:', projectId);
+        setProjectLoading(false);
+      }
     }
   };
 
@@ -413,12 +472,17 @@ function DashboardPageContent() {
                 try {
                   const newProjectId = e.target.value;
                   console.log('Project selection changed to:', newProjectId);
-                  setSelectedProjectId(newProjectId);
+                  
+                  // Only update if the value actually changed
+                  if (newProjectId !== selectedProjectId) {
+                    setSelectedProjectId(newProjectId);
+                  }
                 } catch (error) {
                   console.error('Error in project selection change:', error);
                   // Reset to safe state
                   setSelectedProjectId('');
                   setProjectMetrics(null);
+                  currentProjectIdRef.current = '';
                 }
               }}
               className="block w-80 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"

@@ -41,6 +41,15 @@ class ZohoService {
   private autoRefreshTimer: NodeJS.Timeout | null = null;
   private readonly AUTO_REFRESH_INTERVAL = 45 * 60 * 1000; // 45 minutes
   private lastRefreshTime: number = 0; // Track when auto-refresh was last triggered
+  
+  // Rate limiting properties
+  private requestCount: number = 0;
+  private lastRequestTime: number = 0;
+  private readonly MAX_REQUESTS_PER_MINUTE = 30; // Conservative limit
+  private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
+  private retryCount: number = 0;
+  private readonly MAX_RETRIES = 3;
+  private readonly BASE_DELAY = 1000; // 1 second base delay for exponential backoff
 
   constructor() {
     // Start automatic token refresh
@@ -130,6 +139,9 @@ class ZohoService {
 
   private async makeRequest(endpoint: string): Promise<any> {
     try {
+      // Apply rate limiting
+      await this.applyRateLimit();
+      
       const token = await this.getAccessToken();
       
       const response = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
@@ -140,10 +152,34 @@ class ZohoService {
         params: {
           organization_id: process.env.ZOHO_ORGANIZATION_ID,
         },
+        timeout: 30000, // 30 second timeout
       });
+
+      // Reset retry count on success
+      this.retryCount = 0;
+      this.requestCount++;
+      this.lastRequestTime = Date.now();
 
       return response.data;
     } catch (error: any) {
+      // Handle rate limiting (400 with specific error message)
+      if (error.response?.status === 400 && 
+          error.response?.data?.error === 'Access Denied' &&
+          error.response?.data?.error_description?.includes('too many requests')) {
+        
+        console.log('Zoho rate limit hit, implementing exponential backoff...');
+        await this.handleRateLimit();
+        
+        // Retry the request after backoff
+        if (this.retryCount < this.MAX_RETRIES) {
+          this.retryCount++;
+          console.log(`Retrying request after rate limit backoff (attempt ${this.retryCount})`);
+          return this.makeRequest(endpoint);
+        } else {
+          throw new Error('Zoho API rate limit exceeded after maximum retries. Please try again later.');
+        }
+      }
+
       // If we get a 401, try refreshing the token once
       if (error.response?.status === 401) {
         console.log('Token expired, refreshing...');
@@ -164,6 +200,7 @@ class ZohoService {
             params: {
               organization_id: process.env.ZOHO_ORGANIZATION_ID,
             },
+            timeout: 30000,
           });
           
           console.log('Request retry successful after token refresh');
@@ -177,12 +214,60 @@ class ZohoService {
       // Handle other HTTP errors
       if (error.response?.status) {
         console.error(`Zoho API error ${error.response.status} for ${endpoint}:`, error.response.data);
+        
+        // Provide more specific error messages
+        if (error.response.status === 403) {
+          throw new Error('Zoho API access forbidden - check your organization ID and permissions');
+        } else if (error.response.status === 429) {
+          throw new Error('Zoho API rate limit exceeded - please try again later');
+        } else if (error.response.status >= 500) {
+          throw new Error('Zoho API server error - please try again later');
+        }
+        
         throw new Error(`Zoho API error ${error.response.status}: ${error.response.data?.message || 'Unknown error'}`);
       }
       
       console.error(`Error making Zoho request to ${endpoint}:`, error);
       throw new Error(`Failed to fetch data from Zoho: ${endpoint}`);
     }
+  }
+
+  private async applyRateLimit(): Promise<void> {
+    const now = Date.now();
+    
+    // Check if we need to wait between requests
+    if (this.lastRequestTime > 0) {
+      const timeSinceLastRequest = now - this.lastRequestTime;
+      if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
+        const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+        console.log(`Rate limiting: waiting ${waitTime}ms before next request`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+    
+    // Check if we've exceeded the per-minute limit
+    if (this.requestCount >= this.MAX_REQUESTS_PER_MINUTE) {
+      const timeSinceFirstRequest = now - this.lastRequestTime;
+      if (timeSinceFirstRequest < 60000) { // Less than 1 minute
+        const waitTime = 60000 - timeSinceFirstRequest;
+        console.log(`Rate limiting: exceeded ${this.MAX_REQUESTS_PER_MINUTE} requests per minute, waiting ${waitTime}ms`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        this.requestCount = 0;
+      } else {
+        // Reset counter if more than 1 minute has passed
+        this.requestCount = 0;
+      }
+    }
+  }
+
+  private async handleRateLimit(): Promise<void> {
+    const delay = this.BASE_DELAY * Math.pow(2, this.retryCount);
+    console.log(`Rate limit backoff: waiting ${delay}ms before retry`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // Reset request counters to allow fresh start
+    this.requestCount = 0;
+    this.lastRequestTime = 0;
   }
 
   async getProjects(): Promise<ZohoProject[]> {

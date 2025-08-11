@@ -260,16 +260,30 @@ class ClockifyService {
 
   async getUser(): Promise<any> {
     try {
-      return await this.makeRequest('/user');
+      if (!this._isConfigured) {
+        console.log('Clockify not configured, returning mock user');
+        return this.getMockUser();
+      }
+
+      const url = new URL(`${this.baseUrl}/user`);
+      console.log(`🔍 Clockify API Request: ${url.toString()}`);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Clockify API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Clockify API Success: /user`);
+      return data;
     } catch (error) {
       console.error('Failed to get Clockify user:', error);
-      // Return mock user data when Clockify fails
-      return {
-        id: 'mock-user-id',
-        name: 'Mock User',
-        email: 'user@example.com',
-        status: 'ACTIVE'
-      };
+      console.log('Returning mock user due to Clockify API failure');
+      return this.getMockUser();
     }
   }
 
@@ -291,62 +305,70 @@ class ClockifyService {
 
   async getProjects(): Promise<any[]> {
     try {
+      if (!this._isConfigured) {
+        console.log('Clockify not configured, returning mock projects');
+        return this.getMockProjects();
+      }
+
       if (!this.workspaceId) {
         throw new Error('Workspace ID not configured');
       }
-      return await this.makeRequest(`/workspaces/${this.workspaceId}/projects`);
+
+      const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/projects`);
+      console.log(`🔍 Clockify API Request: ${url.toString()}`);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Clockify API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Clockify API Success: /workspaces/${this.workspaceId}/projects`);
+      return data;
     } catch (error) {
       console.error('Failed to get Clockify projects:', error);
-      // Return mock project data when Clockify fails
-      return [
-        {
-          id: 'mock-project-1',
-          name: 'Mock Project 1',
-          clientId: 'mock-client-1',
-          clientName: 'Mock Client 1',
-          status: 'ACTIVE',
-          billable: true,
-          hourlyRate: { amount: 150, currency: 'USD' }
-        },
-        {
-          id: 'mock-project-2',
-          name: 'Mock Project 2',
-          clientId: 'mock-client-2',
-          clientName: 'Mock Client 2',
-          status: 'ACTIVE',
-          billable: true,
-          hourlyRate: { amount: 175, currency: 'USD' }
-        }
-      ];
+      console.log('Returning mock projects due to Clockify API failure');
+      return this.getMockProjects();
     }
   }
 
   async getTimeEntries(projectId: string, startDate: string, endDate: string): Promise<any[]> {
     try {
+      if (!this._isConfigured) {
+        console.log('Clockify not configured, returning mock data');
+        return this.getMockTimeEntries(projectId, startDate, endDate);
+      }
+
       if (!this.workspaceId) {
         throw new Error('Workspace ID not configured');
       }
-      return await this.makeRequest(`/workspaces/${this.workspaceId}/projects/${projectId}/time-entries`, {
-        start: startDate,
-        end: endDate
+
+      const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/projects/${projectId}/time-entries`);
+      url.searchParams.append('start', startDate);
+      url.searchParams.append('end', endDate);
+
+      console.log(`🔍 Clockify API Request: ${url.toString()}`);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: this.getHeaders(),
       });
+
+      if (!response.ok) {
+        throw new Error(`Clockify API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Clockify API Success: /workspaces/${this.workspaceId}/projects/${projectId}/time-entries`);
+      return data;
     } catch (error) {
       console.error('Failed to get Clockify time entries:', error);
-      // Return mock time entry data when Clockify fails
-      return [
-        {
-          id: 'mock-time-entry-1',
-          description: 'Mock work session',
-          timeInterval: {
-            start: startDate,
-            end: endDate,
-            duration: 'PT2H30M'
-          },
-          billable: true,
-          userId: 'mock-user-id',
-          userName: 'Mock User'
-        }
-      ];
+      console.log('Returning mock time entry data due to Clockify API failure');
+      return this.getMockTimeEntries(projectId, startDate, endDate);
     }
   }
 
@@ -413,7 +435,9 @@ class ClockifyService {
       return data;
     } catch (error) {
       console.error('Failed to get all Clockify time entries:', error);
+      
       // Return mock time entry data when Clockify fails
+      console.log('Returning mock time entry data due to Clockify API failure');
       return [
         {
           id: 'mock-time-entry-1',
@@ -543,6 +567,61 @@ class ClockifyService {
     const seconds = parseInt(match[3] || '0');
     
     return hours + (minutes / 60) + (seconds / 3600);
+  }
+
+  // Enhanced method to generate mock time entries
+  private getMockTimeEntries(projectId: string, startDate: string, endDate: string): any[] {
+    return [
+      {
+        id: `mock-${projectId}-1`,
+        description: 'Mock project work',
+        timeInterval: {
+          start: startDate,
+          end: endDate,
+          duration: 'PT8H0M'
+        },
+        billable: true,
+        userId: 'mock-user-id',
+        userName: 'Mock User',
+        projectId: projectId,
+        projectName: 'Mock Project'
+      }
+    ];
+  }
+
+  // Enhanced method to generate mock projects
+  private getMockProjects(): any[] {
+    return [
+      {
+        id: 'mock-project-1',
+        name: 'Mock Project 1',
+        workspaceId: 'mock-workspace',
+        clientId: 'mock-client-1',
+        clientName: 'Mock Client 1',
+        isPublic: true,
+        isTemplate: false,
+        color: '#000000',
+        billable: true,
+        public: true,
+        archived: false,
+        status: 'ACTIVE',
+        budget: 50000,
+        hourlyRate: { amount: 150, currency: 'USD' }
+      }
+    ];
+  }
+
+  // Enhanced method to generate mock user
+  private getMockUser(): any {
+    return {
+      id: 'mock-user-id',
+      email: 'mock@example.com',
+      name: 'Mock User',
+      profilePicture: '',
+      status: 'ACTIVE',
+      activeWorkspace: 'mock-workspace',
+      defaultWorkspace: 'mock-workspace'
+    };
   }
 }
 
