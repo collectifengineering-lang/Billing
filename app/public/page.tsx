@@ -137,52 +137,59 @@ export default function PublicPage() {
   const sortedProjectIds = Array.from(allProjectIds).sort();
   const sortedMonths = Array.from(allMonths).sort();
 
+  // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading public data...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-xl text-gray-600 dark:text-gray-300">Loading public data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-900">Public Project Statuses & Comments</h1>
-            <p className="mt-2 text-gray-600">View and edit project statuses and comments. No authentication required.</p>
-          </div>
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4">
+            Public Project Statuses
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+            View and edit project statuses and comments. No authentication required.
+          </p>
+        </div>
 
+        {/* Content */}
+        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+              <thead className="bg-gray-50 dark:bg-slate-700/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Project ID
                   </th>
                   {sortedMonths.map(month => (
-                    <th key={month} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th key={month} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       {month}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
                 {sortedProjectIds.map(projectId => (
-                  <tr key={projectId}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={projectId} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors duration-200">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                       {projectId}
                     </td>
                     {sortedMonths.map(month => (
-                      <td key={month} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td key={month} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         <div className="space-y-2">
                           {/* Status */}
                           <div>
-                            <span className="text-xs text-gray-400">Status:</span>
+                            <span className="text-xs text-gray-400 dark:text-gray-500">Status:</span>
                             {editingCell?.type === 'status' && editingCell.projectId === projectId && editingCell.month === month ? (
                               <input
                                 type="text"
@@ -190,13 +197,13 @@ export default function PublicPage() {
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 onBlur={handleSave}
-                                className="ml-2 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="ml-2 px-3 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                 autoFocus
                               />
                             ) : (
                               <button
                                 onClick={() => handleCellClick('status', projectId, month)}
-                                className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded hover:bg-blue-200 min-w-[60px] text-left"
+                                className="ml-2 px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/40 min-w-[60px] text-left transition-colors duration-200"
                               >
                                 {statuses[projectId]?.[month] || 'Click to add'}
                               </button>
@@ -205,7 +212,7 @@ export default function PublicPage() {
                           
                           {/* Comment */}
                           <div>
-                            <span className="text-xs text-gray-400">Comment:</span>
+                            <span className="text-xs text-gray-400 dark:text-gray-500">Comment:</span>
                             {editingCell?.type === 'comment' && editingCell.projectId === projectId && editingCell.month === month ? (
                               <input
                                 type="text"
@@ -213,13 +220,13 @@ export default function PublicPage() {
                                 onChange={(e) => setEditValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 onBlur={handleSave}
-                                className="ml-2 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="ml-2 px-3 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                                 autoFocus
                               />
                             ) : (
                               <button
                                 onClick={() => handleCellClick('comment', projectId, month)}
-                                className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded hover:bg-green-200 min-w-[60px] text-left"
+                                className="ml-2 px-3 py-1 text-xs bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/40 min-w-[60px] text-left transition-colors duration-200"
                               >
                                 {comments[projectId]?.[month] || 'Click to add'}
                               </button>

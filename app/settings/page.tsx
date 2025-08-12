@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Target, Settings, Users, Clock, Database, Key } from 'lucide-react';
 import AdminOnly from '@/components/AdminOnly';
 
 function SettingsPageContent() {
@@ -99,231 +99,308 @@ function SettingsPageContent() {
     }
   };
 
-  const handleAddOrUpdateManager = async () => {
-    if (!newManagerId.trim() || !newManagerName.trim()) {
-      toast.error('Please provide both ID and Name');
+  const handleSaveManager = async () => {
+    if (!newManagerName.trim()) {
+      toast.error('Manager name is required');
       return;
     }
+
     setSavingManager(true);
     try {
       const response = await fetch('/api/project-managers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: newManagerId.trim(), name: newManagerName.trim(), color: newManagerColor }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: newManagerId || undefined,
+          name: newManagerName.trim(),
+          color: newManagerColor,
+        }),
       });
+
       if (!response.ok) {
         throw new Error('Failed to save project manager');
       }
-      toast.success('Project manager saved');
+
+      toast.success(newManagerId ? 'Manager updated successfully' : 'Manager added successfully');
+      
+      // Reset form
       setNewManagerId('');
       setNewManagerName('');
-      // keep color for convenience
-      await mutateProjectManagers();
+      setNewManagerColor('#6366f1');
+      
+      // Refresh data
+      mutateProjectManagers();
     } catch (error) {
-      console.error('Error saving project manager:', error);
-      toast.error('Failed to save project manager');
+      console.error('Error saving manager:', error);
+      toast.error('Failed to save manager');
     } finally {
       setSavingManager(false);
     }
   };
 
+  const handleDeleteManager = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this project manager?')) {
+      return;
+    }
 
+    try {
+      const response = await fetch('/api/project-managers', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id }),
+      });
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Settings</h1>
-          <p className="text-gray-600">Failed to load settings</p>
-        </div>
-      </div>
-    );
-  }
+      if (!response.ok) {
+        throw new Error('Failed to delete project manager');
+      }
+
+      toast.success('Manager deleted successfully');
+      mutateProjectManagers();
+    } catch (error) {
+      console.error('Error deleting manager:', error);
+      toast.error('Failed to delete manager');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center space-x-4">
-                  <Link
-                    href="/"
-                    className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-1" />
-                    Back to Home
-                  </Link>
-                </div>
-                <h1 className="text-3xl font-bold text-gray-900 mt-2">Settings</h1>
-              </div>
-              <div className="flex space-x-3"></div>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="relative mb-12">
+          {/* Back Button - Top Left */}
+          <div className="absolute top-0 left-0">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center w-12 h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-full hover:bg-white dark:hover:bg-slate-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              <ArrowLeft className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+            </Link>
           </div>
-          
-          <div className="space-y-6">
-            {/* Authentication */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Authentication</h2>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">Token Status</h3>
-                  <p className="text-sm text-gray-600">
-                    {tokenStatus?.status?.hasToken ? 'Token is valid' : 'No valid token'}
+
+          {/* Main Header Content */}
+          <div className="text-center">
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4">
+              Settings
+            </h1>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Configure project managers, integrations, and system preferences
+            </p>
+          </div>
+        </div>
+
+        {/* Settings Content */}
+        <div className="max-w-4xl mx-auto space-y-8">
+          {/* Authentication Status */}
+          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-xl flex items-center justify-center mr-4">
+                <Key className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Authentication Status</h2>
+                <p className="text-gray-600 dark:text-gray-300">Zoho Books API connection status</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              {error ? (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                  <p className="text-red-700 dark:text-red-300">Error loading token status</p>
+                </div>
+              ) : tokenStatus ? (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
+                  <p className="text-green-700 dark:text-green-300">
+                    Token expires: {new Date(tokenStatus.expiresAt).toLocaleString()}
                   </p>
                 </div>
-                <button
-                  onClick={handleRefreshToken}
-                  disabled={isRefreshing}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {isRefreshing ? 'Refreshing...' : 'Refresh Token'}
-                </button>
+              ) : (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+                  <p className="text-yellow-700 dark:text-yellow-300">Loading token status...</p>
+                </div>
+              )}
+              
+              <button
+                onClick={handleRefreshToken}
+                disabled={isRefreshing}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl font-medium transition-colors duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+              >
+                {isRefreshing ? 'Refreshing...' : 'Refresh Token'}
+              </button>
+            </div>
+          </div>
+
+          {/* Project Managers */}
+          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/40 rounded-xl flex items-center justify-center mr-4">
+                <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Project Managers</h2>
+                <p className="text-gray-600 dark:text-gray-300">Manage project manager assignments and colors</p>
               </div>
             </div>
-
-            {/* Project Managers */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Project Managers</h2>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
+            
+            <div className="space-y-6">
+              {/* Add/Edit Form */}
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  {newManagerId ? 'Edit Manager' : 'Add New Manager'}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <input
                     type="text"
-                    value={newManagerId}
-                    onChange={(e) => setNewManagerId(e.target.value)}
-                    placeholder="e.g. JD"
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                  <input
-                    type="text"
+                    placeholder="Manager Name"
                     value={newManagerName}
                     onChange={(e) => setNewManagerName(e.target.value)}
-                    placeholder="Jane Doe"
-                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
+                    className="px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   />
+                  <input
+                    type="color"
+                    value={newManagerColor}
+                    onChange={(e) => setNewManagerColor(e.target.value)}
+                    className="w-full h-12 border border-gray-300 dark:border-slate-600 rounded-xl cursor-pointer"
+                  />
+                  <button
+                    onClick={handleSaveManager}
+                    disabled={savingManager || !newManagerName.trim()}
+                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-xl font-medium transition-colors duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+                  >
+                    {savingManager ? 'Saving...' : (newManagerId ? 'Update' : 'Add')}
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="color"
-                      value={newManagerColor}
-                      onChange={(e) => setNewManagerColor(e.target.value)}
-                      className="h-10 w-16 p-0 border rounded"
-                    />
-                    <div className="text-sm text-gray-600">{newManagerColor}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4">
-                <button
-                  onClick={handleAddOrUpdateManager}
-                  disabled={savingManager}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                >
-                  {savingManager ? 'Saving...' : 'Add / Update Manager'}
-                </button>
+                {newManagerId && (
+                  <button
+                    onClick={() => {
+                      setNewManagerId('');
+                      setNewManagerName('');
+                      setNewManagerColor('#6366f1');
+                    }}
+                    className="mt-3 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
               </div>
 
-              {/* Existing managers list */}
-              <div className="mt-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Existing Managers</h3>
+              {/* Manager List */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Current Managers</h3>
                 {projectManagers && Object.keys(projectManagers).length > 0 ? (
-                  <ul className="divide-y divide-gray-200 border rounded-md">
+                  <ul className="space-y-3">
                     {Object.entries(projectManagers).map(([id, { name, color }]) => (
-                      <li key={id} className="flex items-center justify-between px-4 py-2">
+                      <li key={id} className="flex items-center justify-between bg-white dark:bg-slate-700 rounded-xl p-4 border border-gray-200 dark:border-slate-600">
                         <div className="flex items-center space-x-3">
-                          <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
-                          <span className="text-gray-900">{name}</span>
-                          <span className="text-gray-500 text-sm">({id})</span>
+                          <div 
+                            className="w-4 h-4 rounded-full border-2 border-white dark:border-slate-600 shadow-sm"
+                            style={{ backgroundColor: color }}
+                          />
+                          <span className="text-gray-900 dark:text-white font-medium">{name}</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm">({id})</span>
                         </div>
-                        <button
-                          onClick={() => {
-                            setNewManagerId(id);
-                            setNewManagerName(name);
-                            setNewManagerColor(color);
-                          }}
-                          className="text-sm text-blue-600 hover:underline"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => {
+                              setNewManagerId(id);
+                              setNewManagerName(name);
+                              setNewManagerColor(color);
+                            }}
+                            className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteManager(id)}
+                            className="px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors duration-200"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <div className="text-sm text-gray-500">No managers yet</div>
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <Users className="h-12 w-12 mx-auto mb-3 text-gray-400 dark:text-gray-500" />
+                    <p>No project managers configured yet</p>
+                  </div>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* Clockify Integration */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Clockify Integration</h2>
-              <div className="space-y-4">
-                {/* Clockify Status Indicator */}
-                {clockifyStatus.configured ? (
-                  <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-green-800">
-                          Clockify Integration Active
-                        </p>
-                        <p className="text-xs text-green-600">
-                          Time tracking data will be included in dashboard metrics
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-yellow-800">
-                          Clockify Integration Not Configured
-                        </p>
-                        <p className="text-xs text-yellow-600">
-                          {clockifyStatus.error || 'Please configure Clockify API credentials'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Connection Test Button */}
-                <div>
-                  <button
-                    onClick={testClockifyConnection}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Test Connection
-                  </button>
-                </div>
-
-                {/* Workspace Information */}
-                {clockifyStatus.workspaces && clockifyStatus.workspaces.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Available Workspaces</h3>
-                    <ul className="space-y-2">
-                      {clockifyStatus.workspaces.map((workspace: any) => (
-                        <li key={workspace.id} className="text-sm text-gray-600">
-                          {workspace.name} ({workspace.id})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+          {/* Clockify Integration */}
+          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-8">
+            <div className="flex items-center mb-6">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-xl flex items-center justify-center mr-4">
+                <Clock className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Clockify Integration</h2>
+                <p className="text-gray-600 dark:text-gray-300">Time tracking and analytics integration</p>
+              </div>
+            </div>
+            
+            <div className="space-y-6">
+              {/* Status Indicator */}
+              {clockifyStatus.configured ? (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                    <div>
+                      <p className="text-lg font-semibold text-green-800 dark:text-green-200">
+                        Clockify Integration Active
+                      </p>
+                      <p className="text-green-600 dark:text-green-300">
+                        Time tracking data will be included in dashboard metrics
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                    <div>
+                      <p className="text-lg font-semibold text-yellow-800 dark:text-yellow-200">
+                        Clockify Integration Not Configured
+                      </p>
+                      <p className="text-yellow-600 dark:text-yellow-300">
+                        {clockifyStatus.error || 'Please configure Clockify API credentials'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Connection Test Button */}
+              <div>
+                <button
+                  onClick={testClockifyConnection}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors duration-200 shadow-lg hover:shadow-xl"
+                >
+                  Test Connection
+                </button>
+              </div>
+
+              {/* Workspace Information */}
+              {clockifyStatus.workspaces && clockifyStatus.workspaces.length > 0 && (
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Available Workspaces</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {clockifyStatus.workspaces.map((workspace: any) => (
+                      <div key={workspace.id} className="bg-white dark:bg-slate-700 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                        <p className="font-medium text-gray-900 dark:text-white">{workspace.name}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">ID: {workspace.id}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

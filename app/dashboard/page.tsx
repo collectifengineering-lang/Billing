@@ -1238,7 +1238,35 @@ function DashboardPageContent() {
 export default function DashboardPage() {
   return (
     <AdminOnly>
-      <DashboardPageContent />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Header */}
+          <div className="relative mb-12">
+            {/* Back Button - Top Left */}
+            <div className="absolute top-0 left-0">
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center w-12 h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-full hover:bg-white dark:hover:bg-slate-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                <ArrowLeft className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+              </Link>
+            </div>
+
+            {/* Main Header Content */}
+            <div className="text-center">
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4">
+                Financial Dashboard
+              </h1>
+              <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+                Comprehensive financial insights, profitability analysis, and performance metrics
+              </p>
+            </div>
+          </div>
+
+          {/* Dashboard Content */}
+          <DashboardPageContent />
+        </div>
+      </div>
     </AdminOnly>
   );
 }
