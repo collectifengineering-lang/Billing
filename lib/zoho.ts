@@ -129,7 +129,12 @@ class ZohoService {
       this.lastRefreshTime = Date.now();
 
       console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
-      console.log(`Token value: ${this.accessToken.substring(0, 10)}...`);
+      console.log(`Token value: ${this.accessToken?.substring(0, 10) ?? 'N/A'}...`);
+      
+      // Ensure we have a valid token before returning
+      if (!this.accessToken) {
+        throw new Error('Failed to set access token after refresh');
+      }
       
       return this.accessToken;
     } catch (error) {
@@ -191,7 +196,7 @@ class ZohoService {
       }
       
       console.log(`Making Zoho API request to: ${endpoint}`);
-      console.log(`Token (first 10 chars): ${token.substring(0, 10)}...`);
+      console.log(`Token (first 10 chars): ${token?.substring(0, 10) ?? 'N/A'}...`);
       
       // Create AbortController for timeout
       const controller = new AbortController();
@@ -694,11 +699,11 @@ class ZohoService {
   }
 
   // Method to manually refresh token (for testing)
-  async forceRefreshToken(): Promise<void> {
+  async forceRefreshToken(): Promise<string> {
     this.accessToken = null;
     this.tokenExpiry = 0;
     this.lastRefreshTime = Date.now(); // Track manual refresh time
-    await this.getAccessToken();
+    return await this.getAccessToken();
   }
 
   // Get token status for debugging
