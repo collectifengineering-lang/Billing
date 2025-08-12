@@ -7,17 +7,17 @@ import {
   EmployeeProfitabilityReport,
   PayrollSystem,
   SalaryImport,
-  SurePayrollConfig
+  BambooHRConfig
 } from './types';
 import { ClockifyTimeEntry, ClockifyUser } from './clockify';
-import { configureSurePayroll as _configureSurePayrollService, getSurePayrollService, importSurePayrollEmployees, importSurePayrollSalaries } from './surepayroll';
+import { configureBambooHR as _configureBambooHRService, getBambooHRService, importBambooHREmployees, importBambooHRSalaries } from './bamboohr';
 
 export class PayrollService {
   private employees: Map<string, Employee> = new Map();
   private salaries: Map<string, EmployeeSalary[]> = new Map();
   private multipliers: Map<string, ProjectMultiplier[]> = new Map();
   private payrollSystem?: PayrollSystem;
-  private surepayrollConfig?: SurePayrollConfig;
+  private bamboohrConfig?: BambooHRConfig;
 
   constructor() {
     console.log('Payroll service initialized');
@@ -309,40 +309,40 @@ export class PayrollService {
     console.log(`Payroll system configured: ${system.name}`);
   }
 
-  // SurePayroll Integration
-  async configureSurePayroll(config: SurePayrollConfig): Promise<void> {
-    this.surepayrollConfig = config;
-    _configureSurePayrollService(config);
-    console.log(`SurePayroll configured for client ID: ${config.clientId}`);
+  // BambooHR Integration
+  async configureBambooHR(config: BambooHRConfig): Promise<void> {
+    this.bamboohrConfig = config;
+    _configureBambooHRService(config);
+    console.log(`BambooHR configured for subdomain: ${config.subdomain}`);
   }
 
-  async importSalariesFromSurePayroll(): Promise<SalaryImport> {
-    if (!this.surepayrollConfig) {
-      throw new Error('SurePayroll not configured');
+  async importSalariesFromBambooHR(): Promise<SalaryImport> {
+    if (!this.bamboohrConfig) {
+      throw new Error('BambooHR not configured');
     }
 
     try {
-      // Import employees from SurePayroll
-      const surepayrollEmployees = await importSurePayrollEmployees();
-      for (const employee of surepayrollEmployees) {
+      // Import employees from BambooHR
+      const bamboohrEmployees = await importBambooHREmployees();
+      for (const employee of bamboohrEmployees) {
         await this.addEmployee(employee);
       }
 
-      // Import salaries from SurePayroll
-      const surepayrollSalaries = await importSurePayrollSalaries();
-      for (const salary of surepayrollSalaries) {
+      // Import salaries from BambooHR
+      const bamboohrSalaries = await importBambooHRSalaries();
+      for (const salary of bamboohrSalaries) {
         await this.addSalary(salary);
       }
 
       return {
-        source: 'surepayroll',
+        source: 'bamboohr',
         importDate: new Date().toISOString(),
-        recordsImported: surepayrollEmployees.length + surepayrollSalaries.length,
+        recordsImported: bamboohrEmployees.length + bamboohrSalaries.length,
         errors: []
       };
     } catch (error: any) {
       return {
-        source: 'surepayroll',
+        source: 'bamboohr',
         importDate: new Date().toISOString(),
         recordsImported: 0,
         errors: [error.message]
@@ -355,8 +355,8 @@ export class PayrollService {
       throw new Error('No payroll system configured');
     }
 
-    if (this.payrollSystem.type === 'surepayroll' && this.surepayrollConfig) {
-      return await this.importSalariesFromSurePayroll();
+    if (this.payrollSystem.type === 'bamboohr' && this.bamboohrConfig) {
+      return await this.importSalariesFromBambooHR();
     }
 
     // This would integrate with other payroll system APIs
@@ -394,7 +394,7 @@ export class PayrollService {
       salaries: Array.from(this.salaries.entries()),
       multipliers: Array.from(this.multipliers.entries()),
       payrollSystem: this.payrollSystem,
-      surepayrollConfig: this.surepayrollConfig
+      bamboohrConfig: this.bamboohrConfig
     };
   }
 
@@ -403,10 +403,10 @@ export class PayrollService {
     this.salaries = new Map(data.salaries);
     this.multipliers = new Map(data.multipliers);
     this.payrollSystem = data.payrollSystem;
-    this.surepayrollConfig = data.surepayrollConfig;
+    this.bamboohrConfig = data.bamboohrConfig;
 
-    if (this.surepayrollConfig) {
-      _configureSurePayrollService(this.surepayrollConfig);
+    if (this.bamboohrConfig) {
+      _configureBambooHRService(this.bamboohrConfig);
     }
 
     console.log('Payroll data imported successfully');
@@ -460,11 +460,11 @@ export const generateEmployeeProfitabilityReport = async (
   );
 };
 
-// SurePayroll specific functions
-export const configureSurePayroll = async (config: SurePayrollConfig) => {
-  await payrollService.configureSurePayroll(config);
+// BambooHR specific functions
+export const configureBambooHR = async (config: BambooHRConfig) => {
+  await payrollService.configureBambooHR(config);
 };
 
-export const importSurePayrollData = async () => {
-  return await payrollService.importSalariesFromSurePayroll();
+export const importBambooHRData = async () => {
+  return await payrollService.importSalariesFromBambooHR();
 };

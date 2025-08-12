@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { payrollService } from '../../../../lib/payroll';
-import { SurePayrollConfig } from '../../../../lib/types';
+import { BambooHRConfig } from '../../../../lib/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,16 +9,16 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'configure': {
-        const config: SurePayrollConfig = data;
-        await payrollService.configureSurePayroll(config);
+        const config: BambooHRConfig = data;
+        await payrollService.configureBambooHR(config);
         return NextResponse.json({ 
           success: true, 
-          message: `SurePayroll configured for client ID: ${config.clientId}` 
+          message: `BambooHR configured for subdomain: ${config.subdomain}` 
         });
       }
 
       case 'import-data': {
-        const importResult = await payrollService.importSalariesFromSurePayroll();
+        const importResult = await payrollService.importSalariesFromBambooHR();
         return NextResponse.json({ 
           success: true, 
           result: importResult 
@@ -26,25 +26,25 @@ export async function POST(request: NextRequest) {
       }
 
       case 'test-connection': {
-        // Test the SurePayroll connection by trying to get company info
-        const { configureSurePayroll } = await import('../../../../lib/surepayroll');
-        const testConfig: SurePayrollConfig = data;
-        configureSurePayroll(testConfig);
+        // Test the BambooHR connection by trying to get company info
+        const { configureBambooHR } = await import('../../../../lib/bamboohr');
+        const testConfig: BambooHRConfig = data;
+        configureBambooHR(testConfig);
         
-        const { getSurePayrollService } = await import('../../../../lib/surepayroll');
-        const service = getSurePayrollService();
+        const { getBambooHRService } = await import('../../../../lib/bamboohr');
+        const service = getBambooHRService();
         const companyInfo = await service.getCompanyInfo();
         
         return NextResponse.json({ 
           success: true, 
-          message: 'SurePayroll connection successful',
+          message: 'BambooHR connection successful',
           companyInfo 
         });
       }
 
       case 'get-employees': {
-        const { configureSurePayroll: configureTest, getSurePayrollService: getTestService } = await import('../../../../lib/surepayroll');
-        const testConfig: SurePayrollConfig = data;
+        const { configureBambooHR: configureTest, getBambooHRService: getTestService } = await import('../../../../lib/bamboohr');
+        const testConfig: BambooHRConfig = data;
         configureTest(testConfig);
         const testService = getTestService();
         const employees = await testService.getAllEmployees();
@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
       }
 
       case 'get-compensation': {
-        const { configureSurePayroll: configureTest2, getSurePayrollService: getTestService2 } = await import('../../../../lib/surepayroll');
-        const testConfig: SurePayrollConfig = data.config;
+        const { configureBambooHR: configureTest2, getBambooHRService: getTestService2 } = await import('../../../../lib/bamboohr');
+        const testConfig: BambooHRConfig = data.config;
         const employeeId = data.employeeId;
         configureTest2(testConfig);
         const testService2 = getTestService2();
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
   } catch (error: any) {
-    console.error('Error in SurePayroll integration:', error);
+    console.error('Error in BambooHR integration:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -18,7 +18,7 @@ This system integrates employee salary data with Clockify time tracking to provi
 - **Historical Trends**: Track profitability over time periods
 
 ### ✅ **Payroll System Integration**
-- **SurePayroll**: Full integration with employee and compensation data
+- **BambooHR**: Full integration with employee and compensation data
 - **Multiple Payroll Systems**: Support for Gusto, QuickBooks, ADP, and custom systems
 - **API Integration**: Automated salary data import
 - **Manual Entry**: Fallback for manual salary data entry
@@ -65,15 +65,15 @@ interface ProjectMultiplier {
 }
 ```
 
-### SurePayroll Integration
+### BambooHR Integration
 ```typescript
-interface SurePayrollConfig {
-  clientId: string;
+interface BambooHRConfig {
+  subdomain: string;
   apiKey: string;
   webhookSecret?: string;
 }
 
-interface SurePayrollEmployee {
+interface BambooHREmployee {
   id: string;
   firstName: string;
   lastName: string;
@@ -90,7 +90,7 @@ interface SurePayrollEmployee {
   customFields?: Record<string, any>;
 }
 
-interface SurePayrollCompensation {
+interface BamboohrCompensation {
   employeeId: string;
   effectiveDate: string;
   endDate?: string;
@@ -127,24 +127,24 @@ interface SurePayrollCompensation {
 ### Profitability Analysis
 - `POST /api/payroll/profitability` - Generate various reports
 
-### SurePayroll Integration
-- `POST /api/payroll/surepayroll` - SurePayroll operations
+### BambooHR Integration
+- `POST /api/payroll/bamboohr` - BambooHR operations
 
 ## Usage Examples
 
-### 1. SurePayroll Integration Setup
+### 1. BambooHR Integration Setup
 
 ```typescript
-// Configure SurePayroll
-await configureSurePayroll({
-  clientId: 'your_client_id',
+// Configure BambooHR
+await configureBambooHR({
+  subdomain: 'your_company',
   apiKey: 'your_api_key',
   webhookSecret: 'your_webhook_secret'
 });
 
-// Import data from SurePayroll
-const importResult = await importSurePayrollData();
-console.log(`Imported ${importResult.recordsImported} records from SurePayroll`);
+// Import data from BambooHR
+const importResult = await importBambooHRData();
+console.log(`Imported ${importResult.recordsImported} records from BambooHR`);
 ```
 
 ### 2. Adding Employee with Salary History
@@ -275,38 +275,38 @@ Time Entry: 2024-03-15, 8 hours, billable
 - Billable Value: 8 * $43.27 * 2.5 = $865.40
 ```
 
-## SurePayroll Integration
+## BambooHR Integration
 
 ### Setup Requirements
 
-1. **SurePayroll Account**: Active SurePayroll subscription
+1. **BambooHR Account**: Active BambooHR subscription
 2. **API Access**: API key with appropriate permissions
-3. **Client ID**: Your SurePayroll client identifier
+3. **Subdomain**: Your BambooHR subdomain (e.g., "company.bamboohr.com")
 4. **Webhook Secret**: For real-time updates (optional)
 
 ### Configuration
 
 ```typescript
-// Configure SurePayroll integration
-await configureSurePayroll({
-  clientId: 'your_client_id',
+// Configure BambooHR integration
+await configureBambooHR({
+  subdomain: 'your_company',
   apiKey: 'your_api_key_here',
   webhookSecret: 'your_webhook_secret'
 });
 
 // Import all employee and salary data
-const importResult = await importSurePayrollData();
+const importResult = await importBambooHRData();
 ```
 
 ### API Operations
 
 #### Test Connection
 ```typescript
-POST /api/payroll/surepayroll
+POST /api/payroll/bamboohr
 {
   "action": "test-connection",
   "data": {
-    "clientId": "your_client_id",
+    "subdomain": "your_company",
     "apiKey": "your_api_key"
   }
 }
@@ -314,7 +314,7 @@ POST /api/payroll/surepayroll
 
 #### Import Data
 ```typescript
-POST /api/payroll/surepayroll
+POST /api/payroll/bamboohr
 {
   "action": "import-data"
 }
@@ -322,11 +322,11 @@ POST /api/payroll/surepayroll
 
 #### Get Employees
 ```typescript
-POST /api/payroll/surepayroll
+POST /api/payroll/bamboohr
 {
   "action": "get-employees",
   "data": {
-    "clientId": "your_client_id",
+    "subdomain": "your_company",
     "apiKey": "your_api_key"
   }
 }
@@ -334,12 +334,12 @@ POST /api/payroll/surepayroll
 
 #### Get Compensation
 ```typescript
-POST /api/payroll/surepayroll
+POST /api/payroll/bamboohr
 {
   "action": "get-compensation",
   "data": {
     "config": {
-      "clientId": "your_client_id",
+      "subdomain": "your_company",
       "apiKey": "your_api_key"
     },
     "employeeId": "123"
@@ -349,10 +349,10 @@ POST /api/payroll/surepayroll
 
 ### Data Mapping
 
-The system automatically maps SurePayroll data to internal structures:
+The system automatically maps BambooHR data to internal structures:
 
-| SurePayroll Field | Internal Field | Notes |
-|-------------------|----------------|-------|
+| BambooHR Field | Internal Field | Notes |
+|----------------|----------------|-------|
 | `id` | `employeeId` | Employee identifier |
 | `displayName` | `name` | Full employee name |
 | `email` | `email` | Employee email |
@@ -364,7 +364,7 @@ The system automatically maps SurePayroll data to internal structures:
 | `compensationHourlyRate` | `hourlyRate` | Calculated hourly rate |
 | `compensationEffectiveDate` | `effectiveDate` | Salary effective date |
 
-### Supported SurePayroll Features
+### Supported BambooHR Features
 
 #### Employee Management
 - ✅ Employee directory
@@ -399,8 +399,8 @@ The system automatically maps SurePayroll data to internal structures:
 
 #### Supported Systems
 
-1. **SurePayroll** ⭐ **RECOMMENDED**
-   - API endpoint: `https://api.surepayroll.com/v1`
+1. **BambooHR** ⭐ **RECOMMENDED**
+   - API endpoint: `https://api.bamboohr.com/api/gateway.php/{subdomain}`
    - Comprehensive employee data
    - Real-time webhook support
    - Historical compensation tracking
@@ -431,16 +431,16 @@ The system automatically maps SurePayroll data to internal structures:
 ```typescript
 // Configure payroll system
 await payrollService.configurePayrollSystem({
-  name: 'SurePayroll',
-  type: 'surepayroll',
-  apiEndpoint: 'https://api.surepayroll.com/v1',
+  name: 'BambooHR',
+  type: 'bamboohr',
+  apiEndpoint: 'https://api.bamboohr.com/api/gateway.php/{subdomain}',
   apiKey: 'your_api_key',
-  webhookUrl: 'https://your-app.com/webhooks/surepayroll'
+  webhookUrl: 'https://your-app.com/webhooks/bamboohr'
 });
 
-// Configure SurePayroll specifically
-await configureSurePayroll({
-  clientId: 'your_client_id',
+// Configure BambooHR specifically
+await configureBambooHR({
+  subdomain: 'your_company',
   apiKey: 'your_api_key',
   webhookSecret: 'your_webhook_secret'
 });
@@ -498,14 +498,14 @@ The payroll integration enhances the existing dashboard with:
 
 ```typescript
 const payrollData = await payrollService.exportData();
-// Includes: employees, salaries, multipliers, payroll system config, surepayroll config
+// Includes: employees, salaries, multipliers, payroll system config, bamboohr config
 ```
 
 ### Import Payroll Data
 
 ```typescript
 await payrollService.importData(payrollData);
-// Restores: employees, salaries, multipliers, payroll system config, surepayroll config
+// Restores: employees, salaries, multipliers, payroll system config, bamboohr config
 ```
 
 ## Security & Privacy
@@ -538,7 +538,7 @@ await payrollService.importData(payrollData);
    - Check multiplier effective dates
    - Ensure multiplier records exist for time entry dates
 
-3. **SurePayroll Import Errors**
+3. **BambooHR Import Errors**
    - Validate API credentials and client ID
    - Check API permissions for employee and compensation data
    - Verify webhook configuration
@@ -555,7 +555,7 @@ await payrollService.importData(payrollData);
 - **Multiplier Lookup**: Test project multiplier retrieval for specific dates
 - **Time Entry Validation**: Verify time entry processing with payroll data
 - **Report Generation**: Test profitability report generation
-- **SurePayroll Connection Test**: Verify API connectivity and permissions
+- **BambooHR Connection Test**: Verify API connectivity and permissions
 
 ## Future Enhancements
 
@@ -592,4 +592,4 @@ For questions or issues with the payroll integration:
 
 ---
 
-*This payroll integration provides comprehensive project profitability analysis while maintaining historical accuracy and supporting multiple payroll systems, with full SurePayroll integration.*
+*This payroll integration provides comprehensive project profitability analysis while maintaining historical accuracy and supporting multiple payroll systems, with full BambooHR integration.*

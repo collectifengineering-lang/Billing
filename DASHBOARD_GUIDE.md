@@ -146,7 +146,7 @@ The dashboard integrates data from multiple systems:
 - Multiplier calculations
 - Historical rate tracking
 
-### SurePayroll Integration
+### BambooHR Integration
 - Employee compensation data
 - Historical salary tracking
 - Benefits and overhead calculations

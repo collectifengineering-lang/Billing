@@ -1,28 +1,27 @@
 import {
-  SurePayrollConfig,
-  SurePayrollEmployee,
-  SurePayrollCompensation,
-  SurePayrollTimeOff,
-  SurePayrollReport,
+  BambooHRConfig,
+  BambooHREmployee,
+  BamboohrCompensation,
+  BambooHRTimeOff,
+  BambooHRReport,
   Employee,
   EmployeeSalary,
   SalaryImport
 } from './types';
 
-export class SurePayrollService {
-  private config: SurePayrollConfig;
+export class BambooHRService {
+  private config: BambooHRConfig;
   private baseUrl: string;
 
-  constructor(config: SurePayrollConfig) {
+  constructor(config: BambooHRConfig) {
     this.config = config;
-    this.baseUrl = `https://api.surepayroll.com/v1`;
+    this.baseUrl = `https://api.bamboohr.com/api/gateway.php/${config.subdomain}`;
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers = {
-      'Authorization': `Bearer ${this.config.apiKey}`,
-      'X-Client-ID': this.config.clientId,
+      'Authorization': `Basic ${btoa(`${this.config.apiKey}:x`)}`,
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       ...options.headers
@@ -35,39 +34,39 @@ export class SurePayrollService {
       });
 
       if (!response.ok) {
-        throw new Error(`SurePayroll API error: ${response.status} ${response.statusText}`);
+        throw new Error(`BambooHR API error: ${response.status} ${response.statusText}`);
       }
 
       return await response.json();
     } catch (error) {
-      console.error('SurePayroll API request failed:', error);
+      console.error('BambooHR API request failed:', error);
       throw error;
     }
   }
 
   // Employee Management
-  async getAllEmployees(): Promise<SurePayrollEmployee[]> {
-    const response = await this.makeRequest('/employees');
+  async getAllEmployees(): Promise<BambooHREmployee[]> {
+    const response = await this.makeRequest('/employees/all');
     return response.employees || [];
   }
 
-  async getEmployee(employeeId: string): Promise<SurePayrollEmployee> {
+  async getEmployee(employeeId: string): Promise<BambooHREmployee> {
     const response = await this.makeRequest(`/employees/${employeeId}`);
     return response.employee;
   }
 
-  async getEmployeeDirectory(): Promise<SurePayrollEmployee[]> {
+  async getEmployeeDirectory(): Promise<BambooHREmployee[]> {
     const response = await this.makeRequest('/employees/directory');
     return response.employees || [];
   }
 
   // Compensation Management
-  async getEmployeeCompensation(employeeId: string): Promise<SurePayrollCompensation[]> {
+  async getEmployeeCompensation(employeeId: string): Promise<BamboohrCompensation[]> {
     const response = await this.makeRequest(`/employees/${employeeId}/compensation`);
     return response.compensation || [];
   }
 
-  async getCompensationHistory(employeeId: string, startDate?: string, endDate?: string): Promise<SurePayrollCompensation[]> {
+  async getCompensationHistory(employeeId: string, startDate?: string, endDate?: string): Promise<BamboohrCompensation[]> {
     let endpoint = `/employees/${employeeId}/compensation/history`;
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
@@ -82,12 +81,12 @@ export class SurePayrollService {
   }
 
   // Time Off Management
-  async getEmployeeTimeOff(employeeId: string): Promise<SurePayrollTimeOff[]> {
+  async getEmployeeTimeOff(employeeId: string): Promise<BambooHRTimeOff[]> {
     const response = await this.makeRequest(`/employees/${employeeId}/timeoff`);
     return response.timeOff || [];
   }
 
-  async getAllTimeOff(startDate?: string, endDate?: string): Promise<SurePayrollTimeOff[]> {
+  async getAllTimeOff(startDate?: string, endDate?: string): Promise<BambooHRTimeOff[]> {
     let endpoint = '/timeoff';
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
@@ -107,7 +106,7 @@ export class SurePayrollService {
     return response.report;
   }
 
-  async createCustomReport(reportData: SurePayrollReport): Promise<SurePayrollReport> {
+  async createCustomReport(reportData: BambooHRReport): Promise<BambooHRReport> {
     const response = await this.makeRequest('/reports', {
       method: 'POST',
       body: JSON.stringify(reportData)
@@ -167,9 +166,9 @@ export class SurePayrollService {
 
   // Data Import Methods
   async importEmployees(): Promise<Employee[]> {
-    const surepayrollEmployees = await this.getAllEmployees();
+    const bamboohrEmployees = await this.getAllEmployees();
 
-    return surepayrollEmployees.map(emp => ({
+    return bamboohrEmployees.map(emp => ({
       id: emp.id,
       name: emp.displayName,
       email: emp.email,
@@ -196,7 +195,7 @@ export class SurePayrollService {
           annualSalary: comp.annualSalary,
           hourlyRate: comp.hourlyRate,
           currency: comp.currency,
-          notes: `Imported from SurePayroll - ${comp.payType} (${comp.paySchedule})`
+          notes: `Imported from BambooHR - ${comp.payType} (${comp.paySchedule})`
         });
       }
     }
@@ -210,14 +209,14 @@ export class SurePayrollService {
       const salaries = await this.importSalaries();
 
       return {
-        source: 'surepayroll',
+        source: 'bamboohr',
         importDate: new Date().toISOString(),
         recordsImported: employees.length + salaries.length,
         errors: []
       };
     } catch (error: any) {
       return {
-        source: 'surepayroll',
+        source: 'bamboohr',
         importDate: new Date().toISOString(),
         recordsImported: 0,
         errors: [error.message]
@@ -226,7 +225,7 @@ export class SurePayrollService {
   }
 
   // Helper Methods
-  async searchEmployees(query: string): Promise<SurePayrollEmployee[]> {
+  async searchEmployees(query: string): Promise<BambooHREmployee[]> {
     const employees = await this.getAllEmployees();
     return employees.filter(emp => 
       emp.displayName.toLowerCase().includes(query.toLowerCase()) ||
@@ -234,42 +233,42 @@ export class SurePayrollService {
     );
   }
 
-  async getEmployeesByDepartment(department: string): Promise<SurePayrollEmployee[]> {
+  async getEmployeesByDepartment(department: string): Promise<BambooHREmployee[]> {
     const employees = await this.getAllEmployees();
     return employees.filter(emp => emp.department === department);
   }
 
-  async getActiveEmployees(): Promise<SurePayrollEmployee[]> {
+  async getActiveEmployees(): Promise<BambooHREmployee[]> {
     const employees = await this.getAllEmployees();
     return employees.filter(emp => emp.status === 'active');
   }
 }
 
-export let surepayrollService: SurePayrollService | null = null;
+export let bamboohrService: BambooHRService | null = null;
 
-export const configureSurePayroll = (config: SurePayrollConfig) => {
-  surepayrollService = new SurePayrollService(config);
-  console.log(`SurePayroll service configured for client ID: ${config.clientId}`);
+export const configureBambooHR = (config: BambooHRConfig) => {
+  bamboohrService = new BambooHRService(config);
+  console.log(`BambooHR service configured for subdomain: ${config.subdomain}`);
 };
 
-export const getSurePayrollService = (): SurePayrollService => {
-  if (!surepayrollService) {
-    throw new Error('SurePayroll service not configured. Call configureSurePayroll first.');
+export const getBambooHRService = (): BambooHRService => {
+  if (!bamboohrService) {
+    throw new Error('BambooHR service not configured. Call configureBambooHR first.');
   }
-  return surepayrollService;
+  return bamboohrService;
 };
 
-export const importSurePayrollEmployees = async (): Promise<Employee[]> => {
-  const service = getSurePayrollService();
+export const importBambooHREmployees = async (): Promise<Employee[]> => {
+  const service = getBambooHRService();
   return await service.importEmployees();
 };
 
-export const importSurePayrollSalaries = async (): Promise<EmployeeSalary[]> => {
-  const service = getSurePayrollService();
+export const importBambooHRSalaries = async (): Promise<EmployeeSalary[]> => {
+  const service = getBambooHRService();
   return await service.importSalaries();
 };
 
-export const importSurePayrollData = async (): Promise<SalaryImport> => {
-  const service = getSurePayrollService();
+export const importBambooHRData = async (): Promise<SalaryImport> => {
+  const service = getBambooHRService();
   return await service.importAllData();
 };

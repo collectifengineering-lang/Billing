@@ -271,20 +271,20 @@ export interface EmployeeProfitabilityReport {
 // Payroll system integration
 export interface PayrollSystem {
   name: string;
-  type: 'gusto' | 'quickbooks' | 'adp' | 'surepayroll' | 'custom';
+  type: 'gusto' | 'quickbooks' | 'adp' | 'bamboohr' | 'custom';
   apiEndpoint?: string;
   apiKey?: string;
   webhookUrl?: string;
 }
 
-// SurePayroll specific interfaces
-export interface SurePayrollConfig {
-  clientId: string;
+// BambooHR specific interfaces
+export interface BambooHRConfig {
+  subdomain: string;
   apiKey: string;
   webhookSecret?: string;
 }
 
-export interface SurePayrollEmployee {
+export interface BambooHREmployee {
   id: string;
   firstName: string;
   lastName: string;
@@ -301,7 +301,7 @@ export interface SurePayrollEmployee {
   customFields?: Record<string, any>;
 }
 
-export interface SurePayrollCompensation {
+export interface BamboohrCompensation {
   employeeId: string;
   effectiveDate: string;
   endDate?: string;
@@ -318,7 +318,7 @@ export interface SurePayrollCompensation {
   notes?: string;
 }
 
-export interface SurePayrollTimeOff {
+export interface BambooHRTimeOff {
   employeeId: string;
   type: string;
   startDate: string;
@@ -327,7 +327,7 @@ export interface SurePayrollTimeOff {
   status: 'approved' | 'pending' | 'denied';
 }
 
-export interface SurePayrollReport {
+export interface BambooHRReport {
   id: string;
   name: string;
   fields: string[];
@@ -335,7 +335,7 @@ export interface SurePayrollReport {
 }
 
 export interface SalaryImport {
-  source: 'manual' | 'api' | 'csv' | 'surepayroll';
+  source: 'manual' | 'api' | 'csv' | 'bamboohr';
   importDate: string;
   recordsImported: number;
   errors?: string[];
