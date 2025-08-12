@@ -378,61 +378,13 @@ class ClockifyService {
         throw new Error('Workspace ID not configured');
       }
       
-      // Clockify API requires POST for filtered time entries with date parameters
-      const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/time-entries`);
-      
-      console.log(`🔍 Clockify API Request: ${url.toString()}`);
-      console.log(`   Method: POST`);
-      console.log(`   Headers: ${JSON.stringify(this.getHeaders())}`);
-      console.log(`   Body: ${JSON.stringify({ start: startDate, end: endDate })}`);
-
-      const response = await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          ...this.getHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          start: startDate,
-          end: endDate
-        }),
-      });
-
-      console.log(`📡 Clockify API Response: ${response.status} ${response.statusText}`);
-
-      if (response.status === 401) {
-        throw new Error('Clockify API authentication failed - check your API key');
+      // First try the Reports API for bulk time entry data
+      try {
+        return await this.getTimeEntriesViaReports(startDate, endDate);
+      } catch (reportsError) {
+        console.warn('Reports API failed, falling back to user time entries:', reportsError);
+        return await this.getTimeEntriesViaUserEndpoint(startDate, endDate);
       }
-      
-      if (response.status === 403) {
-        throw new Error('Clockify API access forbidden - check your workspace ID and permissions');
-      }
-      
-      if (response.status === 404) {
-        const errorDetails = `Endpoint not found: /workspaces/${this.workspaceId}/time-entries`;
-        console.error(`❌ 404 Error Details: ${errorDetails}`);
-        console.error(`   Full URL: ${url.toString()}`);
-        console.error(`   Workspace ID: ${this.workspaceId}`);
-        console.error(`   API Key configured: ${!!this.apiKey}`);
-        throw new Error(`Clockify API error: 404 Not Found - ${errorDetails}`);
-      }
-      
-      if (response.status === 405) {
-        throw new Error('Clockify API method not allowed - this endpoint requires POST method');
-      }
-      
-      if (response.status === 429) {
-        throw new Error('Clockify API rate limit exceeded - try again later');
-      }
-      
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`Clockify API error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log(`✅ Clockify API Success: /workspaces/${this.workspaceId}/time-entries`);
-      return data;
     } catch (error) {
       console.error('Failed to get all Clockify time entries:', error);
       
@@ -454,6 +406,154 @@ class ClockifyService {
           projectName: 'Mock Project 1'
         }
       ];
+    }
+  }
+
+  // Method to get time entries via Reports API (preferred method)
+  private async getTimeEntriesViaReports(startDate: string, endDate: string): Promise<any[]> {
+    const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/reports/detailed`);
+    
+    console.log(`🔍 Clockify Reports API Request: ${url.toString()}`);
+    console.log(`   Method: POST (Reports API)`);
+    console.log(`   Headers: ${JSON.stringify(this.getHeaders())}`);
+    console.log(`   Body: ${JSON.stringify({ 
+      dateRangeStart: startDate, 
+      dateRangeEnd: endDate,
+      detailedFilter: {
+        pageSize: 1000, // Get more entries per page
+        sortColumn: "DATE"
+      }
+    })}`);
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        dateRangeStart: startDate,
+        dateRangeEnd: endDate,
+        detailedFilter: {
+          pageSize: 1000,
+          sortColumn: "DATE"
+        }
+      }),
+    });
+
+    console.log(`📡 Clockify Reports API Response: ${response.status} ${response.statusText}`);
+
+    if (response.status === 401) {
+      throw new Error('Clockify API authentication failed - check your API key');
+    }
+    
+    if (response.status === 403) {
+      throw new Error('Clockify API access forbidden - check your workspace ID and permissions');
+    }
+    
+    if (response.status === 404) {
+      const errorDetails = `Reports endpoint not found: /workspaces/${this.workspaceId}/reports/detailed`;
+      console.error(`❌ 404 Error Details: ${errorDetails}`);
+      console.error(`   Full URL: ${url.toString()}`);
+      console.error(`   Workspace ID: ${this.workspaceId}`);
+      console.error(`   API Key configured: ${!!this.apiKey}`);
+      throw new Error(`Clockify API error: 404 Not Found - ${errorDetails}`);
+    }
+    
+    if (response.status === 405) {
+      throw new Error('Clockify API method not allowed - this endpoint requires POST method');
+    }
+    
+    if (response.status === 429) {
+      throw new Error('Clockify API rate limit exceeded - try again later');
+    }
+    
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Clockify API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log(`✅ Clockify Reports API Success: /workspaces/${this.workspaceId}/reports/detailed`);
+    
+    // Transform the reports data to match our expected time entry format
+    if (data.timeentries) {
+      return data.timeentries.map((entry: any) => ({
+        id: entry.id,
+        description: entry.description || 'No description',
+        timeInterval: {
+          start: entry.timeInterval?.start,
+          end: entry.timeInterval?.end,
+          duration: entry.timeInterval?.duration
+        },
+        billable: entry.billable || false,
+        userId: entry.userId,
+        userName: entry.userName,
+        projectId: entry.projectId,
+        projectName: entry.projectName,
+        hourlyRate: entry.hourlyRate
+      }));
+    }
+    
+    return [];
+  }
+
+  // Fallback method to get time entries via user endpoint (GET method)
+  private async getTimeEntriesViaUserEndpoint(startDate: string, endDate: string): Promise<any[]> {
+    try {
+      // Get the current user first
+      const user = await this.getUser();
+      if (!user?.id) {
+        throw new Error('Could not get current user for time entries');
+      }
+
+      // Use GET method with query parameters - this is the correct way to fetch time entries
+      const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/user/${user.id}/time-entries`);
+      url.searchParams.set('start', startDate);
+      url.searchParams.set('end', endDate);
+      
+      console.log(`🔍 Clockify User Time Entries API Request: ${url.toString()}`);
+      console.log(`   Method: GET (User Time Entries)`);
+      console.log(`   Headers: ${JSON.stringify(this.getHeaders())}`);
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      console.log(`📡 Clockify User Time Entries API Response: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Clockify User Time Entries API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Clockify User Time Entries API Success: /workspaces/${this.workspaceId}/user/${user.id}/time-entries`);
+      
+      // Transform the data to match our expected format
+      if (Array.isArray(data)) {
+        return data.map((entry: any) => ({
+          id: entry.id,
+          description: entry.description || 'No description',
+          timeInterval: {
+            start: entry.timeInterval?.start,
+            end: entry.timeInterval?.end,
+            duration: entry.timeInterval?.duration
+          },
+          billable: entry.billable || false,
+          userId: entry.userId,
+          userName: entry.userName,
+          projectId: entry.projectId,
+          projectName: entry.projectName,
+          hourlyRate: entry.hourlyRate
+        }));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Failed to get time entries via user endpoint:', error);
+      throw error;
     }
   }
 

@@ -50,6 +50,15 @@ export async function GET(request: NextRequest) {
           now.toISOString()
         );
 
+        console.log('📊 Clockify time entries received:', {
+          count: timeEntries?.length || 0,
+          sampleEntry: timeEntries?.[0] ? {
+            id: timeEntries[0].id,
+            projectId: timeEntries[0].projectId,
+            duration: timeEntries[0].timeInterval?.duration
+          } : 'No entries'
+        });
+
         // Group time entries by project
         const projectTimeMap = new Map();
         timeEntries.forEach(entry => {
@@ -82,6 +91,10 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.warn('⚠️ Failed to fetch Clockify data, using defaults:', error);
+      console.error('Clockify error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       clockifyData = new Map();
     }
 
@@ -147,11 +160,18 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('❌ Top Projects API error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+    
     return NextResponse.json(
       { 
         success: false,
         error: 'Failed to generate top projects data',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     );

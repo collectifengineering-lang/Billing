@@ -88,23 +88,64 @@ class ZohoService {
   }
 
   private async getAccessToken(): Promise<string> {
-    // Check if token is still valid (with buffer)
-    if (this.accessToken && Date.now() < (this.tokenExpiry - this.TOKEN_REFRESH_BUFFER)) {
-      return this.accessToken;
-    }
-
-    // If there's already a refresh in progress, wait for it
-    if (this.refreshPromise) {
-      return this.refreshPromise;
-    }
-
-    // Start a new refresh
-    this.refreshPromise = this.refreshAccessToken();
     try {
-      const token = await this.refreshPromise;
-      return token;
-    } finally {
-      this.refreshPromise = null;
+      // Check if we have a valid token
+      if (this.accessToken && Date.now() < this.tokenExpiry) {
+        console.log('Using existing valid token');
+        return this.accessToken;
+      }
+
+      console.log('Token expired or missing, refreshing...');
+      
+      // Clear any existing token
+      this.accessToken = null;
+      this.tokenExpiry = 0;
+
+      if (!process.env.ZOHO_CLIENT_ID || !process.env.ZOHO_CLIENT_SECRET || !process.env.ZOHO_REFRESH_TOKEN) {
+        const missingVars = [];
+        if (!process.env.ZOHO_CLIENT_ID) missingVars.push('ZOHO_CLIENT_ID');
+        if (!process.env.ZOHO_CLIENT_SECRET) missingVars.push('ZOHO_CLIENT_SECRET');
+        if (!process.env.ZOHO_REFRESH_TOKEN) missingVars.push('ZOHO_REFRESH_TOKEN');
+        
+        throw new Error(`Missing required Zoho environment variables: ${missingVars.join(', ')}`);
+      }
+
+      const response = await axios.post('https://accounts.zoho.com/oauth/v2/token', null, {
+        params: {
+          refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+          client_id: process.env.ZOHO_CLIENT_ID,
+          client_secret: process.env.ZOHO_CLIENT_SECRET,
+          grant_type: 'refresh_token',
+        },
+        timeout: 10000,
+      });
+
+      if (!response.data.access_token) {
+        throw new Error('No access token received from Zoho');
+      }
+
+      this.accessToken = response.data.access_token;
+      this.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
+      this.lastRefreshTime = Date.now();
+
+      console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
+      console.log(`Token value: ${this.accessToken.substring(0, 10)}...`);
+      
+      return this.accessToken;
+    } catch (error) {
+      console.error('Error refreshing Zoho access token:', error);
+      
+      // Log specific error details for debugging
+      if (axios.isAxiosError(error)) {
+        console.error('Axios error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message
+        });
+      }
+      
+      throw new Error(`Failed to authenticate with Zoho: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -144,6 +185,14 @@ class ZohoService {
       
       const token = await this.getAccessToken();
       
+      // Validate token before making request
+      if (!token || token === 'undefined') {
+        throw new Error('Invalid or missing access token');
+      }
+      
+      console.log(`Making Zoho API request to: ${endpoint}`);
+      console.log(`Token (first 10 chars): ${token.substring(0, 10)}...`);
+      
       // Create AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
@@ -168,6 +217,7 @@ class ZohoService {
         this.requestCount++;
         this.lastRequestTime = Date.now();
 
+        console.log(`Zoho API request successful: ${endpoint}`);
         return response.data;
       } catch (axiosError: any) {
         clearTimeout(timeoutId);
@@ -209,6 +259,13 @@ class ZohoService {
         try {
           const newToken = await this.forceRefreshToken();
           
+          // Validate the new token
+          if (!newToken || newToken === 'undefined') {
+            throw new Error('Failed to obtain valid token after refresh');
+          }
+          
+          console.log(`Retrying request with new token: ${endpoint}`);
+          
           // Retry the request with the new token
           const retryResponse = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
             headers: {
@@ -228,25 +285,16 @@ class ZohoService {
           throw new Error(`Zoho API authentication failed after token refresh: ${endpoint}`);
         }
       }
-      
-      // Handle other HTTP errors
-      if (error.response?.status) {
-        console.error(`Zoho API error ${error.response.status} for ${endpoint}:`, error.response.data);
-        
-        // Provide more specific error messages
-        if (error.response.status === 403) {
-          throw new Error('Zoho API access forbidden - check your organization ID and permissions');
-        } else if (error.response.status === 429) {
-          throw new Error('Zoho API rate limit exceeded - please try again later');
-        } else if (error.response.status >= 500) {
-          throw new Error('Zoho API server error - please try again later');
-        }
-        
-        throw new Error(`Zoho API error ${error.response.status}: ${error.response.data?.message || 'Unknown error'}`);
-      }
-      
-      console.error(`Error making Zoho request to ${endpoint}:`, error);
-      throw new Error(`Failed to fetch data from Zoho: ${endpoint}`);
+
+      // Log the error details for debugging
+      console.error(`Zoho API request failed for ${endpoint}:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+
+      throw error;
     }
   }
 

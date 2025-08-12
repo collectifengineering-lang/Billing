@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
 
       // Get financial metrics for current year
       try {
+        console.log('💰 Fetching financial metrics...');
         financialMetrics = await zohoService.getFinancialMetrics(
           currentYearStart.toISOString().split('T')[0],
           now.toISOString().split('T')[0]
@@ -69,6 +70,12 @@ export async function GET(request: NextRequest) {
             now.toISOString()
           )
         ]);
+
+        console.log('📊 Clockify raw data received:', {
+          user: clockifyUser?.name || 'Unknown',
+          projectsCount: clockifyProjects?.length || 0,
+          timeEntriesCount: timeEntries?.length || 0
+        });
 
         // Calculate time tracking metrics
         const totalHours = timeEntries.reduce((sum, entry) => {
@@ -121,6 +128,10 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.warn('⚠️ Failed to fetch Clockify data, using defaults:', error);
+      console.error('Clockify error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       clockifyData = {
         totalHours: 28400,
         billableHours: 25200,
@@ -186,8 +197,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(dashboardData);
   } catch (error) {
     console.error('❌ Homepage Dashboard API error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+    
     return NextResponse.json(
-      { error: 'Failed to generate homepage dashboard data' },
+      { 
+        error: 'Failed to generate homepage dashboard data',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }
