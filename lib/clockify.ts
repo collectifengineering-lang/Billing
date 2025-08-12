@@ -554,7 +554,7 @@ class ClockifyService {
             hourlyRate: 0
           };
         }
-      }).filter(entry => entry !== null); // Remove any null entries
+      }).filter((entry: any) => entry !== null); // Remove any null entries
     }
     
     console.warn('⚠️ No time entries found in Reports API response');
@@ -665,7 +665,7 @@ class ClockifyService {
               hourlyRate: 0
             };
           }
-        }).filter(entry => entry !== null); // Remove any null entries
+        }).filter((entry: any) => entry !== null); // Remove any null entries
       }
       
       return [];
