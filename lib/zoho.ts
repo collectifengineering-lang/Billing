@@ -299,9 +299,33 @@ class ZohoService {
           
           console.info('Request retry successful after token refresh');
           return retryResponse.data;
-        } catch (refreshError) {
+        } catch (refreshError: any) {
           console.error('Failed to refresh token or retry request:', refreshError);
-          throw new Error(`Zoho API authentication failed after token refresh: ${endpoint}`);
+          
+          // Log detailed refresh error information
+          if (axios.isAxiosError(refreshError)) {
+            console.error('Token refresh Axios error details:', {
+              status: refreshError.response?.status,
+              statusText: refreshError.response?.statusText,
+              data: refreshError.response?.data,
+              message: refreshError.message,
+              endpoint: endpoint
+            });
+          }
+          
+          // Check if it's a rate limiting issue during token refresh
+          if (refreshError.response?.status === 400 && 
+              refreshError.response?.data?.error_description?.includes('too many requests')) {
+            throw new Error(`Zoho token refresh rate limited: ${endpoint}. Please wait before retrying.`);
+          }
+          
+          // Check if it's an authentication issue during token refresh
+          if (refreshError.response?.status === 400 && 
+              refreshError.response?.data?.error_description?.includes('invalid')) {
+            throw new Error(`Zoho token refresh failed - invalid credentials: ${endpoint}. Check your OAuth configuration.`);
+          }
+          
+          throw new Error(`Zoho API authentication failed after token refresh: ${endpoint}. Error: ${refreshError.message}`);
         }
       }
 
@@ -596,11 +620,13 @@ class ZohoService {
   // New method to get Profit & Loss statement
   async getProfitAndLoss(startDate: string, endDate: string): Promise<any> {
     try {
+      console.info(`📊 Fetching Zoho Profit & Loss for ${startDate} to ${endDate}`);
       const data = await this.makeRequest(`reports/profitandloss?from_date=${startDate}&to_date=${endDate}`);
-      console.log('Profit & Loss data:', JSON.stringify(data, null, 2));
+      console.info('✅ Profit & Loss data fetched successfully');
       return data;
     } catch (error) {
-      console.error('Error fetching Profit & Loss:', error);
+      console.error('❌ Error fetching Profit & Loss:', error);
+      console.warn('🎭 Profit & Loss data unavailable, will use defaults');
       return null;
     }
   }
@@ -608,11 +634,13 @@ class ZohoService {
   // New method to get Cash Flow statement
   async getCashFlow(startDate: string, endDate: string): Promise<any> {
     try {
+      console.info(`💰 Fetching Zoho Cash Flow for ${startDate} to ${endDate}`);
       const data = await this.makeRequest(`reports/cashflow?from_date=${startDate}&to_date=${endDate}`);
-      console.log('Cash Flow data:', JSON.stringify(data, null, 2));
+      console.info('✅ Cash Flow data fetched successfully');
       return data;
     } catch (error) {
-      console.error('Error fetching Cash Flow:', error);
+      console.error('❌ Error fetching Cash Flow:', error);
+      console.warn('🎭 Cash Flow data unavailable, will use defaults');
       return null;
     }
   }
@@ -620,11 +648,13 @@ class ZohoService {
   // New method to get Balance Sheet
   async getBalanceSheet(date: string): Promise<any> {
     try {
+      console.info(`📈 Fetching Zoho Balance Sheet for ${date}`);
       const data = await this.makeRequest(`reports/balancesheet?date=${date}`);
-      console.log('Balance Sheet data:', JSON.stringify(data, null, 2));
+      console.info('✅ Balance Sheet data fetched successfully');
       return data;
     } catch (error) {
-      console.error('Error fetching Balance Sheet:', error);
+      console.error('❌ Error fetching Balance Sheet:', error);
+      console.warn('🎭 Balance Sheet data unavailable, will use defaults');
       return null;
     }
   }
@@ -666,26 +696,46 @@ class ZohoService {
     cashBalance: number;
   }> {
     try {
-      const [plData, cfData, bsData] = await Promise.all([
+      console.info(`💰 Fetching Zoho financial metrics for ${startDate} to ${endDate}`);
+      
+      const [plData, cfData, bsData] = await Promise.allSettled([
         this.getProfitAndLoss(startDate, endDate),
         this.getCashFlow(startDate, endDate),
         this.getBalanceSheet(endDate)
       ]);
 
-      // Extract financial metrics from the responses
-      const revenue = plData?.revenue?.total || 0;
-      const expenses = plData?.expenses?.total || 0;
+      // Extract financial metrics from the responses with fallbacks
+      const revenue = plData.status === 'fulfilled' ? (plData.value?.revenue?.total || 0) : 0;
+      const expenses = plData.status === 'fulfilled' ? (plData.value?.expenses?.total || 0) : 0;
       const grossProfit = revenue - expenses;
       
       // Calculate net profit (may need adjustment based on actual Zoho response structure)
-      const netProfit = grossProfit - (plData?.operating_expenses?.total || 0);
-      const operatingIncome = grossProfit - (plData?.operating_expenses?.total || 0);
+      const operatingExpenses = plData.status === 'fulfilled' ? (plData.value?.operating_expenses?.total || 0) : 0;
+      const netProfit = grossProfit - operatingExpenses;
+      const operatingIncome = grossProfit - operatingExpenses;
       
       // Extract cash flow data
-      const cashFlow = cfData?.net_cash_flow || 0;
-      const accountsReceivable = bsData?.current_assets?.accounts_receivable || 0;
-      const accountsPayable = bsData?.current_liabilities?.accounts_payable || 0;
-      const cashBalance = bsData?.current_assets?.cash_and_bank || 0;
+      const cashFlow = cfData.status === 'fulfilled' ? (cfData.value?.net_cash_flow || 0) : 0;
+      const accountsReceivable = bsData.status === 'fulfilled' ? (bsData.value?.current_assets?.accounts_receivable || 0) : 0;
+      const accountsPayable = bsData.status === 'fulfilled' ? (bsData.value?.current_liabilities?.accounts_payable || 0) : 0;
+      const cashBalance = bsData.status === 'fulfilled' ? (bsData.value?.current_assets?.cash_and_bank || 0) : 0;
+
+      // Log which data sources succeeded/failed
+      console.info('📊 Financial metrics data sources:', {
+        profitLoss: plData.status === 'fulfilled' ? '✅' : '❌',
+        cashFlow: cfData.status === 'fulfilled' ? '✅' : '❌',
+        balanceSheet: bsData.status === 'fulfilled' ? '✅' : '❌'
+      });
+
+      if (plData.status === 'rejected') {
+        console.warn('⚠️ Profit & Loss data failed:', plData.reason);
+      }
+      if (cfData.status === 'rejected') {
+        console.warn('⚠️ Cash Flow data failed:', cfData.reason);
+      }
+      if (bsData.status === 'rejected') {
+        console.warn('⚠️ Balance Sheet data failed:', bsData.reason);
+      }
 
       return {
         revenue,
@@ -699,7 +749,9 @@ class ZohoService {
         cashBalance
       };
     } catch (error) {
-      console.error('Error fetching financial metrics:', error);
+      console.error('❌ Error fetching financial metrics:', error);
+      console.warn('🎭 Returning default financial metrics due to API failure');
+      
       // Return default values if API calls fail
       return {
         revenue: 0,
