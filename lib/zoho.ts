@@ -45,11 +45,11 @@ class ZohoService {
   // Rate limiting properties
   private requestCount: number = 0;
   private lastRequestTime: number = 0;
-  private readonly MAX_REQUESTS_PER_MINUTE = 30; // Conservative limit
-  private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
+  private readonly MAX_REQUESTS_PER_MINUTE = 80; // Conservative limit (Zoho allows 100, we use 80)
+  private readonly MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests (was 2)
   private retryCount: number = 0;
   private readonly MAX_RETRIES = 3;
-  private readonly BASE_DELAY = 1000; // 1 second base delay for exponential backoff
+  private readonly BASE_DELAY = 2000; // 2 seconds base delay for exponential backoff (was 1)
 
   constructor() {
     // Start automatic token refresh
@@ -195,8 +195,8 @@ class ZohoService {
         throw new Error('Invalid or missing access token');
       }
       
-      console.log(`Making Zoho API request to: ${endpoint}`);
-      console.log(`Token (first 10 chars): ${token?.substring(0, 10) ?? 'N/A'}...`);
+      console.info(`Making Zoho API request to: ${endpoint}`);
+      console.info(`Token (first 10 chars): ${token?.substring(0, 10) ?? 'N/A'}...`);
       
       // Create AbortController for timeout
       const controller = new AbortController();
@@ -222,7 +222,7 @@ class ZohoService {
         this.requestCount++;
         this.lastRequestTime = Date.now();
 
-        console.log(`Zoho API request successful: ${endpoint}`);
+        console.info(`Zoho API request successful: ${endpoint}`);
         return response.data;
       } catch (axiosError: any) {
         clearTimeout(timeoutId);
@@ -237,16 +237,30 @@ class ZohoService {
     } catch (error: any) {
       // Handle rate limiting (400 with specific error message)
       if (error.response?.status === 400 && 
-          error.response?.data?.error === 'Access Denied' &&
           error.response?.data?.error_description?.includes('too many requests')) {
         
-        console.log('Zoho rate limit hit, implementing exponential backoff...');
+        console.warn('Zoho rate limit hit, implementing exponential backoff...');
         await this.handleRateLimit();
         
         // Retry the request after backoff
         if (this.retryCount < this.MAX_RETRIES) {
           this.retryCount++;
-          console.log(`Retrying request after rate limit backoff (attempt ${this.retryCount})`);
+          console.info(`Retrying request after rate limit backoff (attempt ${this.retryCount})`);
+          return this.makeRequest(endpoint);
+        } else {
+          throw new Error('Zoho API rate limit exceeded after maximum retries. Please try again later.');
+        }
+      }
+
+      // Handle 429 Too Many Requests (explicit rate limit)
+      if (error.response?.status === 429) {
+        console.warn('Zoho 429 rate limit hit, implementing exponential backoff...');
+        await this.handleRateLimit();
+        
+        // Retry the request after backoff
+        if (this.retryCount < this.MAX_RETRIES) {
+          this.retryCount++;
+          console.info(`Retrying request after 429 backoff (attempt ${this.retryCount})`);
           return this.makeRequest(endpoint);
         } else {
           throw new Error('Zoho API rate limit exceeded after maximum retries. Please try again later.');
@@ -255,7 +269,7 @@ class ZohoService {
 
       // If we get a 401, try refreshing the token once
       if (error.response?.status === 401) {
-        console.log('Token expired, refreshing...');
+        console.info('Token expired, refreshing...');
         
         // Clear the current token and force a refresh
         this.accessToken = null;
@@ -269,7 +283,7 @@ class ZohoService {
             throw new Error('Failed to obtain valid token after refresh');
           }
           
-          console.log(`Retrying request with new token: ${endpoint}`);
+          console.info(`Retrying request with new token: ${endpoint}`);
           
           // Retry the request with the new token
           const retryResponse = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
@@ -283,7 +297,7 @@ class ZohoService {
             timeout: 15000,
           });
           
-          console.log('Request retry successful after token refresh');
+          console.info('Request retry successful after token refresh');
           return retryResponse.data;
         } catch (refreshError) {
           console.error('Failed to refresh token or retry request:', refreshError);
@@ -311,7 +325,7 @@ class ZohoService {
       const timeSinceLastRequest = now - this.lastRequestTime;
       if (timeSinceLastRequest < this.MIN_REQUEST_INTERVAL) {
         const waitTime = this.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-        console.log(`Rate limiting: waiting ${waitTime}ms before next request`);
+        console.info(`Rate limiting: waiting ${waitTime}ms before next request`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
@@ -321,7 +335,7 @@ class ZohoService {
       const timeSinceFirstRequest = now - this.lastRequestTime;
       if (timeSinceFirstRequest < 60000) { // Less than 1 minute
         const waitTime = 60000 - timeSinceFirstRequest;
-        console.log(`Rate limiting: exceeded ${this.MAX_REQUESTS_PER_MINUTE} requests per minute, waiting ${waitTime}ms`);
+        console.warn(`Rate limiting: exceeded ${this.MAX_REQUESTS_PER_MINUTE} requests per minute, waiting ${waitTime}ms`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         this.requestCount = 0;
       } else {
@@ -333,8 +347,11 @@ class ZohoService {
 
   private async handleRateLimit(): Promise<void> {
     const delay = this.BASE_DELAY * Math.pow(2, this.retryCount);
-    console.log(`Rate limit backoff: waiting ${delay}ms before retry`);
-    await new Promise(resolve => setTimeout(resolve, delay));
+    const jitter = Math.random() * 1000; // Add up to 1 second of jitter
+    const totalDelay = delay + jitter;
+    
+    console.warn(`Rate limit backoff: waiting ${totalDelay}ms before retry (attempt ${this.retryCount + 1})`);
+    await new Promise(resolve => setTimeout(resolve, totalDelay));
     
     // Reset request counters to allow fresh start
     this.requestCount = 0;

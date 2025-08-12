@@ -485,24 +485,79 @@ class ClockifyService {
     console.info(`✅ Clockify Reports API Success: /workspaces/${this.workspaceId}/reports/detailed`);
     
     // Transform the reports data to match our expected time entry format
-    if (data.timeentries) {
-      return data.timeentries.map((entry: any) => ({
-        id: entry.id,
-        description: entry.description || 'No description',
-        timeInterval: {
-          start: entry.timeInterval?.start,
-          end: entry.timeInterval?.end,
-          duration: entry.timeInterval?.duration
-        },
-        billable: entry.billable || false,
-        userId: entry.userId,
-        userName: entry.userName,
-        projectId: entry.projectId,
-        projectName: entry.projectName,
-        hourlyRate: entry.hourlyRate
-      }));
+    if (data.timeentries && Array.isArray(data.timeentries)) {
+      console.info(`📊 Processing ${data.timeentries.length} time entries from Reports API`);
+      
+      return data.timeentries.map((entry: any, index: number) => {
+        try {
+          // Handle duration conversion - Reports API returns duration in seconds as number
+          let duration = 'PT0H0M';
+          if (entry.duration !== undefined && entry.duration !== null) {
+            if (typeof entry.duration === 'number') {
+              // Convert seconds to ISO 8601 duration format
+              const hours = Math.floor(entry.duration / 3600);
+              const minutes = Math.floor((entry.duration % 3600) / 60);
+              duration = `PT${hours}H${minutes}M`;
+            } else if (typeof entry.duration === 'string') {
+              // If it's already a string, use it directly
+              duration = entry.duration;
+            }
+          }
+
+          // Handle undefined IDs - generate a fallback ID if needed
+          const entryId = entry.id || `reports-entry-${index}-${Date.now()}`;
+          
+          // Log sample entry for debugging (first few entries)
+          if (index < 3) {
+            console.info(`📝 Sample entry ${index}:`, {
+              id: entryId,
+              duration: entry.duration,
+              convertedDuration: duration,
+              projectId: entry.projectId,
+              userId: entry.userId
+            });
+          }
+
+          return {
+            id: entryId,
+            description: entry.description || 'No description',
+            timeInterval: {
+              start: entry.timeInterval?.start || entry.start,
+              end: entry.timeInterval?.end || entry.end,
+              duration: duration
+            },
+            billable: entry.billable || false,
+            userId: entry.userId || 'unknown-user',
+            userName: entry.userName || 'Unknown User',
+            projectId: entry.projectId || 'unknown-project',
+            projectName: entry.projectName || 'Unknown Project',
+            hourlyRate: entry.hourlyRate || 0
+          };
+        } catch (entryError) {
+          console.error(`❌ Error processing time entry ${index}:`, entryError);
+          console.error(`   Raw entry data:`, entry);
+          
+          // Return a safe fallback entry
+          return {
+            id: `error-entry-${index}-${Date.now()}`,
+            description: 'Error processing entry',
+            timeInterval: {
+              start: startDate,
+              end: endDate,
+              duration: 'PT0H0M'
+            },
+            billable: false,
+            userId: 'error-user',
+            userName: 'Error User',
+            projectId: 'error-project',
+            projectName: 'Error Project',
+            hourlyRate: 0
+          };
+        }
+      }).filter(entry => entry !== null); // Remove any null entries
     }
     
+    console.warn('⚠️ No time entries found in Reports API response');
     return [];
   }
 
@@ -544,21 +599,73 @@ class ClockifyService {
       
       // Transform the data to match our expected format
       if (Array.isArray(data)) {
-        return data.map((entry: any) => ({
-          id: entry.id,
-          description: entry.description || 'No description',
-          timeInterval: {
-            start: entry.timeInterval?.start,
-            end: entry.timeInterval?.end,
-            duration: entry.timeInterval?.duration
-          },
-          billable: entry.billable || false,
-          userId: entry.userId,
-          userName: entry.userName,
-          projectId: entry.projectId,
-          projectName: entry.projectName,
-          hourlyRate: entry.hourlyRate
-        }));
+        return data.map((entry: any, index: number) => {
+          try {
+            // Handle duration conversion - User API might also return duration as number
+            let duration = 'PT0H0M';
+            if (entry.duration !== undefined && entry.duration !== null) {
+              if (typeof entry.duration === 'number') {
+                // Convert seconds to ISO 8601 duration format
+                const hours = Math.floor(entry.duration / 3600);
+                const minutes = Math.floor((entry.duration % 3600) / 60);
+                duration = `PT${hours}H${minutes}M`;
+              } else if (typeof entry.duration === 'string') {
+                // If it's already a string, use it directly
+                duration = entry.duration;
+              }
+            }
+
+            // Handle undefined IDs - generate a fallback ID if needed
+            const entryId = entry.id || `user-entry-${index}-${Date.now()}`;
+            
+            // Log sample entry for debugging (first few entries)
+            if (index < 3) {
+              console.info(`📝 Fallback entry ${index}:`, {
+                id: entryId,
+                duration: entry.duration,
+                convertedDuration: duration,
+                projectId: entry.projectId,
+                userId: entry.userId
+              });
+            }
+
+            return {
+              id: entryId,
+              description: entry.description || 'No description',
+              timeInterval: {
+                start: entry.timeInterval?.start || entry.start,
+                end: entry.timeInterval?.end || entry.end,
+              duration: duration
+              },
+              billable: entry.billable || false,
+              userId: entry.userId || 'unknown-user',
+              userName: entry.userName || 'Unknown User',
+              projectId: entry.projectId || 'unknown-project',
+              projectName: entry.projectName || 'Unknown Project',
+              hourlyRate: entry.hourlyRate || 0
+            };
+          } catch (entryError) {
+            console.error(`❌ Error processing fallback time entry ${index}:`, entryError);
+            console.error(`   Raw entry data:`, entry);
+            
+            // Return a safe fallback entry
+            return {
+              id: `error-fallback-${index}-${Date.now()}`,
+              description: 'Error processing fallback entry',
+              timeInterval: {
+                start: startDate,
+                end: endDate,
+                duration: 'PT0H0M'
+              },
+              billable: false,
+              userId: 'error-user',
+              userName: 'Error User',
+              projectId: 'error-project',
+              projectName: 'Error Project',
+              hourlyRate: 0
+            };
+          }
+        }).filter(entry => entry !== null); // Remove any null entries
       }
       
       return [];
