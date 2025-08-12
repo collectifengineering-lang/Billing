@@ -297,8 +297,15 @@ export default function HighPerformanceTable({
         const viewportHeight = window.innerHeight;
         const margin = 8;
 
+        // Get the original button position from the click event
+        const buttonElement = document.querySelector(`[data-project-id="${openDropdown}"] .dropdown-trigger`);
+        if (!buttonElement) return;
+        
+        const buttonRect = buttonElement.getBoundingClientRect();
+        const originalY = buttonRect.bottom + 5; // Original position below button
+
         let newX = dropdownPosition.x;
-        let newY = dropdownPosition.y;
+        let newY = originalY; // Start with original position
 
         // Ensure dropdown doesn't go off the right edge
         if (newX + width + margin > viewportWidth) {
@@ -307,7 +314,8 @@ export default function HighPerformanceTable({
         
         // Ensure dropdown doesn't go off the bottom edge
         if (newY + height + margin > viewportHeight) {
-          newY = Math.max(margin, dropdownPosition.y - height - 10);
+          // Position above the button instead
+          newY = Math.max(margin, buttonRect.top - height - 5);
         }
 
         // Ensure dropdown doesn't go off the left edge
@@ -323,6 +331,20 @@ export default function HighPerformanceTable({
         if (Math.abs(newX - dropdownPosition.x) > 1 || Math.abs(newY - dropdownPosition.y) > 1) {
           setDropdownPosition({ x: newX, y: newY });
         }
+        
+        // Fallback: if dropdown is still not visible, force it to be visible
+        setTimeout(() => {
+          const element = managerMenuRef.current;
+          if (element) {
+            const rect = element.getBoundingClientRect();
+            if (rect.bottom > window.innerHeight || rect.top < 0 || rect.right > window.innerWidth || rect.left < 0) {
+              console.warn('Dropdown still not properly positioned, applying fallback positioning');
+              const fallbackX = Math.max(8, Math.min(window.innerWidth - rect.width - 8, 8));
+              const fallbackY = Math.max(8, Math.min(window.innerHeight - rect.height - 8, 8));
+              setDropdownPosition({ x: fallbackX, y: fallbackY });
+            }
+          }
+        }, 100);
       };
 
       const id = window.requestAnimationFrame(adjust);
@@ -1121,9 +1143,18 @@ export default function HighPerformanceTable({
                               x = rect.right - 220;
                             }
                             
+                            // Check if there's enough space below the button, otherwise position above
+                            const dropdownHeight = 200; // Approximate dropdown height
+                            let y = rect.bottom + 5; // Default: below button
+                            
+                            if (rect.bottom + dropdownHeight + 10 > window.innerHeight) {
+                              // Not enough space below, position above
+                              y = rect.top - dropdownHeight - 5;
+                            }
+                            
                             const position = { 
                               x: Math.max(8, x), // Ensure minimum left margin
-                              y: rect.bottom + 5 
+                              y: Math.max(8, y) // Ensure minimum top margin
                             };
                             
                             // Validate final position
@@ -1138,15 +1169,19 @@ export default function HighPerformanceTable({
                             
                             console.log('HighPerformanceTable dropdown positioning:', {
                               projectId: project.projectId,
-                              rect: { left: rect.left, right: rect.right, bottom: rect.bottom },
+                              rect: { left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top },
                               window: { width: window.innerWidth, height: window.innerHeight },
-                              calculated: position
+                              calculated: position,
+                              dropdownHeight,
+                              spaceBelow: window.innerHeight - rect.bottom,
+                              spaceAbove: rect.top
                             });
                             
                             setOpenDropdown(project.projectId);
                             setDropdownPosition(position);
                           }}
                           className="ml-2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200 dropdown-trigger"
+                          data-project-id={project.projectId}
                         >
                           <User className="h-4 w-4" />
                         </button>

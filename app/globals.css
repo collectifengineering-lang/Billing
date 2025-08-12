@@ -108,6 +108,25 @@
     height: 60px; /* Slightly taller headers */
   }
 
+  /* Dropdown positioning fixes */
+  .dropdown-trigger {
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Ensure dropdowns appear above other content */
+  [data-dropdown="true"] {
+    position: fixed !important;
+    z-index: 9999 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Smooth dropdown animations */
+  [data-dropdown="true"] {
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+    transform-origin: top left;
+  }
+
   /* Ensure dropdowns are properly positioned and visible */
   [data-dropdown="true"] {
     position: fixed !important;
