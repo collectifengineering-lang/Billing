@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import ProjectModal from '@/components/ProjectModal';
 import HighPerformanceTable from '@/components/HighPerformanceTable';
+import BillingChart from '@/components/BillingChart';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -76,6 +77,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [billingData, setBillingData] = useState<any[]>([]);
   const [projections, setProjections] = useState<any>({});
+  const [closedProjects, setClosedProjects] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -152,6 +154,35 @@ export default function HomePage() {
     };
 
     fetchDashboardData();
+    
+    // Load closed projects from localStorage
+    const savedClosedProjects = localStorage.getItem('closedProjects');
+    if (savedClosedProjects) {
+      try {
+        const closedProjectsArray = JSON.parse(savedClosedProjects);
+        setClosedProjects(new Set(closedProjectsArray));
+      } catch (error) {
+        console.error('Error parsing closed projects from localStorage:', error);
+      }
+    }
+    
+    // Listen for project status changes from other components
+    const handleProjectStatusChange = (event: CustomEvent) => {
+      const { projectId, status, closedProjects: newClosedProjects } = event.detail;
+      console.log('HomePage: Received project status change:', { projectId, status, newClosedProjects });
+      
+      if (newClosedProjects) {
+        setClosedProjects(newClosedProjects);
+        // Save to localStorage to persist the change
+        localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
+      }
+    };
+
+    window.addEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+    };
   }, []);
 
   const formatCurrency = (amount: number) => {
@@ -773,6 +804,7 @@ export default function HomePage() {
                 transition={{ duration: 0.3 }}
                 className="space-y-6"
               >
+                {/* Area Chart showing projected and billed amounts */}
                 <motion.div
                   variants={cardVariants}
                   initial="hidden"
@@ -782,17 +814,33 @@ export default function HomePage() {
                   <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
                     <CardHeader>
                       <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">
-                        Projections Table
+                        Financial Projections Overview
                       </CardTitle>
                       <CardDescription>
-                        View and manage your financial projections
+                        Projected and billed amounts from 1 year back to 1 year in the future
                       </CardDescription>
                     </CardHeader>
+                    <CardContent>
+                      <BillingChart billingData={billingData} closedProjects={closedProjects} />
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Projections Table */}
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: 0.2 }}
+                >
+                  <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
                     <CardContent>
                       <HighPerformanceTable 
                         billingData={billingData}
                         projections={projections}
                         onUpdateProjections={handleUpdateProjections}
+                        closedProjects={closedProjects}
+                        onClosedProjectsChange={setClosedProjects}
                       />
                     </CardContent>
                   </Card>

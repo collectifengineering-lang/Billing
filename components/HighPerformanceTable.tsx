@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { FixedSizeList as List } from 'react-window';
 import { formatCurrency, formatMonth, isCurrentMonth, isPastMonth, getProjectionsMonthRange } from '../lib/utils';
 import { BillingData } from '../lib/types';
@@ -70,14 +71,14 @@ export default function HighPerformanceTable({
   const [editingSignedFee, setEditingSignedFee] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<{ x: number; y: number } | null>(null);
+  const [dropdownAnchor, setDropdownAnchor] = useState<HTMLElement | null>(null);
   const managerMenuRef = useRef<HTMLDivElement | null>(null);
   const [openMenuCell, setOpenMenuCell] = useState<{ projectId: string; month: string } | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const statusMenuRef = useRef<HTMLDivElement | null>(null);
   const [editingCommentCell, setEditingCommentCell] = useState<{ projectId: string; month: string } | null>(null);
   const [commentValue, setCommentValue] = useState('');
-  const [commentPosition, setCommentPosition] = useState<{ x: number; y: number } | null>(null);
+  const [commentAnchor, setCommentAnchor] = useState<HTMLElement | null>(null);
   const [closedProjects, setClosedProjects] = useState<Set<string>>(externalClosedProjects || new Set());
   const [projectManagers, setProjectManagers] = useState<ProjectManager[]>([]);
   const [projectAssignments, setProjectAssignments] = useState<ProjectAssignment>({});
@@ -194,6 +195,13 @@ export default function HighPerformanceTable({
   // Debug component lifecycle
   useEffect(() => {
     return () => {
+      // Cleanup dropdowns on unmount
+      setOpenDropdown(null);
+      setDropdownAnchor(null);
+      setOpenMenuCell(null);
+      setMenuAnchor(null);
+      setEditingCommentCell(null);
+      setCommentAnchor(null);
     };
   }, []);
 
@@ -218,23 +226,23 @@ export default function HighPerformanceTable({
   // Handle clicks outside dropdown to close it
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (openDropdown && dropdownPosition) {
+      if (openDropdown && dropdownAnchor) {
         const target = event.target as HTMLElement;
         // Check if the click is outside the dropdown
         const dropdownElement = managerMenuRef.current;
         if (dropdownElement && !dropdownElement.contains(target)) {
           setOpenDropdown(null);
-          setDropdownPosition(null);
+          setDropdownAnchor(null);
         }
       }
       
-      if (openMenuCell && menuPosition) {
+      if (openMenuCell && menuAnchor) {
         const target = event.target as HTMLElement;
         // Check if the click is outside the status menu
         const menuElement = statusMenuRef.current;
         if (menuElement && !menuElement.contains(target)) {
           setOpenMenuCell(null);
-          setMenuPosition(null);
+          setMenuAnchor(null);
         }
       }
 
@@ -244,7 +252,7 @@ export default function HighPerformanceTable({
         if (!commentModalRef.current.contains(target)) {
           setEditingCommentCell(null);
           setCommentValue('');
-          setCommentPosition(null);
+          setCommentAnchor(null);
         }
       }
     };
@@ -256,7 +264,7 @@ export default function HighPerformanceTable({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openDropdown, dropdownPosition, openMenuCell, menuPosition, editingCommentCell]);
+  }, [openDropdown, dropdownAnchor, openMenuCell, menuAnchor, editingCommentCell]);
 
   // Cross-tab synchronization removed - now using SWR for real-time sync
 
@@ -283,141 +291,73 @@ export default function HighPerformanceTable({
     };
   }, []);
 
-  // Adjust manager dropdown position to avoid viewport overflow
+  // Simple dropdown positioning using anchor elements
+  const getDropdownPosition = useCallback((anchor: HTMLElement, dropdownWidth: number = 220, dropdownHeight: number = 200) => {
+    const rect = anchor.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 8;
+
+    // Start with position below and to the left of the anchor
+    let x = rect.left;
+    let y = rect.bottom + 5;
+
+    // Adjust horizontal position if dropdown would go off the right edge
+    if (x + dropdownWidth + margin > viewportWidth) {
+      x = Math.max(margin, viewportWidth - dropdownWidth - margin);
+    }
+
+    // Adjust vertical position if dropdown would go off the bottom edge
+    if (y + dropdownHeight + margin > viewportHeight) {
+      y = Math.max(margin, rect.top - dropdownHeight - 5);
+    }
+
+    // Ensure minimum margins
+    x = Math.max(margin, x);
+    y = Math.max(margin, y);
+
+    // Debug positioning
+    console.log('Dropdown positioning:', {
+      anchor: anchor.tagName,
+      rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+      viewport: { width: viewportWidth, height: viewportHeight },
+      dropdown: { width: dropdownWidth, height: dropdownHeight },
+      calculated: { x, y }
+    });
+
+    return { x, y };
+  }, []);
+
+  // Only close dropdowns on significant scroll or resize events
   useEffect(() => {
-    if (!openDropdown || !dropdownPosition) return;
+    let scrollTimeout: NodeJS.Timeout;
     
-    // Add a small delay to ensure the dropdown is fully rendered
-    const timeoutId = setTimeout(() => {
-      const adjust = () => {
-        const element = managerMenuRef.current;
-        if (!element) return;
-        const { offsetWidth: width, offsetHeight: height } = element;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const margin = 8;
-
-        // Get the original button position from the click event
-        const buttonElement = document.querySelector(`[data-project-id="${openDropdown}"] .dropdown-trigger`);
-        if (!buttonElement) return;
-        
-        const buttonRect = buttonElement.getBoundingClientRect();
-        const originalY = buttonRect.bottom + 5; // Original position below button
-
-        let newX = dropdownPosition.x;
-        let newY = originalY; // Start with original position
-
-        // Ensure dropdown doesn't go off the right edge
-        if (newX + width + margin > viewportWidth) {
-          newX = Math.max(margin, viewportWidth - width - margin);
-        }
-        
-        // Ensure dropdown doesn't go off the bottom edge
-        if (newY + height + margin > viewportHeight) {
-          // Position above the button instead
-          newY = Math.max(margin, buttonRect.top - height - 5);
-        }
-
-        // Ensure dropdown doesn't go off the left edge
-        if (newX < margin) {
-          newX = margin;
-        }
-
-        // Ensure dropdown doesn't go off the top edge
-        if (newY < margin) {
-          newY = margin;
-        }
-
-        if (Math.abs(newX - dropdownPosition.x) > 1 || Math.abs(newY - dropdownPosition.y) > 1) {
-          setDropdownPosition({ x: newX, y: newY });
-        }
-        
-        // Fallback: if dropdown is still not visible, force it to be visible
-        setTimeout(() => {
-          const element = managerMenuRef.current;
-          if (element) {
-            const rect = element.getBoundingClientRect();
-            if (rect.bottom > window.innerHeight || rect.top < 0 || rect.right > window.innerWidth || rect.left < 0) {
-              console.warn('Dropdown still not properly positioned, applying fallback positioning');
-              const fallbackX = Math.max(8, Math.min(window.innerWidth - rect.width - 8, 8));
-              const fallbackY = Math.max(8, Math.min(window.innerHeight - rect.height - 8, 8));
-              setDropdownPosition({ x: fallbackX, y: fallbackY });
+    const handleScroll = () => {
+      // Debounce scroll events to avoid closing dropdowns on small scrolls
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        if (openDropdown || openMenuCell) {
+          // Only close if scrolling significantly (more than 50px)
+          const scrollTop = Math.max(
+            stickyListRef.current?.scrollTop || 0,
+            scrollableListRef.current?.scrollTop || 0
+          );
+          
+          if (Math.abs(scrollTop - (window as any).lastScrollTop || 0) > 50) {
+            if (openDropdown) {
+              setOpenDropdown(null);
+              setDropdownAnchor(null);
+            }
+            if (openMenuCell) {
+              setOpenMenuCell(null);
+              setMenuAnchor(null);
             }
           }
-        }, 100);
-      };
-
-      const id = window.requestAnimationFrame(adjust);
-      return () => window.cancelAnimationFrame(id);
-    }, 50); // 50ms delay
-
-    return () => clearTimeout(timeoutId);
-  }, [openDropdown, dropdownPosition]);
-
-  // Adjust status menu position to avoid viewport overflow
-  useEffect(() => {
-    if (!openMenuCell || !menuPosition) return;
-    
-    // Add a small delay to ensure the dropdown is fully rendered
-    const timeoutId = setTimeout(() => {
-      const adjust = () => {
-        const element = statusMenuRef.current;
-        if (!element) return;
-        const { offsetWidth: width, offsetHeight: height } = element;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const margin = 8;
-
-        let newX = menuPosition.x;
-        let newY = menuPosition.y;
-
-        // Ensure menu doesn't go off the right edge
-        if (newX + width + margin > viewportWidth) {
-          newX = Math.max(margin, viewportWidth - width - margin);
+          (window as any).lastScrollTop = scrollTop;
         }
-        
-        // Ensure menu doesn't go off the bottom edge
-        if (newY + height + margin > viewportHeight) {
-          newY = Math.max(margin, menuPosition.y - height - 10);
-        }
-
-        // Ensure menu doesn't go off the left edge
-        if (newX < margin) {
-          newX = margin;
-        }
-
-        // Ensure menu doesn't go off the top edge
-        if (newY < margin) {
-          newY = margin;
-        }
-
-        if (Math.abs(newX - menuPosition.x) > 1 || Math.abs(newY - menuPosition.y) > 1) {
-          setMenuPosition({ x: newX, y: newY });
-        }
-      };
-
-      // Defer until after render so dimensions are correct
-      const id = window.requestAnimationFrame(adjust);
-      return () => window.cancelAnimationFrame(id);
-    }, 50); // 50ms delay
-
-    return () => clearTimeout(timeoutId);
-  }, [openMenuCell, menuPosition]);
-
-  // Close dropdowns when scrolling to prevent positioning issues
-  useEffect(() => {
-    const handleScroll = () => {
-      if (openDropdown) {
-        setOpenDropdown(null);
-        setDropdownPosition(null);
-      }
-      if (openMenuCell) {
-        setOpenMenuCell(null);
-        setMenuPosition(null);
-      }
+      }, 100);
     };
 
-    // Listen to scroll events on both sticky and scrollable sections
     const stickyElement = stickyListRef.current;
     const scrollableElement = scrollableListRef.current;
 
@@ -429,6 +369,7 @@ export default function HighPerformanceTable({
     }
 
     return () => {
+      clearTimeout(scrollTimeout);
       if (stickyElement) {
         stickyElement.removeEventListener('scroll', handleScroll);
       }
@@ -438,21 +379,38 @@ export default function HighPerformanceTable({
     };
   }, [openDropdown, openMenuCell]);
 
-  // Close dropdowns when window is resized to prevent positioning issues
+  // Only close dropdowns on significant window resize
   useEffect(() => {
+    let resizeTimeout: NodeJS.Timeout;
+    
     const handleResize = () => {
-      if (openDropdown) {
-        setOpenDropdown(null);
-        setDropdownPosition(null);
-      }
-      if (openMenuCell) {
-        setOpenMenuCell(null);
-        setMenuPosition(null);
-      }
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        // Only close if window size changed significantly (more than 100px)
+        const currentWidth = window.innerWidth;
+        const currentHeight = window.innerHeight;
+        
+        if (Math.abs(currentWidth - (window as any).lastWidth || 0) > 100 || 
+            Math.abs(currentHeight - (window as any).lastHeight || 0) > 100) {
+          if (openDropdown) {
+            setOpenDropdown(null);
+            setDropdownAnchor(null);
+          }
+          if (openMenuCell) {
+            setOpenMenuCell(null);
+            setMenuAnchor(null);
+          }
+          (window as any).lastWidth = currentWidth;
+          (window as any).lastHeight = currentHeight;
+        }
+      }, 100);
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [openDropdown, openMenuCell]);
 
   // Hide vertical scrollbar on sticky section
@@ -702,6 +660,12 @@ export default function HighPerformanceTable({
       onClosedProjectsChange?.(updatedClosedProjects);
       mutateClosedProjects();
       setOpenDropdown(null);
+      
+      // Emit custom event for other components to listen to
+      window.dispatchEvent(new CustomEvent('projectStatusChanged', {
+        detail: { projectId, status: 'closed', closedProjects: updatedClosedProjects }
+      }));
+      
       toast.success('Project closed');
     } catch (error) {
       console.error('Error closing project:', error);
@@ -722,6 +686,12 @@ export default function HighPerformanceTable({
       setClosedProjects(updatedClosedProjects);
       onClosedProjectsChange?.(updatedClosedProjects);
       mutateClosedProjects();
+      
+      // Emit custom event for other components to listen to
+      window.dispatchEvent(new CustomEvent('projectStatusChanged', {
+        detail: { projectId, status: 'reopened', closedProjects: updatedClosedProjects }
+      }));
+      
       toast.success('Project reopened');
     } catch (error) {
       console.error('Error reopening project:', error);
@@ -754,7 +724,7 @@ export default function HighPerformanceTable({
       window.dispatchEvent(new CustomEvent('projectionsUpdated'));
       
       setOpenMenuCell(null);
-      setMenuPosition(null);
+      setMenuAnchor(null);
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
@@ -768,9 +738,9 @@ export default function HighPerformanceTable({
     if (action === 'AddComment' || action === 'EditComment') {
       setEditingCommentCell(openMenuCell);
       setCommentValue(getCellComment(projectId, month));
-      setCommentPosition(menuPosition);
+      setCommentAnchor(menuAnchor);
       setOpenMenuCell(null);
-      setMenuPosition(null);
+      setMenuAnchor(null);
       return;
     }
     
@@ -783,7 +753,7 @@ export default function HighPerformanceTable({
         });
         mutateMonthlyComments();
         setOpenMenuCell(null);
-        setMenuPosition(null);
+        setMenuAnchor(null);
       } catch (error) {
         console.error('Error removing comment:', error);
         toast.error('Failed to remove comment');
@@ -1124,61 +1094,8 @@ export default function HighPerformanceTable({
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const buttonWidth = rect.width;
-                            
-                            // Validate that the button is visible in the viewport
-                            if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
-                              console.warn('Button is outside viewport, skipping dropdown positioning:', {
-                                projectId: project.projectId,
-                                rect,
-                                viewport: { width: window.innerWidth, height: window.innerHeight }
-                              });
-                              return;
-                            }
-                            
-                            // Position dropdown to the left of the button if there's not enough space on the right
-                            let x = rect.left;
-                            if (rect.left + 220 > window.innerWidth) { // 220px is approximate dropdown width
-                              x = rect.right - 220;
-                            }
-                            
-                            // Check if there's enough space below the button, otherwise position above
-                            const dropdownHeight = 200; // Approximate dropdown height
-                            let y = rect.bottom + 5; // Default: below button
-                            
-                            if (rect.bottom + dropdownHeight + 10 > window.innerHeight) {
-                              // Not enough space below, position above
-                              y = rect.top - dropdownHeight - 5;
-                            }
-                            
-                            const position = { 
-                              x: Math.max(8, x), // Ensure minimum left margin
-                              y: Math.max(8, y) // Ensure minimum top margin
-                            };
-                            
-                            // Validate final position
-                            if (position.x < 0 || position.y < 0 || position.x > window.innerWidth || position.y > window.innerHeight) {
-                              console.warn('Calculated position is outside viewport:', {
-                                projectId: project.projectId,
-                                position,
-                                viewport: { width: window.innerWidth, height: window.innerHeight }
-                              });
-                              return;
-                            }
-                            
-                            console.log('HighPerformanceTable dropdown positioning:', {
-                              projectId: project.projectId,
-                              rect: { left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top },
-                              window: { width: window.innerWidth, height: window.innerHeight },
-                              calculated: position,
-                              dropdownHeight,
-                              spaceBelow: window.innerHeight - rect.bottom,
-                              spaceAbove: rect.top
-                            });
-                            
                             setOpenDropdown(project.projectId);
-                            setDropdownPosition(position);
+                            setDropdownAnchor(e.currentTarget);
                           }}
                           className="ml-2 p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-200 dropdown-trigger"
                           data-project-id={project.projectId}
@@ -1426,7 +1343,7 @@ export default function HighPerformanceTable({
                                 });
                                 
                                 setOpenMenuCell({ projectId: project.projectId, month });
-                                setMenuPosition(position);
+                                setMenuAnchor(e.currentTarget);
                               }}
                             >
                               ⋯
@@ -1463,14 +1380,14 @@ export default function HighPerformanceTable({
       </div>
 
       {/* Floating dropdown menu */}
-      {openDropdown && dropdownPosition && (
+      {openDropdown && dropdownAnchor && createPortal(
         <div 
           ref={managerMenuRef}
           className="fixed bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl z-[9999] min-w-[220px] py-2"
           data-dropdown="true"
           style={{
-            left: `${dropdownPosition.x}px`,
-            top: `${dropdownPosition.y}px`,
+            left: `${getDropdownPosition(dropdownAnchor, 220, 200).x}px`,
+            top: `${getDropdownPosition(dropdownAnchor, 220, 200).y}px`,
             pointerEvents: 'auto'
           }}
         >
@@ -1567,20 +1484,21 @@ export default function HighPerformanceTable({
             <X className="h-4 w-4 mr-2" />
             Close Project
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Status menu */}
-      {openMenuCell && menuPosition && (
+      {openMenuCell && menuAnchor && createPortal(
         <div 
           ref={statusMenuRef}
           className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] min-w-[200px] py-2 backdrop-blur-sm"
           data-dropdown="true"
-          style={{
-            left: `${menuPosition.x}px`,
-            top: `${menuPosition.y}px`,
-            pointerEvents: 'auto'
-          }}
+                      style={{
+              left: `${getDropdownPosition(menuAnchor, 200, 150).x}px`,
+              top: `${getDropdownPosition(menuAnchor, 200, 150).y}px`,
+              pointerEvents: 'auto'
+            }}
         >
           {/* Status Section */}
           {(() => {
@@ -1628,17 +1546,18 @@ export default function HighPerformanceTable({
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Comment editing modal */}
-      {editingCommentCell && commentPosition && (
+      {editingCommentCell && commentAnchor && createPortal(
         <div 
           ref={commentModalRef}
           className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-[9999] min-w-[300px] max-w-md comment-modal"
           style={{
-            left: `${commentPosition.x}px`,
-            top: `${commentPosition.y}px`,
+            left: `${getDropdownPosition(commentAnchor, 300, 200).x}px`,
+            top: `${getDropdownPosition(commentAnchor, 300, 200).y}px`,
             pointerEvents: 'auto'
           }}
         >
@@ -1647,7 +1566,7 @@ export default function HighPerformanceTable({
             <button onClick={() => {
               setEditingCommentCell(null);
               setCommentValue('');
-              setCommentPosition(null);
+              setCommentAnchor(null);
             }} className="text-gray-400 hover:text-gray-600">
               <X className="h-5 w-5" />
             </button>
@@ -1685,7 +1604,7 @@ export default function HighPerformanceTable({
                   mutateMonthlyComments();
                   setEditingCommentCell(null);
                   setCommentValue('');
-                  setCommentPosition(null);
+                  setCommentAnchor(null);
                 } catch (error) {
                   console.error('Error saving comment:', error);
                   toast.error('Failed to save comment');
@@ -1699,14 +1618,15 @@ export default function HighPerformanceTable({
               onClick={() => {
                 setEditingCommentCell(null);
                 setCommentValue('');
-                setCommentPosition(null);
+                setCommentAnchor(null);
               }}
               className="ml-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
             >
               Cancel
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <style jsx>{`

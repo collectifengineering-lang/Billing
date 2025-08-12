@@ -32,6 +32,24 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetchProjectsData();
     loadClosedProjects();
+    
+    // Listen for project status changes from other components
+    const handleProjectStatusChange = (event: CustomEvent) => {
+      const { projectId, status, closedProjects: newClosedProjects } = event.detail;
+      console.log('ProjectsPage: Received project status change:', { projectId, status, newClosedProjects });
+      
+      if (newClosedProjects) {
+        setClosedProjects(newClosedProjects);
+        // Save to localStorage to persist the change
+        localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
+      }
+    };
+
+    window.addEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+    };
   }, []);
 
   const fetchProjectsData = async () => {
