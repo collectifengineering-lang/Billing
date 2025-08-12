@@ -79,6 +79,14 @@ export default function HomePage() {
   const [projections, setProjections] = useState<any>({});
   const [closedProjects, setClosedProjects] = useState<Set<string>>(new Set());
 
+  // Monitor topProjects state to ensure it's always an array
+  useEffect(() => {
+    if (topProjects && !Array.isArray(topProjects)) {
+      console.warn('topProjects is not an array, resetting to empty array:', topProjects);
+      setTopProjects([]);
+    }
+  }, [topProjects]);
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -120,8 +128,23 @@ export default function HomePage() {
         const topProjectsData = await topProjectsResponse.json();
         const projectsData = await projectsResponse.json();
 
-        setStats(dashboardData);
-        setTopProjects(topProjectsData.data || []);
+        // Validate and set dashboard stats
+        if (dashboardData && typeof dashboardData === 'object') {
+          setStats(dashboardData);
+        } else {
+          console.warn('Invalid dashboard data received:', dashboardData);
+          setStats(null);
+        }
+
+        // Validate and set top projects with proper error handling
+        console.log('Raw topProjectsData:', topProjectsData);
+        if (topProjectsData && topProjectsData.success && topProjectsData.data && Array.isArray(topProjectsData.data.topProjects)) {
+          console.log('Setting topProjects:', topProjectsData.data.topProjects);
+          setTopProjects(topProjectsData.data.topProjects);
+        } else {
+          console.warn('Invalid topProjects data received, setting empty array:', topProjectsData);
+          setTopProjects([]);
+        }
         
         // Transform Zoho projects to billing data format
         if (projectsData.success && projectsData.data) {
@@ -203,6 +226,7 @@ export default function HomePage() {
   };
 
   const handleProjectClick = (projectId: string) => {
+    if (!Array.isArray(topProjects) || !projectId) return;
     const project = topProjects.find(p => p.id === projectId);
     if (project) {
       setSelectedProject(project);
@@ -263,11 +287,11 @@ export default function HomePage() {
   ];
 
   // Prepare chart data for top projects
-  const topProjectsChartData = topProjects.slice(0, 5).map(project => ({
-    name: project.name,
-    hours: project.hours,
-    revenue: project.revenue,
-    efficiency: Math.round(project.efficiency * 100),
+  const topProjectsChartData = (Array.isArray(topProjects) ? topProjects : []).slice(0, 5).map(project => ({
+    name: project.name || 'Unknown Project',
+    hours: project.hours || 0,
+    revenue: project.revenue || 0,
+    efficiency: Math.round((project.efficiency || 0) * 100),
     multiplier: project.multiplier || 0
   }));
 
@@ -1005,14 +1029,14 @@ export default function HomePage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {topProjects.length > 0 ? (
+                      {Array.isArray(topProjects) && topProjects.length > 0 ? (
                         <div className="h-80">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={topProjects.slice(-5).reverse().map(project => ({
-                              name: project.name,
-                              hours: project.hours,
-                              revenue: project.revenue,
-                              efficiency: Math.round(project.efficiency * 100),
+                              name: project.name || 'Unknown Project',
+                              hours: project.hours || 0,
+                              revenue: project.revenue || 0,
+                              efficiency: Math.round((project.efficiency || 0) * 100),
                               multiplier: project.multiplier || 0
                             }))} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                               <XAxis dataKey="name" />
@@ -1060,10 +1084,10 @@ export default function HomePage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {topProjects.length > 0 ? (
+                        {Array.isArray(topProjects) && topProjects.length > 0 ? (
                           topProjects.slice(-5).reverse().map((project, index) => (
                             <motion.div
-                              key={project.id}
+                              key={project.id || `project-${index}`}
                               initial={{ opacity: 0, x: -20 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: 0.3 + index * 0.1 }}
@@ -1073,15 +1097,15 @@ export default function HomePage() {
                               <div className="flex items-center space-x-4">
                                 <div className="flex-shrink-0">
                                   <div className="w-10 h-10 bg-gradient-to-r from-red-400 to-red-600 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-bold">{topProjects.length - index}</span>
+                                    <span className="text-white text-sm font-bold">{Array.isArray(topProjects) ? topProjects.length - index : 0}</span>
                                   </div>
                                 </div>
                                 <div>
                                   <p className="font-semibold text-gray-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors duration-200">
-                                    {project.name}
+                                    {project.name || 'Unknown Project'}
                                   </p>
                                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    {project.hours}h • {formatPercentage(project.efficiency)} efficient
+                                    {(project.hours || 0)}h • {formatPercentage(project.efficiency || 0)} efficient
                                   </p>
                                 </div>
                               </div>
@@ -1094,7 +1118,7 @@ export default function HomePage() {
                                 </div>
                                 <div className="text-right">
                                   <p className="font-semibold text-gray-900 dark:text-white">
-                                    {formatCurrency(project.revenue)}
+                                    {formatCurrency(project.revenue || 0)}
                                   </p>
                                   <p className="text-sm text-gray-500 dark:text-gray-400">Revenue</p>
                                 </div>
