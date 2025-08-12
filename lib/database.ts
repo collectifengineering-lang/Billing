@@ -99,4 +99,295 @@ export async function testDatabaseConnection() {
   }
 }
 
+// BambooHR Database Operations
+export async function saveBambooHRConfig(config: {
+  subdomain: string;
+  apiKey: string;
+  webhookSecret?: string;
+}) {
+  try {
+    const result = await prisma.bambooHRConfig.upsert({
+      where: { subdomain: config.subdomain },
+      update: {
+        apiKey: config.apiKey,
+        webhookSecret: config.webhookSecret,
+        isActive: true,
+        lastSync: new Date(),
+        updatedAt: new Date()
+      },
+      create: {
+        subdomain: config.subdomain,
+        apiKey: config.apiKey,
+        webhookSecret: config.webhookSecret,
+        isActive: true,
+        lastSync: new Date()
+      }
+    });
+    
+    console.log(`BambooHR config saved for subdomain: ${config.subdomain}`);
+    return result;
+  } catch (error) {
+    console.error('Error saving BambooHR config:', error);
+    throw error;
+  }
+}
+
+export async function getBambooHRConfig(subdomain: string) {
+  try {
+    return await prisma.bambooHRConfig.findUnique({
+      where: { subdomain }
+    });
+  } catch (error) {
+    console.error('Error getting BambooHR config:', error);
+    throw error;
+  }
+}
+
+export async function saveEmployee(employee: {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  department?: string;
+  position?: string;
+  hireDate: string;
+  terminationDate?: string;
+}) {
+  try {
+    const result = await prisma.employee.upsert({
+      where: { id: employee.id },
+      update: {
+        name: employee.name,
+        email: employee.email,
+        status: employee.status,
+        department: employee.department,
+        position: employee.position,
+        hireDate: employee.hireDate,
+        terminationDate: employee.terminationDate,
+        updatedAt: new Date()
+      },
+      create: {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        status: employee.status,
+        department: employee.department,
+        position: employee.position,
+        hireDate: employee.hireDate,
+        terminationDate: employee.terminationDate
+      }
+    });
+    
+    console.log(`Employee saved: ${employee.name} (${employee.id})`);
+    return result;
+  } catch (error) {
+    console.error('Error saving employee:', error);
+    throw error;
+  }
+}
+
+export async function saveEmployeeSalary(salary: {
+  employeeId: string;
+  effectiveDate: string;
+  endDate?: string;
+  annualSalary: number;
+  hourlyRate: number;
+  currency?: string;
+  notes?: string;
+  source?: string;
+}) {
+  try {
+    const result = await prisma.employeeSalary.upsert({
+      where: {
+        employeeId_effectiveDate: {
+          employeeId: salary.employeeId,
+          effectiveDate: salary.effectiveDate
+        }
+      },
+      update: {
+        endDate: salary.endDate,
+        annualSalary: salary.annualSalary,
+        hourlyRate: salary.hourlyRate,
+        currency: salary.currency,
+        notes: salary.notes,
+        source: salary.source,
+        updatedAt: new Date()
+      },
+      create: {
+        employeeId: salary.employeeId,
+        effectiveDate: salary.effectiveDate,
+        endDate: salary.endDate,
+        annualSalary: salary.annualSalary,
+        hourlyRate: salary.hourlyRate,
+        currency: salary.currency || 'USD',
+        notes: salary.notes,
+        source: salary.source || 'bamboohr'
+      }
+    });
+    
+    console.log(`Employee salary saved for ${salary.employeeId} effective ${salary.effectiveDate}`);
+    return result;
+  } catch (error) {
+    console.error('Error saving employee salary:', error);
+    throw error;
+  }
+}
+
+export async function saveProjectMultiplier(multiplier: {
+  projectId: string;
+  projectName: string;
+  multiplier: number;
+  effectiveDate: string;
+  endDate?: string;
+  notes?: string;
+}) {
+  try {
+    const result = await prisma.projectMultiplier.upsert({
+      where: {
+        projectId_effectiveDate: {
+          projectId: multiplier.projectId,
+          effectiveDate: multiplier.effectiveDate
+        }
+      },
+      update: {
+        projectName: multiplier.projectName,
+        multiplier: multiplier.multiplier,
+        endDate: multiplier.endDate,
+        notes: multiplier.notes,
+        updatedAt: new Date()
+      },
+      create: {
+        projectId: multiplier.projectId,
+        projectName: multiplier.projectName,
+        multiplier: multiplier.multiplier,
+        effectiveDate: multiplier.effectiveDate,
+        endDate: multiplier.endDate,
+        notes: multiplier.notes
+      }
+    });
+    
+    console.log(`Project multiplier saved for ${multiplier.projectName} effective ${multiplier.effectiveDate}`);
+    return result;
+  } catch (error) {
+    console.error('Error saving project multiplier:', error);
+    throw error;
+  }
+}
+
+export async function saveEmployeeTimeEntry(timeEntry: {
+  employeeId: string;
+  employeeName: string;
+  projectId: string;
+  projectName: string;
+  date: string;
+  hours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  hourlyRate: number;
+  projectMultiplier: number;
+  totalCost: number;
+  billableValue: number;
+  efficiency: number;
+  description?: string;
+  tags: string[];
+}) {
+  try {
+    const result = await prisma.employeeTimeEntry.upsert({
+      where: {
+        employeeId_projectId_date: {
+          employeeId: timeEntry.employeeId,
+          projectId: timeEntry.projectId,
+          date: timeEntry.date
+        }
+      },
+      update: {
+        employeeName: timeEntry.employeeName,
+        projectName: timeEntry.projectName,
+        hours: timeEntry.hours,
+        billableHours: timeEntry.billableHours,
+        nonBillableHours: timeEntry.nonBillableHours,
+        hourlyRate: timeEntry.hourlyRate,
+        projectMultiplier: timeEntry.projectMultiplier,
+        totalCost: timeEntry.totalCost,
+        billableValue: timeEntry.billableValue,
+        efficiency: timeEntry.efficiency,
+        description: timeEntry.description,
+        tags: timeEntry.tags,
+        updatedAt: new Date()
+      },
+      create: {
+        employeeId: timeEntry.employeeId,
+        employeeName: timeEntry.employeeName,
+        projectId: timeEntry.projectId,
+        projectName: timeEntry.projectName,
+        date: timeEntry.date,
+        hours: timeEntry.hours,
+        billableHours: timeEntry.billableHours,
+        nonBillableHours: timeEntry.nonBillableHours,
+        hourlyRate: timeEntry.hourlyRate,
+        projectMultiplier: timeEntry.projectMultiplier,
+        totalCost: timeEntry.totalCost,
+        billableValue: timeEntry.billableValue,
+        efficiency: timeEntry.efficiency,
+        description: timeEntry.description,
+        tags: timeEntry.tags
+      }
+    });
+    
+    console.log(`Time entry saved for ${timeEntry.employeeName} on ${timeEntry.date}`);
+    return result;
+  } catch (error) {
+    console.error('Error saving time entry:', error);
+    throw error;
+  }
+}
+
+export async function getAllEmployees() {
+  try {
+    return await prisma.employee.findMany({
+      include: {
+        salaries: true
+      }
+    });
+  } catch (error) {
+    console.error('Error getting all employees:', error);
+    throw error;
+  }
+}
+
+export async function getAllEmployeeSalaries() {
+  try {
+    return await prisma.employeeSalary.findMany({
+      include: {
+        employee: true
+      }
+    });
+  } catch (error) {
+    console.error('Error getting all employee salaries:', error);
+    throw error;
+  }
+}
+
+export async function getAllProjectMultipliers() {
+  try {
+    return await prisma.projectMultiplier.findMany();
+  } catch (error) {
+    console.error('Error getting all project multipliers:', error);
+    throw error;
+  }
+}
+
+export async function getAllEmployeeTimeEntries() {
+  try {
+    return await prisma.employeeTimeEntry.findMany({
+      include: {
+        employee: true
+      }
+    });
+  } catch (error) {
+    console.error('Error getting all time entries:', error);
+    throw error;
+  }
+}
+
 export { prisma };

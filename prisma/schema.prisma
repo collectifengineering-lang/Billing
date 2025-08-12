@@ -64,3 +64,91 @@ model ProjectManager {
   name      String
   color     String
 }
+
+// BambooHR Integration Tables
+model BambooHRConfig {
+  id            Int      @id @default(autoincrement())
+  subdomain    String   @unique
+  apiKey       String   @map("api_key")
+  webhookSecret String? @map("webhook_secret")
+  isActive     Boolean  @default(true) @map("is_active")
+  lastSync     DateTime? @map("last_sync")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+}
+
+model Employee {
+  id              String            @id
+  name            String
+  email           String
+  status          String            @default("active")
+  department      String?
+  position        String?
+  hireDate        String            @map("hire_date")
+  terminationDate String?           @map("termination_date")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  salaries        EmployeeSalary[]
+  timeEntries     EmployeeTimeEntry[]
+}
+
+model EmployeeSalary {
+  id            Int      @id @default(autoincrement())
+  employeeId    String   @map("employee_id")
+  effectiveDate String   @map("effective_date")
+  endDate       String?  @map("end_date")
+  annualSalary  Decimal  @map("annual_salary") @db.Decimal(12, 2)
+  hourlyRate    Decimal  @map("hourly_rate") @db.Decimal(8, 2)
+  currency      String   @default("USD")
+  notes         String?
+  source        String   @default("bamboohr")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  @@unique([employeeId, effectiveDate])
+}
+
+model ProjectMultiplier {
+  id            Int      @id @default(autoincrement())
+  projectId     String   @map("project_id")
+  projectName   String   @map("project_name")
+  multiplier    Decimal  @db.Decimal(4, 2)
+  effectiveDate String   @map("effective_date")
+  endDate       String?  @map("end_date")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@unique([projectId, effectiveDate])
+}
+
+model EmployeeTimeEntry {
+  id                Int      @id @default(autoincrement())
+  employeeId        String   @map("employee_id")
+  employeeName      String   @map("employee_name")
+  projectId         String   @map("project_id")
+  projectName       String   @map("project_name")
+  date              String
+  hours             Decimal  @db.Decimal(8, 2)
+  billableHours     Decimal  @map("billable_hours") @db.Decimal(8, 2)
+  nonBillableHours  Decimal  @map("non_billable_hours") @db.Decimal(8, 2)
+  hourlyRate        Decimal  @map("hourly_rate") @db.Decimal(8, 2)
+  projectMultiplier Decimal  @map("project_multiplier") @db.Decimal(4, 2)
+  totalCost         Decimal  @map("total_cost") @db.Decimal(12, 2)
+  billableValue     Decimal  @map("billable_value") @db.Decimal(12, 2)
+  efficiency        Decimal  @db.Decimal(4, 4)
+  description       String?
+  tags              String[]
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  @@unique([employeeId, projectId, date])
+}

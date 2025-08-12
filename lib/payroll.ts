@@ -11,6 +11,17 @@ import {
 } from './types';
 import { ClockifyTimeEntry, ClockifyUser } from './clockify';
 import { configureBambooHR as _configureBambooHRService, getBambooHRService, importBambooHREmployees, importBambooHRSalaries } from './bamboohr';
+import { 
+  saveEmployee, 
+  saveEmployeeSalary, 
+  saveProjectMultiplier, 
+  saveEmployeeTimeEntry,
+  getAllEmployees as dbGetAllEmployees,
+  getAllEmployeeSalaries as dbGetAllEmployeeSalaries,
+  getAllProjectMultipliers as dbGetAllProjectMultipliers,
+  getAllEmployeeTimeEntries as dbGetAllEmployeeTimeEntries,
+  saveBambooHRConfig
+} from './database';
 
 export class PayrollService {
   private employees: Map<string, Employee> = new Map();
@@ -25,28 +36,56 @@ export class PayrollService {
 
   // Employee Management
   async addEmployee(employee: Employee): Promise<void> {
+    // Save to database
+    await saveEmployee(employee);
+    // Also keep in memory for backward compatibility
     this.employees.set(employee.id, employee);
     console.log(`Employee added: ${employee.name} (${employee.id})`);
   }
 
   async getEmployee(employeeId: string): Promise<Employee | null> {
-    return this.employees.get(employeeId) || null;
+    // Try memory first, then database
+    let employee = this.employees.get(employeeId);
+    if (!employee) {
+      // Load from database
+      const dbEmployees = await dbGetAllEmployees();
+      const dbEmployee = dbEmployees.find(emp => emp.id === employeeId);
+      if (dbEmployee) {
+        this.employees.set(employeeId, dbEmployee);
+        employee = dbEmployee;
+      }
+    }
+    return employee || null;
   }
 
   async getAllEmployees(): Promise<Employee[]> {
-    return Array.from(this.employees.values());
+    // Load from database and sync memory
+    const dbEmployees = await dbGetAllEmployees();
+    // Update memory cache
+    for (const emp of dbEmployees) {
+      this.employees.set(emp.id, emp);
+    }
+    return dbEmployees;
   }
 
   async updateEmployee(employeeId: string, updates: Partial<Employee>): Promise<void> {
     const employee = this.employees.get(employeeId);
     if (employee) {
-      this.employees.set(employeeId, { ...employee, ...updates });
+      const updatedEmployee = { ...employee, ...updates };
+      // Save to database
+      await saveEmployee(updatedEmployee);
+      // Update memory
+      this.employees.set(employeeId, updatedEmployee);
       console.log(`Employee updated: ${employee.name}`);
     }
   }
 
   // Salary Management
   async addSalary(salary: EmployeeSalary): Promise<void> {
+    // Save to database
+    await saveEmployeeSalary(salary);
+    
+    // Also keep in memory for backward compatibility
     const employeeSalaries = this.salaries.get(salary.employeeId) || [];
     
     // If this is a new current salary, end the previous one
@@ -54,6 +93,8 @@ export class PayrollService {
       const currentSalary = employeeSalaries.find(s => !s.endDate);
       if (currentSalary) {
         currentSalary.endDate = salary.effectiveDate;
+        // Update the previous salary in database
+        await saveEmployeeSalary(currentSalary);
       }
     }
     
@@ -65,7 +106,20 @@ export class PayrollService {
   }
 
   async getEmployeeSalary(employeeId: string, date: string): Promise<EmployeeSalary | null> {
-    const employeeSalaries = this.salaries.get(employeeId) || [];
+    // Try memory first, then database
+    let employeeSalaries = this.salaries.get(employeeId);
+    if (!employeeSalaries || employeeSalaries.length === 0) {
+      // Load from database
+      const dbSalaries = await dbGetAllEmployeeSalaries();
+      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
+      if (employeeDbSalaries.length > 0) {
+        this.salaries.set(employeeId, employeeDbSalaries);
+        employeeSalaries = employeeDbSalaries;
+      }
+    }
+    
+    if (!employeeSalaries) return null;
+    
     const targetDate = new Date(date);
     
     return employeeSalaries.find(salary => {
@@ -76,11 +130,26 @@ export class PayrollService {
   }
 
   async getEmployeeSalaryHistory(employeeId: string): Promise<EmployeeSalary[]> {
-    return this.salaries.get(employeeId) || [];
+    // Try memory first, then database
+    let employeeSalaries = this.salaries.get(employeeId);
+    if (!employeeSalaries || employeeSalaries.length === 0) {
+      // Load from database
+      const dbSalaries = await dbGetAllEmployeeSalaries();
+      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
+      if (employeeDbSalaries.length > 0) {
+        this.salaries.set(employeeId, employeeDbSalaries);
+        employeeSalaries = employeeDbSalaries;
+      }
+    }
+    return employeeSalaries || [];
   }
 
   // Project Multiplier Management
   async addProjectMultiplier(multiplier: ProjectMultiplier): Promise<void> {
+    // Save to database
+    await saveProjectMultiplier(multiplier);
+    
+    // Also keep in memory for backward compatibility
     const projectMultipliers = this.multipliers.get(multiplier.projectId) || [];
     
     // If this is a new current multiplier, end the previous one
@@ -88,6 +157,8 @@ export class PayrollService {
       const currentMultiplier = projectMultipliers.find(m => !m.endDate);
       if (currentMultiplier) {
         currentMultiplier.endDate = multiplier.effectiveDate;
+        // Update the previous multiplier in database
+        await saveProjectMultiplier(currentMultiplier);
       }
     }
     
@@ -99,7 +170,20 @@ export class PayrollService {
   }
 
   async getProjectMultiplier(projectId: string, date: string): Promise<ProjectMultiplier | null> {
-    const projectMultipliers = this.multipliers.get(projectId) || [];
+    // Try memory first, then database
+    let projectMultipliers = this.multipliers.get(projectId);
+    if (!projectMultipliers || projectMultipliers.length === 0) {
+      // Load from database
+      const dbMultipliers = await dbGetAllProjectMultipliers();
+      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
+      if (projectDbMultipliers.length > 0) {
+        this.multipliers.set(projectId, projectDbMultipliers);
+        projectMultipliers = projectDbMultipliers;
+      }
+    }
+    
+    if (!projectMultipliers) return null;
+    
     const targetDate = new Date(date);
     
     return projectMultipliers.find(multiplier => {
@@ -110,7 +194,18 @@ export class PayrollService {
   }
 
   async getProjectMultiplierHistory(projectId: string): Promise<ProjectMultiplier[]> {
-    return this.multipliers.get(projectId) || [];
+    // Try memory first, then database
+    let projectMultipliers = this.multipliers.get(projectId);
+    if (!projectMultipliers || projectMultipliers.length === 0) {
+      // Load from database
+      const dbMultipliers = await dbGetAllProjectMultipliers();
+      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
+      if (projectDbMultipliers.length > 0) {
+        this.multipliers.set(projectId, projectDbMultipliers);
+        projectMultipliers = projectDbMultipliers;
+      }
+    }
+    return projectMultipliers || [];
   }
 
   // Time Entry Processing with Historical Rates
@@ -148,7 +243,7 @@ export class PayrollService {
       const billableValue = billableHours * salary.hourlyRate * projectMultiplier;
       const efficiency = hours > 0 ? billableHours / hours : 0;
 
-      employeeTimeEntries.push({
+      const timeEntry = {
         employeeId: entry.userId,
         employeeName: user.name,
         projectId: entry.projectId,
@@ -164,7 +259,12 @@ export class PayrollService {
         efficiency,
         description: entry.description,
         tags: entry.tags.map(tag => tag.name)
-      });
+      };
+
+      // Save to database
+      await saveEmployeeTimeEntry(timeEntry);
+
+      employeeTimeEntries.push(timeEntry);
     }
 
     return employeeTimeEntries;
@@ -313,6 +413,14 @@ export class PayrollService {
   async configureBambooHR(config: BambooHRConfig): Promise<void> {
     this.bamboohrConfig = config;
     _configureBambooHRService(config);
+    
+    // Save configuration to database
+    await saveBambooHRConfig({
+      subdomain: config.subdomain,
+      apiKey: config.apiKey,
+      webhookSecret: config.webhookSecret
+    });
+    
     console.log(`BambooHR configured for subdomain: ${config.subdomain}`);
   }
 
