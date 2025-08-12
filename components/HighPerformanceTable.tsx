@@ -550,10 +550,10 @@ export default function HighPerformanceTable({
 
   const getCellClass = (status: string) => {
     switch (status) {
-      case 'Confirmed': return 'bg-blue-50';
-      case 'Estimate': return 'bg-yellow-50';
-      case 'Billed': return 'bg-green-50';
-      case 'Other': return 'bg-purple-50';
+      case 'Confirmed': return 'bg-blue-100/80 dark:bg-blue-900/40 border-l-4 border-l-blue-500 dark:border-l-blue-400 shadow-sm';
+      case 'Estimate': return 'bg-amber-100/80 dark:bg-amber-900/40 border-l-4 border-l-amber-500 dark:border-l-amber-400 shadow-sm';
+      case 'Billed': return 'bg-emerald-100/80 dark:bg-emerald-900/40 border-l-4 border-l-emerald-500 dark:border-l-emerald-400 shadow-sm';
+      case 'Other': return 'bg-violet-100/80 dark:bg-violet-900/40 border-l-4 border-l-violet-500 dark:border-l-violet-400 shadow-sm';
       default: return '';
     }
   };
@@ -1129,7 +1129,7 @@ export default function HighPerformanceTable({
                             
                             return (
                               <div 
-                                className="text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200"
+                                className="text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200 text-gray-900 dark:text-white"
                                 onClick={() => {
                                   setEditingSignedFee(project.projectId);
                                   setEditValue(displayValue.toString());
@@ -1157,7 +1157,7 @@ export default function HighPerformanceTable({
                           />
                         ) : (
                           <div 
-                            className="text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200"
+                            className="text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 p-1 rounded transition-colors duration-200 text-gray-900 dark:text-white"
                             onClick={() => {
                               setEditingAsrFee(project.projectId);
                               setEditValue(asrFee.toString());
@@ -1492,7 +1492,7 @@ export default function HighPerformanceTable({
       {openMenuCell && menuAnchor && createPortal(
         <div 
           ref={statusMenuRef}
-          className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] min-w-[200px] py-2 backdrop-blur-sm"
+          className="fixed bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl z-[9999] min-w-[200px] py-2"
           data-dropdown="true"
                       style={{
               left: `${getDropdownPosition(menuAnchor, 200, 150).x}px`,
@@ -1506,21 +1506,24 @@ export default function HighPerformanceTable({
             const options = ['Confirmed', 'Estimate', 'Billed', 'Other'] as const;
             return (
               <div className="py-1">
-                <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Status</div>
+                <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</div>
                 {options.map((label) => (
                   <button
                     key={label}
                     onClick={() => handleMenuSelect(label)}
-                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 ${currentStatus === label ? 'bg-gray-50' : ''}`}
+                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white ${currentStatus === label ? 'bg-gray-50 dark:bg-slate-700' : ''}`}
                   >
-                    <span>{label}</span>
-                    {currentStatus === label && <Check className="h-4 w-4 text-green-600" />}
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-3 h-3 rounded-full ${label === 'Confirmed' ? 'bg-blue-500 dark:bg-blue-400' : label === 'Estimate' ? 'bg-amber-500 dark:bg-amber-400' : label === 'Billed' ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-violet-500 dark:bg-violet-400'}`}></div>
+                      <span>{label}</span>
+                    </div>
+                    {currentStatus === label && <Check className="h-4 w-4 text-green-600 dark:text-green-400" />}
                   </button>
                 ))}
-                <div className="my-1 border-t border-gray-200"></div>
+                <div className="my-1 border-t border-gray-200 dark:border-slate-600"></div>
                 <button
                   onClick={() => handleMenuSelect('Clear')}
-                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
                 >
                   Clear
                 </button>
@@ -1530,17 +1533,17 @@ export default function HighPerformanceTable({
 
           {/* Comment Section */}
           <div className="py-1">
-            <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Comment</div>
+            <div className="px-3 pb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Comment</div>
             <button
               onClick={() => handleMenuSelect(getCellComment(openMenuCell.projectId, openMenuCell.month) ? 'EditComment' : 'AddComment')}
-              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white"
             >
               {getCellComment(openMenuCell.projectId, openMenuCell.month) ? 'Edit Comment' : 'Add Comment'}
             </button>
             {getCellComment(openMenuCell.projectId, openMenuCell.month) && (
               <button
                 onClick={() => handleMenuSelect('RemoveComment')}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white"
               >
                 Remove Comment
               </button>
