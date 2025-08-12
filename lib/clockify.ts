@@ -141,6 +141,7 @@ class ClockifyService {
   private apiKey: string | null = null;
   private workspaceId: string | null = null;
   private baseUrl = 'https://api.clockify.me/api/v1';
+  private reportsBaseUrl = 'https://reports.api.clockify.me/v1'; // Correct Reports API base URL
   private _isConfigured: boolean = false;
 
   constructor() {
@@ -150,7 +151,7 @@ class ClockifyService {
     // Check if we have valid credentials
     if (this.apiKey && this.apiKey !== 'your_clockify_api_key_here' && this.workspaceId && this.workspaceId !== 'your_clockify_workspace_id_here') {
       this._isConfigured = true;
-      console.log('Clockify service initialized with valid credentials');
+      console.info('Clockify service initialized with valid credentials');
     } else {
       this._isConfigured = false;
       console.warn('Clockify service initialized without valid credentials - will use mock data');
@@ -380,20 +381,25 @@ class ClockifyService {
       
       // First try the Reports API for bulk time entry data
       try {
+        console.info('🔄 Attempting to fetch time entries via Clockify Reports API (requires Pro plan)...');
         return await this.getTimeEntriesViaReports(startDate, endDate);
       } catch (reportsError) {
-        console.warn('Reports API failed, falling back to user time entries:', reportsError);
+        console.warn('⚠️ Clockify Reports API failed, falling back to user time entries endpoint:', {
+          error: reportsError instanceof Error ? reportsError.message : 'Unknown error',
+          reason: 'Reports API may require Pro plan or may be temporarily unavailable',
+          fallback: 'Using user time entries endpoint instead'
+        });
         return await this.getTimeEntriesViaUserEndpoint(startDate, endDate);
       }
     } catch (error) {
-      console.error('Failed to get all Clockify time entries:', error);
+      console.error('❌ Failed to get all Clockify time entries:', error);
       
       // Return mock time entry data when Clockify fails
-      console.log('Returning mock time entry data due to Clockify API failure');
+      console.warn('🎭 Returning mock time entry data due to Clockify API failure. Check your plan level and API configuration.');
       return [
         {
           id: 'mock-time-entry-1',
-          description: 'Mock work session',
+          description: 'Mock work session (Clockify API unavailable)',
           timeInterval: {
             start: startDate,
             end: endDate,
@@ -411,16 +417,16 @@ class ClockifyService {
 
   // Method to get time entries via Reports API (preferred method)
   private async getTimeEntriesViaReports(startDate: string, endDate: string): Promise<any[]> {
-    const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/reports/detailed`);
+    const url = new URL(`${this.reportsBaseUrl}/workspaces/${this.workspaceId}/reports/detailed`);
     
-    console.log(`🔍 Clockify Reports API Request: ${url.toString()}`);
-    console.log(`   Method: POST (Reports API)`);
-    console.log(`   Headers: ${JSON.stringify(this.getHeaders())}`);
-    console.log(`   Body: ${JSON.stringify({ 
+    console.info(`🔍 Clockify Reports API Request: ${url.toString()}`);
+    console.info(`   Method: POST (Reports API)`);
+    console.info(`   Headers: ${JSON.stringify(this.getHeaders())}`);
+    console.info(`   Body: ${JSON.stringify({ 
       dateRangeStart: startDate, 
       dateRangeEnd: endDate,
       detailedFilter: {
-        pageSize: 1000, // Get more entries per page
+        pageSize: 1000,
         sortColumn: "DATE"
       }
     })}`);
@@ -441,14 +447,14 @@ class ClockifyService {
       }),
     });
 
-    console.log(`📡 Clockify Reports API Response: ${response.status} ${response.statusText}`);
+    console.info(`📡 Clockify Reports API Response: ${response.status} ${response.statusText}`);
 
     if (response.status === 401) {
       throw new Error('Clockify API authentication failed - check your API key');
     }
     
     if (response.status === 403) {
-      throw new Error('Clockify API access forbidden - check your workspace ID and permissions');
+      throw new Error('Clockify API access forbidden - check your workspace ID and permissions. Note: Detailed reports require Pro plan or higher.');
     }
     
     if (response.status === 404) {
@@ -457,7 +463,8 @@ class ClockifyService {
       console.error(`   Full URL: ${url.toString()}`);
       console.error(`   Workspace ID: ${this.workspaceId}`);
       console.error(`   API Key configured: ${!!this.apiKey}`);
-      throw new Error(`Clockify API error: 404 Not Found - ${errorDetails}`);
+      console.error(`   Note: This endpoint requires Clockify Pro plan or higher for detailed reports`);
+      throw new Error(`Clockify API error: 404 Not Found - ${errorDetails}. This endpoint requires Pro plan or higher.`);
     }
     
     if (response.status === 405) {
@@ -470,11 +477,12 @@ class ClockifyService {
     
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`Clockify Reports API error response body: ${errorText}`);
       throw new Error(`Clockify API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log(`✅ Clockify Reports API Success: /workspaces/${this.workspaceId}/reports/detailed`);
+    console.info(`✅ Clockify Reports API Success: /workspaces/${this.workspaceId}/reports/detailed`);
     
     // Transform the reports data to match our expected time entry format
     if (data.timeentries) {
@@ -512,24 +520,27 @@ class ClockifyService {
       url.searchParams.set('start', startDate);
       url.searchParams.set('end', endDate);
       
-      console.log(`🔍 Clockify User Time Entries API Request: ${url.toString()}`);
-      console.log(`   Method: GET (User Time Entries)`);
-      console.log(`   Headers: ${JSON.stringify(this.getHeaders())}`);
+      console.info(`🔍 Clockify User Time Entries API Request (Fallback): ${url.toString()}`);
+      console.info(`   Method: GET (User Time Entries - Fallback from Reports API)`);
+      console.info(`   Headers: ${JSON.stringify(this.getHeaders())}`);
+      console.info(`   Note: Using fallback method because Reports API failed or requires Pro plan`);
 
       const response = await fetch(url.toString(), {
         method: 'GET',
         headers: this.getHeaders(),
       });
 
-      console.log(`📡 Clockify User Time Entries API Response: ${response.status} ${response.statusText}`);
+      console.info(`📡 Clockify User Time Entries API Response: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`Clockify User Time Entries API error response body: ${errorText}`);
         throw new Error(`Clockify User Time Entries API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
-      console.log(`✅ Clockify User Time Entries API Success: /workspaces/${this.workspaceId}/user/${user.id}/time-entries`);
+      console.info(`✅ Clockify User Time Entries API Success (Fallback): /workspaces/${this.workspaceId}/user/${user.id}/time-entries`);
+      console.info(`   Retrieved ${data?.length || 0} time entries via fallback method`);
       
       // Transform the data to match our expected format
       if (Array.isArray(data)) {
@@ -552,7 +563,7 @@ class ClockifyService {
       
       return [];
     } catch (error) {
-      console.error('Failed to get time entries via user endpoint:', error);
+      console.error('Failed to get time entries via user endpoint (fallback):', error);
       throw error;
     }
   }

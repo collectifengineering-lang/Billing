@@ -35,7 +35,7 @@ async function testClockifyAPI() {
     // Test 1: Reports API (preferred method)
     console.log('  Testing Reports API...');
     const reportsResponse = await axios.post(
-      `https://api.clockify.me/api/v1/workspaces/${config.clockify.workspaceId}/reports/detailed`,
+      `https://reports.api.clockify.me/v1/workspaces/${config.clockify.workspaceId}/reports/detailed`,
       {
         dateRangeStart: '2025-01-01T00:00:00Z',
         dateRangeEnd: '2025-01-31T23:59:59Z',
@@ -66,6 +66,7 @@ async function testClockifyAPI() {
     // Test 2: User time entries (fallback method)
     try {
       console.log('  Testing User Time Entries API (fallback)...');
+      console.log('  Note: Reports API may require Pro plan. Testing fallback method...');
       
       // First get user info
       const userResponse = await axios.get(
@@ -90,7 +91,7 @@ async function testClockifyAPI() {
         }
       );
 
-      console.log('  ✅ User Time Entries API successful:', {
+      console.log('  ✅ User Time Entries API successful (fallback):', {
         status: timeEntriesResponse.status,
         timeEntriesCount: timeEntriesResponse.data?.length || 0
       });

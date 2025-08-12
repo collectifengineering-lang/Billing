@@ -73,7 +73,7 @@ The new implementation uses a two-tier approach:
 
 1. **Reports API (Preferred)**:
    ```typescript
-   POST /workspaces/{workspaceId}/reports/detailed
+   POST https://reports.api.clockify.me/v1/workspaces/{workspaceId}/reports/detailed
    Body: {
      dateRangeStart: startDate,
      dateRangeEnd: endDate,
@@ -83,10 +83,11 @@ The new implementation uses a two-tier approach:
      }
    }
    ```
+   **Note**: This endpoint requires a Clockify Pro plan ($9.99/user/month) or higher.
 
 2. **User Time Entries API (Fallback)**:
    ```typescript
-   GET /workspaces/{workspaceId}/user/{userId}/time-entries?start={startDate}&end={endDate}
+   GET https://api.clockify.me/api/v1/workspaces/{workspaceId}/user/{userId}/time-entries?start={startDate}&end={endDate}
    ```
 
 ### Zoho Fix
@@ -107,6 +108,11 @@ Ensure these environment variables are properly set in your Vercel deployment:
 CLOCKIFY_API_KEY=your_clockify_api_key
 CLOCKIFY_WORKSPACE_ID=your_workspace_id
 ```
+
+**Plan Requirements**:
+- **Free Plan**: Can use User Time Entries API (fallback method)
+- **Pro Plan ($9.99/user/month)**: Can use Reports API (preferred method)
+- **Enterprise Plan**: Full access to all APIs
 
 ### Zoho Books
 ```env
@@ -132,11 +138,11 @@ npx tsc --noEmit
 
 This will catch any remaining type errors before deployment.
 
-### 2. Test Clockify Integration
+### 1. Test Clockify Integration
 
 ```bash
-# Test the Reports API endpoint
-curl -X POST "https://api.clockify.me/api/v1/workspaces/{workspaceId}/reports/detailed" \
+# Test the Reports API endpoint (requires Pro plan)
+curl -X POST "https://reports.api.clockify.me/v1/workspaces/{workspaceId}/reports/detailed" \
   -H "X-Api-Key: your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -148,10 +154,15 @@ curl -X POST "https://api.clockify.me/api/v1/workspaces/{workspaceId}/reports/de
     }
   }'
 
-# Test the User Time Entries endpoint (fallback)
+# Test the User Time Entries endpoint (fallback - works with free plan)
 curl -X GET "https://api.clockify.me/api/v1/workspaces/{workspaceId}/user/{userId}/time-entries?start=2025-01-01T00:00:00Z&end=2025-01-31T23:59:59Z" \
   -H "X-Api-Key: your_api_key"
 ```
+
+**Important Notes**:
+- **Reports API**: Requires Clockify Pro plan ($9.99/user/month) or higher
+- **User Time Entries API**: Works with free plan as fallback
+- If Reports API returns 404, check your plan level
 
 ### 2. Test Zoho Authentication
 
@@ -237,12 +248,14 @@ Zoho API request successful: reports/profitandloss
 Before deploying to production:
 
 - [ ] Test TypeScript compilation locally (`npx tsc --noEmit`)
-- [ ] Test Clockify Reports API locally
+- [ ] Test Clockify Reports API locally (requires Pro plan)
+- [ ] Test Clockify User Time Entries API (fallback - works with free plan)
 - [ ] Verify Zoho token refresh works
 - [ ] Check all environment variables are set
 - [ ] Test fallback mechanisms
 - [ ] Monitor Vercel logs for errors
 - [ ] Verify data is being fetched correctly
+- [ ] Check Clockify plan level (Pro plan required for Reports API)
 
 ## Support and Troubleshooting
 
@@ -253,6 +266,23 @@ If issues persist after implementing these fixes:
 3. **Test API Endpoints**: Use curl commands to test directly
 4. **Check API Documentation**: Verify endpoint usage and parameters
 5. **Monitor Rate Limits**: Ensure you're not hitting API limits
+
+### Clockify-Specific Troubleshooting
+
+**Reports API Returns 404**:
+- **Cause**: Most likely a plan restriction
+- **Solution**: Upgrade to Pro plan ($9.99/user/month) or higher
+- **Alternative**: The system will automatically fall back to User Time Entries API
+
+**Reports API Returns 403**:
+- **Cause**: Insufficient permissions or plan level
+- **Solution**: Check your Clockify plan and workspace permissions
+- **Alternative**: Verify your API key has the correct permissions
+
+**Both APIs Fail**:
+- **Cause**: Invalid API key or workspace ID
+- **Solution**: Verify your `CLOCKIFY_API_KEY` and `CLOCKIFY_WORKSPACE_ID`
+- **Alternative**: The system will use mock data as a last resort
 
 ## Additional Resources
 
