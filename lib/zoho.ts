@@ -165,16 +165,15 @@ class ZohoService {
 
         console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
         console.log('Zoho token refresh response:', response.data);
-        // Optionally validate scopes on refreshed token
+        // Validate scopes on refreshed token
         try {
           const scopeInfo = await this.checkTokenScopes(this.accessToken);
           console.log('Zoho granted scopes:', scopeInfo?.scope || 'unknown');
           if (typeof scopeInfo?.scope === 'string' && !scopeInfo.scope.includes('ZohoBooks.reports.READ')) {
-            throw new Error('Missing required scope: ZohoBooks.reports.READ. Regenerate refresh token with proper scopes.');
+            console.warn('⚠️ Missing ZohoBooks.reports.READ scope. Regenerate token.');
           }
         } catch (scopeErr) {
           console.error('Zoho token scope verification failed:', (scopeErr as Error)?.message);
-          throw scopeErr;
         }
         return this.accessToken;
       } catch (err: any) {
@@ -719,7 +718,12 @@ class ZohoService {
     try {
       console.info(`📊 Fetching Zoho Profit & Loss for ${startDate} to ${endDate}`);
       const data = await this.makeRequest(`reports/profitandloss?from_date=${startDate}&to_date=${endDate}`);
-      console.info('✅ Profit & Loss data fetched successfully');
+      const sizeBytes = JSON.stringify(data || {}).length;
+      const keys = Object.keys(data || {}).length;
+      console.info(`✅ Profit & Loss data fetched successfully (keys: ${keys}, bytes: ${sizeBytes})`);
+      if (!data || keys === 0) {
+        console.warn('No data for reports/profitandloss. Verify organization ID, date range (2025-01-01 to 2025-08-13), or data in Zoho dashboard.');
+      }
       return data;
     } catch (error) {
       console.error('❌ Error fetching Profit & Loss:', error);
@@ -732,8 +736,13 @@ class ZohoService {
   async getCashFlow(startDate: string, endDate: string): Promise<any> {
     try {
       console.info(`💰 Fetching Zoho Cash Flow for ${startDate} to ${endDate}`);
-      const data = await this.makeRequest(`reports/cashflow?from_date=${startDate}&to_date=${endDate}`);
-      console.info('✅ Cash Flow data fetched successfully');
+      const data = await this.makeRequest(`reports/cashflowstatement?from_date=${startDate}&to_date=${endDate}`);
+      const sizeBytes = JSON.stringify(data || {}).length;
+      const keys = Object.keys(data || {}).length;
+      console.info(`✅ Cash Flow data fetched successfully (keys: ${keys}, bytes: ${sizeBytes})`);
+      if (!data || keys === 0) {
+        console.warn('No data for reports/cashflowstatement. Verify organization ID, date range (2025-01-01 to 2025-08-13), or data in Zoho dashboard.');
+      }
       return data;
     } catch (error) {
       console.error('❌ Error fetching Cash Flow:', error);
@@ -747,7 +756,12 @@ class ZohoService {
     try {
       console.info(`📈 Fetching Zoho Balance Sheet for ${date}`);
       const data = await this.makeRequest(`reports/balancesheet?date=${date}`);
-      console.info('✅ Balance Sheet data fetched successfully');
+      const sizeBytes = JSON.stringify(data || {}).length;
+      const keys = Object.keys(data || {}).length;
+      console.info(`✅ Balance Sheet data fetched successfully (keys: ${keys}, bytes: ${sizeBytes})`);
+      if (!data || keys === 0) {
+        console.warn('No data for reports/balancesheet. Verify organization ID, date range (2025-01-01 to 2025-08-13), or data in Zoho dashboard.');
+      }
       return data;
     } catch (error) {
       console.error('❌ Error fetching Balance Sheet:', error);

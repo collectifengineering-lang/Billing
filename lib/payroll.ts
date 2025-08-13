@@ -498,21 +498,51 @@ export class PayrollService {
     try {
       // Import employees from BambooHR
       const bamboohrEmployees = await importBambooHREmployees();
+      console.log(`BambooHR import: upserting ${bamboohrEmployees.length} employees to Supabase/Prisma`);
+      let employeeSuccess = 0;
+      const employeeErrors: string[] = [];
       for (const employee of bamboohrEmployees) {
-        await this.addEmployee(employee);
+        try {
+          await this.addEmployee(employee);
+          employeeSuccess += 1;
+        } catch (e: any) {
+          console.error('BambooHR employee upsert failed:', {
+            id: employee.id,
+            name: employee.name,
+            error: e?.message || String(e)
+          });
+          employeeErrors.push(`emp:${employee.id}:${e?.message || e}`);
+        }
       }
 
       // Import salaries from BambooHR
       const bamboohrSalaries = await importBambooHRSalaries();
+      console.log(`BambooHR import: upserting ${bamboohrSalaries.length} salaries to Supabase/Prisma`);
+      let salarySuccess = 0;
+      const salaryErrors: string[] = [];
       for (const salary of bamboohrSalaries) {
-        await this.addSalary(salary);
+        try {
+          await this.addSalary(salary);
+          salarySuccess += 1;
+        } catch (e: any) {
+          console.error('BambooHR salary upsert failed:', {
+            employeeId: salary.employeeId,
+            effectiveDate: salary.effectiveDate,
+            annualSalary: salary.annualSalary,
+            hourlyRate: salary.hourlyRate,
+            error: e?.message || String(e)
+          });
+          salaryErrors.push(`sal:${salary.employeeId}:${salary.effectiveDate}:${e?.message || e}`);
+        }
       }
+
+      console.log(`BambooHR import completed: employees ok=${employeeSuccess}, salaries ok=${salarySuccess}, empErrors=${employeeErrors.length}, salErrors=${salaryErrors.length}`);
 
       return {
         source: 'bamboohr',
         importDate: new Date().toISOString(),
-        recordsImported: bamboohrEmployees.length + bamboohrSalaries.length,
-        errors: []
+        recordsImported: employeeSuccess + salarySuccess,
+        errors: [...employeeErrors, ...salaryErrors]
       };
     } catch (error: any) {
       return {
