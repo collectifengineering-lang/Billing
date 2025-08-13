@@ -51,8 +51,9 @@ class ZohoService {
   private readonly MAX_REQUESTS_PER_MINUTE = 80; // Conservative limit (Zoho allows 100, we use 80)
   private readonly MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests (was 2)
   private retryCount: number = 0;
-  private readonly MAX_RETRIES = 3;
-  private readonly BASE_DELAY = 2000; // 2 seconds base delay for exponential backoff (was 1)
+  private readonly MAX_RETRIES = 5; // Increased from 3 to 5
+  private readonly BASE_DELAY = 5000; // Increased from 2000 to 5000ms base delay for exponential backoff
+  private cachedAccessToken: string | null = null; // Fallback cached token
 
   constructor() {
     // Start automatic token refresh
@@ -93,8 +94,8 @@ class ZohoService {
 
   private async getAccessToken(): Promise<string> {
     try {
-      // Check if we have a valid token
-      if (this.accessToken && Date.now() < this.tokenExpiry) {
+      // Check if we have a valid token and force refresh is not enabled
+      if (this.accessToken && Date.now() < this.tokenExpiry && process.env.ZOHO_FORCE_REFRESH !== 'true') {
         console.log('Using existing valid token');
         return this.accessToken;
       }
@@ -131,17 +132,35 @@ class ZohoService {
           status: error.response?.status,
           statusText: error.response?.statusText,
           data: error.response?.data,
-          message: error.message
+          message: error.message,
+          headers: error.response?.headers // Log headers for rate limit info
         });
+        
+        // Log rate limit headers if available
+        if (error.response?.headers) {
+          const rateLimitHeaders = {
+            'X-Rate-Limit': error.response.headers['x-rate-limit'],
+            'X-Rate-Limit-Remaining': error.response.headers['x-rate-limit-remaining'],
+            'X-Rate-Limit-Reset': error.response.headers['x-rate-limit-reset'],
+            'Retry-After': error.response.headers['retry-after']
+          };
+          console.error('Rate limit headers:', rateLimitHeaders);
+        }
+      }
+      
+      // Try to fall back to cached token if available
+      if (this.cachedAccessToken) {
+        console.warn('Falling back to cached access token due to refresh failure');
+        return this.cachedAccessToken;
       }
       
       throw new Error(`Failed to authenticate with Zoho: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  // Perform the token refresh with form-encoded body and simple backoff if rate-limited
+  // Perform the token refresh with form-encoded body and improved exponential backoff
   private async _performTokenRefreshWithBackoff(): Promise<string> {
-    const maxAttempts = 3;
+    const maxAttempts = 5; // Increased from 3 to 5
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const formData = new URLSearchParams();
@@ -159,12 +178,20 @@ class ZohoService {
           throw new Error('No access token received from Zoho');
         }
 
+        // Cache the successful token and expiry information
         this.accessToken = response.data.access_token;
         this.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
         this.lastRefreshTime = Date.now();
+        
+        // Cache the successful token as fallback
+        this.cachedAccessToken = response.data.access_token;
 
         console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
         console.log('Zoho token refresh response:', response.data);
+        
+        // Log token caching details
+        console.log(`🔐 Token cached: access_token=${this.accessToken.substring(0, 10)}..., expires_in=${response.data.expires_in}s, expiry=${new Date(this.tokenExpiry).toISOString()}`);
+        
         // Validate scopes on refreshed token
         try {
           const scopeInfo = await this.checkTokenScopes(this.accessToken);
@@ -177,17 +204,24 @@ class ZohoService {
         }
         return this.accessToken;
       } catch (err: any) {
-        // If rate-limited by Zoho during token refresh, back off and retry
+        // If rate-limited by Zoho during token refresh, implement exponential backoff
         const isAxios = axios.isAxiosError(err);
         const status = isAxios ? err.response?.status : undefined;
         const description = isAxios ? (err.response?.data as any)?.error_description : undefined;
+        
         if (status === 400 && typeof description === 'string' && description.toLowerCase().includes('too many requests')) {
-          const delayMs = 2000 * attempt * attempt + Math.floor(Math.random() * 500);
+          // Exponential backoff: delay = base * 2^attempt
+          const delayMs = this.BASE_DELAY * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 1000);
           console.warn(`Zoho token refresh rate-limited (attempt ${attempt}/${maxAttempts}). Waiting ${delayMs}ms before retry.`);
           await new Promise(resolve => setTimeout(resolve, delayMs));
           continue;
         }
+        
         // For other errors, do not retry endlessly
+        if (attempt === maxAttempts) {
+          console.error(`Zoho token refresh failed after ${maxAttempts} attempts:`, err);
+          throw new Error('Zoho token refresh rate-limited. Check daily API limits or token validity.');
+        }
         throw err;
       }
     }
@@ -211,10 +245,15 @@ class ZohoService {
         },
       });
 
+      // Cache the successful token and expiry information
       this.accessToken = response.data.access_token;
       this.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
+      
+      // Cache the successful token as fallback
+      this.cachedAccessToken = response.data.access_token;
 
       console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
+      console.log(`🔐 Token cached: access_token=${this.accessToken.substring(0, 10)}..., expires_in=${response.data.expires_in}s, expiry=${new Date(this.tokenExpiry).toISOString()}`);
       
       return this.accessToken;
     } catch (error) {
@@ -644,8 +683,10 @@ class ZohoService {
 
   async getInvoices(): Promise<ZohoInvoice[]> {
     try {
+      console.log('📄 Fetching invoices from Zoho...');
       const data = await this.makeRequest('invoices');
-      return data.invoices?.map((invoice: any) => ({
+      
+      const invoices = data.invoices?.map((invoice: any) => ({
         invoice_id: invoice.invoice_id,
         project_id: invoice.project_id,
         invoice_number: invoice.invoice_number,
@@ -655,6 +696,30 @@ class ZohoService {
         billed_amount: invoice.billed_amount || 0,
         unbilled_amount: invoice.unbilled_amount || 0,
       })) || [];
+      
+      // Log invoice counts and details
+      console.log(`📊 Zoho invoices fetched: ${invoices.length} total invoices`);
+      
+      if (invoices.length > 0) {
+        const statusCounts = invoices.reduce((acc: any, inv) => {
+          acc[inv.status] = (acc[inv.status] || 0) + 1;
+          return acc;
+        }, {});
+        
+        console.log('📋 Invoice status breakdown:', statusCounts);
+        
+        // Log sample invoice data for debugging
+        const sampleInvoice = invoices[0];
+        console.log('📄 Sample invoice data:', {
+          id: sampleInvoice.invoice_id,
+          number: sampleInvoice.invoice_number,
+          project: sampleInvoice.project_id,
+          amount: sampleInvoice.amount,
+          status: sampleInvoice.status
+        });
+      }
+      
+      return invoices;
     } catch (error) {
       console.error('Error fetching invoices:', error);
       return [];

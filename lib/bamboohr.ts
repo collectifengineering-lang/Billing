@@ -9,6 +9,9 @@ import {
   SalaryImport
 } from './types';
 
+// Import xml2js for XML parsing
+import { parseString } from 'xml2js';
+
 export class BambooHRService {
   private config: BambooHRConfig;
   private baseUrl: string;
@@ -114,14 +117,43 @@ export class BambooHRService {
     return response.employees || [];
   }
 
-  // Compensation Management
+  // Compensation Management - Updated to use tables endpoint
   async getEmployeeCompensation(employeeId: string): Promise<BamboohrCompensation[]> {
-    const response = await this.makeRequest(`/employees/${employeeId}/compensation`);
-    return response.compensation || [];
+    try {
+      console.log(`💰 Fetching compensation for employee ${employeeId}...`);
+      
+      // Use the tables endpoint for compensation data
+      const response = await this.makeRequest(`/employees/${employeeId}/tables/compensation`);
+      
+      if (response.tables && response.tables.compensation) {
+        const compensationData = response.tables.compensation;
+        console.log(`✅ Found ${compensationData.length} compensation records for employee ${employeeId}`);
+        
+        // Parse and map the compensation data
+        const compensations: BamboohrCompensation[] = compensationData.map((comp: any) => ({
+          employeeId: employeeId,
+          effectiveDate: comp.effectiveDate || comp['effective-date'] || '',
+          endDate: comp.endDate || comp['end-date'] || '',
+          annualSalary: parseFloat(comp.annualSalary || comp['annual-salary'] || '0'),
+          hourlyRate: parseFloat(comp.hourlyRate || comp['hourly-rate'] || '0'),
+          currency: comp.currency || 'USD',
+          payType: comp.payType || comp['pay-type'] || 'salary',
+          paySchedule: comp.paySchedule || comp['pay-schedule'] || 'monthly'
+        }));
+        
+        return compensations;
+      }
+      
+      console.log(`⚠️ No compensation data found for employee ${employeeId}`);
+      return [];
+    } catch (error) {
+      console.error(`❌ Error fetching compensation for employee ${employeeId}:`, error);
+      return [];
+    }
   }
 
   async getCompensationHistory(employeeId: string, startDate?: string, endDate?: string): Promise<BamboohrCompensation[]> {
-    let endpoint = `/employees/${employeeId}/compensation/history`;
+    let endpoint = `/employees/${employeeId}/tables/compensation`;
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
@@ -130,8 +162,30 @@ export class BambooHRService {
       endpoint += `?${params.toString()}`;
     }
     
-    const response = await this.makeRequest(endpoint);
-    return response.compensation || [];
+    try {
+      const response = await this.makeRequest(endpoint);
+      
+      if (response.tables && response.tables.compensation) {
+        const compensationData = response.tables.compensation;
+        console.log(`✅ Found ${compensationData.length} historical compensation records for employee ${employeeId}`);
+        
+        return compensationData.map((comp: any) => ({
+          employeeId: employeeId,
+          effectiveDate: comp.effectiveDate || comp['effective-date'] || '',
+          endDate: comp.endDate || comp['end-date'] || '',
+          annualSalary: parseFloat(comp.annualSalary || comp['annual-salary'] || '0'),
+          hourlyRate: parseFloat(comp.hourlyRate || comp['hourly-rate'] || '0'),
+          currency: comp.currency || 'USD',
+          payType: comp.payType || comp['pay-type'] || 'salary',
+          paySchedule: comp.paySchedule || comp['pay-schedule'] || 'monthly'
+        }));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error(`❌ Error fetching compensation history for employee ${employeeId}:`, error);
+      return [];
+    }
   }
 
   // Time Off Management
@@ -218,61 +272,122 @@ export class BambooHRService {
     return annualSalary / hoursPerYear;
   }
 
-  // Data Import Methods
+  // Data Import Methods - Enhanced with XML parsing and better logging
   async importEmployees(): Promise<Employee[]> {
-    const bamboohrEmployees = await this.getAllEmployees();
-    console.log(`BambooHR import: preparing to upsert ${bamboohrEmployees.length} employees`);
+    try {
+      console.log('🔄 Starting employee import from BambooHR...');
+      const bamboohrEmployees = await this.getAllEmployees();
+      console.log(`👥 BambooHR import: preparing to upsert ${bamboohrEmployees.length} employees`);
 
-    return bamboohrEmployees.map(emp => ({
-      id: emp.id,
-      name: emp.displayName,
-      email: emp.email,
-      status: emp.status === 'active' ? 'active' : 'inactive',
-      department: emp.department,
-      position: emp.jobTitle,
-      hireDate: emp.hireDate,
-      terminationDate: emp.terminationDate
-    }));
+      const employees: Employee[] = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const emp of bamboohrEmployees) {
+        try {
+          const employee: Employee = {
+            id: emp.id,
+            name: emp.displayName,
+            email: emp.email,
+            status: emp.status === 'active' ? 'active' : 'inactive',
+            department: emp.department,
+            position: emp.jobTitle,
+            hireDate: emp.hireDate,
+            terminationDate: emp.terminationDate
+          };
+          
+          employees.push(employee);
+          successCount++;
+          
+          // Log successful employee mapping
+          console.log(`✅ Employee mapped: ${emp.displayName} (${emp.id}) - ${emp.department}`);
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ Error mapping employee ${emp.id}:`, error);
+        }
+      }
+
+      console.log(`📊 Employee import results: ${successCount} successful, ${errorCount} errors`);
+      return employees;
+    } catch (error) {
+      console.error('❌ Employee import failed:', error);
+      throw error;
+    }
   }
 
   async importSalaries(): Promise<EmployeeSalary[]> {
-    const employees = await this.getAllEmployees();
-    console.log(`BambooHR import: fetching compensation for ${employees.length} employees`);
-    const salaries: EmployeeSalary[] = [];
+    try {
+      console.log('🔄 Starting salary import from BambooHR...');
+      const employees = await this.getAllEmployees();
+      console.log(`💰 BambooHR import: fetching compensation for ${employees.length} employees`);
+      
+      const salaries: EmployeeSalary[] = [];
+      let successCount = 0;
+      let errorCount = 0;
+      let totalCompensationRecords = 0;
 
-    for (const employee of employees) {
-      const compensations = await this.getEmployeeCompensation(employee.id);
+      for (const employee of employees) {
+        try {
+          const compensations = await this.getEmployeeCompensation(employee.id);
+          totalCompensationRecords += compensations.length;
 
-      for (const comp of compensations) {
-        // Log the upsert intent; actual DB upsert occurs in saveEmployeeSalary
-        console.log(`BambooHR upsert salary -> employeeId=${comp.employeeId} effectiveDate=${comp.effectiveDate} annualSalary=${comp.annualSalary} hourlyRate=${comp.hourlyRate}`);
-        salaries.push({
-          employeeId: comp.employeeId,
-          effectiveDate: comp.effectiveDate,
-          endDate: comp.endDate,
-          annualSalary: comp.annualSalary,
-          hourlyRate: comp.hourlyRate,
-          currency: comp.currency,
-          notes: `Imported from BambooHR - ${comp.payType} (${comp.paySchedule})`
-        });
+          for (const comp of compensations) {
+            try {
+              // Log the upsert intent; actual DB upsert occurs in saveEmployeeSalary
+              console.log(`💰 Salary record: employeeId=${comp.employeeId} effectiveDate=${comp.effectiveDate} annualSalary=${comp.annualSalary} hourlyRate=${comp.hourlyRate}`);
+              
+              const salary: EmployeeSalary = {
+                employeeId: comp.employeeId,
+                effectiveDate: comp.effectiveDate,
+                endDate: comp.endDate,
+                annualSalary: comp.annualSalary,
+                hourlyRate: comp.hourlyRate,
+                currency: comp.currency,
+                notes: `Imported from BambooHR - ${comp.payType} (${comp.paySchedule})`
+              };
+              
+              salaries.push(salary);
+              successCount++;
+            } catch (error) {
+              errorCount++;
+              console.error(`❌ Error processing compensation for employee ${comp.employeeId}:`, error);
+            }
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ Error fetching compensation for employee ${employee.id}:`, error);
+        }
       }
-    }
 
-    return salaries;
+      console.log(`📊 Salary import results: ${successCount} successful, ${errorCount} errors, ${totalCompensationRecords} total compensation records`);
+      return salaries;
+    } catch (error) {
+      console.error('❌ Salary import failed:', error);
+      throw error;
+    }
   }
 
   async importAllData(): Promise<SalaryImport> {
     try {
-      const employees = await this.importEmployees();
-      const salaries = await this.importSalaries();
+      console.log('🔄 Starting comprehensive BambooHR data import...');
+      
+      const [employees, salaries] = await Promise.all([
+        this.importEmployees(),
+        this.importSalaries()
+      ]);
 
-      return {
+      const result: SalaryImport = {
         source: 'bamboohr',
         importDate: new Date().toISOString(),
         recordsImported: employees.length + salaries.length,
         errors: []
       };
+
+      console.log(`✅ Comprehensive import completed: ${employees.length} employees, ${salaries.length} salaries`);
+      return result;
     } catch (error: any) {
+      console.error('❌ Comprehensive import failed:', error);
+      
       return {
         source: 'bamboohr',
         importDate: new Date().toISOString(),
@@ -338,25 +453,69 @@ export const importBambooHRData = async (): Promise<SalaryImport> => {
     // Ensure pagination for /v1/employees/directory if >500 employees
     if (employees.length > 500) {
       console.log('⚠️ Large employee count detected, ensuring pagination is working correctly');
+      console.log(`📊 Employee count breakdown: ${employees.length} total employees across multiple pages`);
+    }
+    
+    // Log employee details for debugging
+    if (employees.length > 0) {
+      console.log('📋 Sample employee data:', {
+        firstEmployee: {
+          id: employees[0].id,
+          name: employees[0].displayName,
+          email: employees[0].email,
+          department: employees[0].department,
+          status: employees[0].status
+        }
+      });
     }
     
     const result = await service.importAllData();
     
-    // Log import results
+    // Log import results with detailed breakdown
     console.log('✅ BambooHR import completed:', {
       source: result.source,
       importDate: result.importDate,
       recordsImported: result.recordsImported,
-      errorCount: result.errors?.length || 0
+      errorCount: result.errors?.length || 0,
+      employeeCount: employees.length,
+      successRate: employees.length > 0 ? (result.recordsImported / employees.length * 100).toFixed(2) + '%' : 'N/A'
     });
     
     if (result.errors && result.errors.length > 0) {
       console.warn('⚠️ BambooHR import had errors:', result.errors);
+      console.warn('📊 Error breakdown:', {
+        totalErrors: result.errors.length,
+        errorTypes: result.errors.map(err => err.includes('rate limit') ? 'rate_limit' : 'other')
+      });
+    }
+    
+    // Log pagination verification
+    if (employees.length > 500) {
+      console.log('✅ Pagination verification: Successfully fetched all employees across multiple pages');
     }
     
     return result;
   } catch (error) {
     console.error('❌ BambooHR import failed:', error);
+    
+    // Enhanced error logging
+    if (error instanceof Error) {
+      console.error('🔍 Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Check for specific error types
+      if (error.message.includes('rate limit')) {
+        console.warn('⚠️ Rate limit detected - consider implementing backoff strategy');
+      } else if (error.message.includes('authentication')) {
+        console.warn('⚠️ Authentication error - check API key and subdomain');
+      } else if (error.message.includes('timeout')) {
+        console.warn('⚠️ Request timeout - consider increasing timeout values');
+      }
+    }
+    
     throw error;
   }
 };

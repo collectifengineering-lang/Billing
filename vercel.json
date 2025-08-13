@@ -6,5 +6,11 @@
     "app/api/**/*.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/payroll/bamboohr",
+      "schedule": "0 2 * * *"
+    }
+  ]
 } 

@@ -25,19 +25,64 @@ export async function GET(request: NextRequest) {
     let invoices: any[] = [];
     let clockifyData: any = null;
     let financialMetrics: any = null;
+    let zohoAuthFailed = false;
+    let zohoApiCallCount = 0;
 
     // Fetch Zoho data
     try {
       console.log('🔄 Starting Zoho data fetch...');
-      [projects, invoices] = await Promise.all([
-        zohoService.getProjects(),
-        zohoService.getInvoices()
-      ]);
+      
+      // Track API calls
+      zohoApiCallCount++;
+      projects = await zohoService.getProjects();
+      zohoApiCallCount++;
+      invoices = await zohoService.getInvoices();
+      
       console.log('✅ Zoho data fetched:', { projectsCount: projects.length, invoicesCount: invoices.length });
+      
+      // Log raw invoice data counts and details
+      if (invoices.length > 0) {
+        console.log('📊 Raw invoice data analysis:');
+        console.log(`  - Total invoices: ${invoices.length}`);
+        
+        // Count by status
+        const statusCounts = invoices.reduce((acc: any, inv) => {
+          acc[inv.status] = (acc[inv.status] || 0) + 1;
+          return acc;
+        }, {});
+        console.log('  - Status breakdown:', statusCounts);
+        
+        // Count by project
+        const projectCounts = invoices.reduce((acc: any, inv) => {
+          acc[inv.project_id] = (acc[inv.project_id] || 0) + 1;
+          return acc;
+        }, {});
+        console.log(`  - Projects with invoices: ${Object.keys(projectCounts).length}`);
+        
+        // Amount analysis
+        const totalAmount = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+        const avgAmount = totalAmount / invoices.length;
+        console.log(`  - Total amount: $${totalAmount.toFixed(2)}`);
+        console.log(`  - Average amount: $${avgAmount.toFixed(2)}`);
+        
+        // Sample invoice data
+        const sampleInvoice = invoices[0];
+        console.log('  - Sample invoice:', {
+          id: sampleInvoice.invoice_id,
+          number: sampleInvoice.invoice_number,
+          project: sampleInvoice.project_id,
+          amount: sampleInvoice.amount,
+          status: sampleInvoice.status,
+          date: sampleInvoice.date
+        });
+      } else {
+        console.log('⚠️ No invoices found in Zoho data');
+      }
 
       // Get financial metrics for current year
       try {
         console.log('💰 Fetching financial metrics...');
+        zohoApiCallCount++;
         financialMetrics = await zohoService.getFinancialMetrics(
           currentYearStart.toISOString().split('T')[0],
           now.toISOString().split('T')[0]
@@ -57,10 +102,23 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error('❌ Failed to fetch Zoho data:', error);
+      
+      // Check if it's an authentication/rate limit error
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage.includes('rate limit') || errorMessage.includes('authentication') || errorMessage.includes('token')) {
+          zohoAuthFailed = true;
+          console.warn('⚠️ Zoho authentication failed due to rate limits or token issues. Showing partial data.');
+        }
+      }
+      
       projects = [];
       invoices = [];
       financialMetrics = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
     }
+
+    // Log Zoho API call count for monitoring
+    console.log(`📊 Zoho API calls made in this request: ${zohoApiCallCount}`);
 
     // Fetch Clockify data
     try {
@@ -205,7 +263,9 @@ export async function GET(request: NextRequest) {
       topPerformingProjects: Array.isArray(topPerformingProjects) ? topPerformingProjects : [],
       ytdRevenue: ytdRevenue || 0,
       ytdExpenses: ytdExpenses || 0,
-      ytdProfit: (ytdRevenue || 0) - (ytdExpenses || 0)
+      ytdProfit: (ytdRevenue || 0) - (ytdExpenses || 0),
+      warnings: zohoAuthFailed ? ['Zoho authentication failed due to rate limits. Showing partial data.'] : [],
+      zohoApiCallCount
     };
 
     console.log('✅ Homepage dashboard data generated:', safeDashboardData);
