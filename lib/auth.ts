@@ -86,30 +86,28 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     const userData = await response.json();
     
     // Check if user has admin role by looking at their email domain or specific admin emails
-    // You can customize this logic based on your Azure AD setup
-    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
-    const isAdmin = adminEmails.includes(userData.mail) || 
-                   adminEmails.includes(userData.userPrincipalName) ||
-                   userData.mail?.endsWith('@collectif.nyc') || // Collectif domain
-                   userData.mail?.endsWith('@yourcompany.com'); // Legacy domain
+    // The NEXT_PUBLIC_ADMIN_EMAILS environment variable is available at build time
+    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
+    const userEmail = userData.mail || userData.userPrincipalName || account.username;
+    
+    // Check if user is admin based on email
+    const isAdmin = adminEmails.includes(userEmail) || 
+                   userEmail?.endsWith('@collectif.nyc'); // Collectif domain users are admin
     
     // Debug logging
     console.log('Auth Debug:', {
-      userEmail: userData.mail,
-      userPrincipalName: userData.userPrincipalName,
+      userEmail,
       adminEmails,
       isAdmin,
-      adminEmailsIncludes: adminEmails.includes(userData.mail),
-      adminEmailsIncludesPrincipal: adminEmails.includes(userData.userPrincipalName),
-      endsWithCollectif: userData.mail?.endsWith('@collectif.nyc'),
-      endsWithLegacy: userData.mail?.endsWith('@yourcompany.com'),
+      adminEmailsIncludes: adminEmails.includes(userEmail),
+      endsWithCollectif: userEmail?.endsWith('@collectif.nyc'),
       envVar: process.env.NEXT_PUBLIC_ADMIN_EMAILS
     });
 
     return {
       id: account.localAccountId,
       name: account.name || '',
-      email: account.username || '',
+      email: userEmail || '',
       isAdmin: isAdmin,
       isBasic: true, // All authenticated users get basic access
     };
@@ -117,16 +115,25 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     console.error('Get auth user error:', error);
     // Fallback to basic user if Graph API fails
     const account = msalInstance.getActiveAccount();
+    const userEmail = account?.username;
+    
+    // Even in fallback, check if user should be admin
+    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
+    const isAdmin = adminEmails.includes(userEmail || '') || 
+                   userEmail?.endsWith('@collectif.nyc');
+    
     console.log('Auth Fallback Debug:', {
-      accountEmail: account?.username,
+      accountEmail: userEmail,
       accountName: account?.name,
-      isAdmin: false
+      adminEmails,
+      isAdmin
     });
+    
     return {
       id: account?.localAccountId || '',
       name: account?.name || '',
-      email: account?.username || '',
-      isAdmin: false, // Default to non-admin for security
+      email: userEmail || '',
+      isAdmin: isAdmin,
       isBasic: true,
     };
   }
