@@ -41,6 +41,8 @@ class ZohoService {
   private autoRefreshTimer: NodeJS.Timeout | null = null;
   private readonly AUTO_REFRESH_INTERVAL = 45 * 60 * 1000; // 45 minutes
   private lastRefreshTime: number = 0; // Track when auto-refresh was last triggered
+  private readonly ACCOUNTS_BASE = process.env.ZOHO_ACCOUNTS_BASE || 'https://accounts.zoho.com';
+  private readonly API_BASE = process.env.ZOHO_API_BASE || 'https://www.zohoapis.com';
   
   // Rate limiting properties
   private requestCount: number = 0;
@@ -109,34 +111,15 @@ class ZohoService {
         
         throw new Error(`Missing required Zoho environment variables: ${missingVars.join(', ')}`);
       }
-
-      const response = await axios.post('https://accounts.zoho.com/oauth/v2/token', null, {
-        params: {
-          refresh_token: process.env.ZOHO_REFRESH_TOKEN,
-          client_id: process.env.ZOHO_CLIENT_ID,
-          client_secret: process.env.ZOHO_CLIENT_SECRET,
-          grant_type: 'refresh_token',
-        },
-        timeout: 10000,
-      });
-
-      if (!response.data.access_token) {
-        throw new Error('No access token received from Zoho');
+      // Ensure only one refresh happens at a time across concurrent requests
+      if (!this.refreshPromise) {
+        this.refreshPromise = this._performTokenRefreshWithBackoff();
       }
 
-      this.accessToken = response.data.access_token;
-      this.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
-      this.lastRefreshTime = Date.now();
-
-      console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
-      console.log(`Token value: ${this.accessToken?.substring(0, 10) ?? 'N/A'}...`);
-      
-      // Ensure we have a valid token before returning
-      if (!this.accessToken) {
-        throw new Error('Failed to set access token after refresh');
-      }
-      
-      return this.accessToken;
+      const token = await this.refreshPromise;
+      // Clear the in-flight promise after completion
+      this.refreshPromise = null;
+      return token;
     } catch (error) {
       console.error('Error refreshing Zoho access token:', error);
       
@@ -154,6 +137,50 @@ class ZohoService {
     }
   }
 
+  // Perform the token refresh with form-encoded body and simple backoff if rate-limited
+  private async _performTokenRefreshWithBackoff(): Promise<string> {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const formData = new URLSearchParams();
+        formData.append('refresh_token', process.env.ZOHO_REFRESH_TOKEN || '');
+        formData.append('client_id', process.env.ZOHO_CLIENT_ID || '');
+        formData.append('client_secret', process.env.ZOHO_CLIENT_SECRET || '');
+        formData.append('grant_type', 'refresh_token');
+
+        const response = await axios.post<TokenResponse>(`${this.ACCOUNTS_BASE}/oauth/v2/token`, formData, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          timeout: 15000,
+        });
+
+        if (!response.data.access_token) {
+          throw new Error('No access token received from Zoho');
+        }
+
+        this.accessToken = response.data.access_token;
+        this.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
+        this.lastRefreshTime = Date.now();
+
+        console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
+        return this.accessToken;
+      } catch (err: any) {
+        // If rate-limited by Zoho during token refresh, back off and retry
+        const isAxios = axios.isAxiosError(err);
+        const status = isAxios ? err.response?.status : undefined;
+        const description = isAxios ? (err.response?.data as any)?.error_description : undefined;
+        if (status === 400 && typeof description === 'string' && description.toLowerCase().includes('too many requests')) {
+          const delayMs = 2000 * attempt * attempt + Math.floor(Math.random() * 500);
+          console.warn(`Zoho token refresh rate-limited (attempt ${attempt}/${maxAttempts}). Waiting ${delayMs}ms before retry.`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          continue;
+        }
+        // For other errors, do not retry endlessly
+        throw err;
+      }
+    }
+    throw new Error('Zoho token refresh failed after maximum retries');
+  }
+
   private async refreshAccessToken(): Promise<string> {
     try {
       console.log('Refreshing Zoho access token...');
@@ -165,7 +192,7 @@ class ZohoService {
       formData.append('client_secret', process.env.ZOHO_CLIENT_SECRET || '');
       formData.append('grant_type', 'refresh_token');
       
-      const response = await axios.post<TokenResponse>('https://accounts.zoho.com/oauth/v2/token', formData, {
+      const response = await axios.post<TokenResponse>(`${this.ACCOUNTS_BASE}/oauth/v2/token`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -203,7 +230,7 @@ class ZohoService {
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
       try {
-        const response = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
+        const response = await axios.get(`${this.API_BASE}/books/v3/${endpoint}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -286,7 +313,7 @@ class ZohoService {
           console.info(`Retrying request with new token: ${endpoint}`);
           
           // Retry the request with the new token
-          const retryResponse = await axios.get(`https://www.zohoapis.com/books/v3/${endpoint}`, {
+          const retryResponse = await axios.get(`${this.API_BASE}/books/v3/${endpoint}`, {
             headers: {
               'Authorization': `Bearer ${newToken}`,
               'Content-Type': 'application/json',
