@@ -91,8 +91,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     const userEmail = userData.mail || userData.userPrincipalName || account.username;
     
     // Check if user is admin based on email
-    const isAdmin = adminEmails.includes(userEmail) || 
-                   userEmail?.endsWith('@collectif.nyc'); // Collectif domain users are admin
+    const isAdmin = Boolean(adminEmails.includes(userEmail) || 
+                   userEmail?.endsWith('@collectif.nyc')); // Collectif domain users are admin
     
     // Debug logging
     console.log('Auth Debug:', {
@@ -119,8 +119,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     
     // Even in fallback, check if user should be admin
     const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
-    const isAdmin = adminEmails.includes(userEmail || '') || 
-                   userEmail?.endsWith('@collectif.nyc');
+    const isAdmin = Boolean(adminEmails.includes(userEmail || '') || 
+                   userEmail?.endsWith('@collectif.nyc'));
     
     console.log('Auth Fallback Debug:', {
       accountEmail: userEmail,
