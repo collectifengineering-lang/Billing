@@ -189,7 +189,7 @@ export async function saveEmployee(employee: {
 export async function saveEmployeeSalary(salary: {
   employeeId: string;
   effectiveDate: string;
-  endDate?: string;
+  endDate?: string | null;
   annualSalary: number;
   hourlyRate: number;
   currency?: string;
