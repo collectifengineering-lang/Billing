@@ -34,6 +34,32 @@ export class PayrollService {
     console.log('Payroll service initialized');
   }
 
+  private mapDbEmployeeToDomain(dbEmployee: any): Employee {
+    const statusValue = (dbEmployee.status || '').toLowerCase();
+    const status: 'active' | 'inactive' = statusValue === 'active' ? 'active' : 'inactive';
+    const toIsoDateString = (d: any | undefined | null): string | undefined => {
+      if (!d) return undefined;
+      if (typeof d === 'string') return d;
+      if (d instanceof Date) return d.toISOString();
+      try {
+        const asDate = new Date(d);
+        return isNaN(asDate.getTime()) ? undefined : asDate.toISOString();
+      } catch {
+        return undefined;
+      }
+    };
+    return {
+      id: dbEmployee.id,
+      name: dbEmployee.name,
+      email: dbEmployee.email,
+      status,
+      department: dbEmployee.department ?? undefined,
+      position: dbEmployee.position ?? undefined,
+      hireDate: toIsoDateString(dbEmployee.hireDate) || '',
+      terminationDate: toIsoDateString(dbEmployee.terminationDate),
+    };
+  }
+
   // Employee Management
   async addEmployee(employee: Employee): Promise<void> {
     // Save to database
@@ -49,10 +75,11 @@ export class PayrollService {
     if (!employee) {
       // Load from database
       const dbEmployees = await dbGetAllEmployees();
-      const dbEmployee = dbEmployees.find(emp => emp.id === employeeId);
+      const dbEmployee = dbEmployees.find((emp: any) => emp.id === employeeId);
       if (dbEmployee) {
-        this.employees.set(employeeId, dbEmployee);
-        employee = dbEmployee;
+        const mapped = this.mapDbEmployeeToDomain(dbEmployee);
+        this.employees.set(employeeId, mapped);
+        employee = mapped;
       }
     }
     return employee || null;
@@ -61,11 +88,12 @@ export class PayrollService {
   async getAllEmployees(): Promise<Employee[]> {
     // Load from database and sync memory
     const dbEmployees = await dbGetAllEmployees();
+    const mappedEmployees = dbEmployees.map((emp: any) => this.mapDbEmployeeToDomain(emp));
     // Update memory cache
-    for (const emp of dbEmployees) {
+    for (const emp of mappedEmployees) {
       this.employees.set(emp.id, emp);
     }
-    return dbEmployees;
+    return mappedEmployees;
   }
 
   async updateEmployee(employeeId: string, updates: Partial<Employee>): Promise<void> {
@@ -111,7 +139,7 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
+      const employeeDbSalaries = dbSalaries.filter((s: any) => s.employeeId === employeeId);
       if (employeeDbSalaries.length > 0) {
         this.salaries.set(employeeId, employeeDbSalaries);
         employeeSalaries = employeeDbSalaries;
@@ -135,7 +163,7 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
+      const employeeDbSalaries = dbSalaries.filter((s: any) => s.employeeId === employeeId);
       if (employeeDbSalaries.length > 0) {
         this.salaries.set(employeeId, employeeDbSalaries);
         employeeSalaries = employeeDbSalaries;
@@ -175,7 +203,7 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
+      const projectDbMultipliers = dbMultipliers.filter((m: any) => m.projectId === projectId);
       if (projectDbMultipliers.length > 0) {
         this.multipliers.set(projectId, projectDbMultipliers);
         projectMultipliers = projectDbMultipliers;
@@ -199,7 +227,7 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
+      const projectDbMultipliers = dbMultipliers.filter((m: any) => m.projectId === projectId);
       if (projectDbMultipliers.length > 0) {
         this.multipliers.set(projectId, projectDbMultipliers);
         projectMultipliers = projectDbMultipliers;
