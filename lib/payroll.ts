@@ -49,10 +49,11 @@ export class PayrollService {
     if (!employee) {
       // Load from database
       const dbEmployees = await dbGetAllEmployees();
-      const dbEmployee = dbEmployees.find(emp => emp.id === employeeId);
+      const dbEmployee = dbEmployees.find((emp: any) => emp.id === employeeId);
       if (dbEmployee) {
-        this.employees.set(employeeId, dbEmployee);
-        employee = dbEmployee;
+        const normalized = this.normalizeEmployee(dbEmployee as any);
+        this.employees.set(employeeId, normalized);
+        employee = normalized;
       }
     }
     return employee || null;
@@ -61,11 +62,12 @@ export class PayrollService {
   async getAllEmployees(): Promise<Employee[]> {
     // Load from database and sync memory
     const dbEmployees = await dbGetAllEmployees();
+    const normalizedEmployees = dbEmployees.map((emp: any) => this.normalizeEmployee(emp as any));
     // Update memory cache
-    for (const emp of dbEmployees) {
+    for (const emp of normalizedEmployees) {
       this.employees.set(emp.id, emp);
     }
-    return dbEmployees;
+    return normalizedEmployees;
   }
 
   async updateEmployee(employeeId: string, updates: Partial<Employee>): Promise<void> {
@@ -111,7 +113,9 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
+      const employeeDbSalaries = dbSalaries
+        .filter((s: any) => s.employeeId === employeeId)
+        .map((s: any) => this.normalizeSalary(s));
       if (employeeDbSalaries.length > 0) {
         this.salaries.set(employeeId, employeeDbSalaries);
         employeeSalaries = employeeDbSalaries;
@@ -135,7 +139,9 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
+      const employeeDbSalaries = dbSalaries
+        .filter((s: any) => s.employeeId === employeeId)
+        .map((s: any) => this.normalizeSalary(s));
       if (employeeDbSalaries.length > 0) {
         this.salaries.set(employeeId, employeeDbSalaries);
         employeeSalaries = employeeDbSalaries;
@@ -175,7 +181,9 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
+      const projectDbMultipliers = dbMultipliers
+        .filter((m: any) => m.projectId === projectId)
+        .map((m: any) => this.normalizeProjectMultiplier(m));
       if (projectDbMultipliers.length > 0) {
         this.multipliers.set(projectId, projectDbMultipliers);
         projectMultipliers = projectDbMultipliers;
@@ -199,7 +207,9 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
+      const projectDbMultipliers = dbMultipliers
+        .filter((m: any) => m.projectId === projectId)
+        .map((m: any) => this.normalizeProjectMultiplier(m));
       if (projectDbMultipliers.length > 0) {
         this.multipliers.set(projectId, projectDbMultipliers);
         projectMultipliers = projectDbMultipliers;
@@ -493,6 +503,48 @@ export class PayrollService {
 
   calculateHourlyRate(annualSalary: number, workHoursPerYear: number = 2080): number {
     return annualSalary / workHoursPerYear;
+  }
+
+  // Normalization helpers to convert Prisma results to domain types
+  private normalizeEmployee(dbEmployee: any): Employee {
+    const statusValue = (dbEmployee.status || 'active').toLowerCase();
+    const normalizedStatus: 'active' | 'inactive' =
+      statusValue === 'active' ? 'active' : 'inactive';
+    return {
+      id: dbEmployee.id,
+      name: dbEmployee.name,
+      email: dbEmployee.email,
+      status: normalizedStatus,
+      department: dbEmployee.department ?? undefined,
+      position: dbEmployee.position ?? undefined,
+      hireDate: dbEmployee.hireDate,
+      terminationDate: dbEmployee.terminationDate ?? undefined
+    };
+  }
+
+  private normalizeSalary(dbSalary: any): EmployeeSalary {
+    const toNumber = (v: any) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
+    return {
+      employeeId: dbSalary.employeeId,
+      effectiveDate: dbSalary.effectiveDate,
+      endDate: dbSalary.endDate ?? undefined,
+      annualSalary: toNumber(dbSalary.annualSalary),
+      hourlyRate: toNumber(dbSalary.hourlyRate),
+      currency: dbSalary.currency || 'USD',
+      notes: dbSalary.notes ?? undefined
+    };
+  }
+
+  private normalizeProjectMultiplier(dbMultiplier: any): ProjectMultiplier {
+    const toNumber = (v: any) => (v && typeof v === 'object' && 'toNumber' in v ? v.toNumber() : Number(v));
+    return {
+      projectId: dbMultiplier.projectId,
+      projectName: dbMultiplier.projectName,
+      multiplier: toNumber(dbMultiplier.multiplier),
+      effectiveDate: dbMultiplier.effectiveDate,
+      endDate: dbMultiplier.endDate ?? undefined,
+      notes: dbMultiplier.notes ?? undefined
+    };
   }
 
   // Data Export/Import
