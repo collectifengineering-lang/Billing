@@ -43,6 +43,7 @@ class ZohoService {
   private lastRefreshTime: number = 0; // Track when auto-refresh was last triggered
   private readonly ACCOUNTS_BASE = process.env.ZOHO_ACCOUNTS_BASE || 'https://accounts.zoho.com';
   private readonly API_BASE = process.env.ZOHO_API_BASE || 'https://www.zohoapis.com';
+  private organizationValidated: boolean = false;
   
   // Rate limiting properties
   private requestCount: number = 0;
@@ -56,6 +57,7 @@ class ZohoService {
   constructor() {
     // Start automatic token refresh
     this._startAutoRefresh();
+    console.log(`Zoho API base: ${this.API_BASE} | Accounts base: ${this.ACCOUNTS_BASE}`);
   }
 
   private _startAutoRefresh(): void {
@@ -162,6 +164,18 @@ class ZohoService {
         this.lastRefreshTime = Date.now();
 
         console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
+        console.log('Zoho token refresh response:', response.data);
+        // Optionally validate scopes on refreshed token
+        try {
+          const scopeInfo = await this.checkTokenScopes(this.accessToken);
+          console.log('Zoho granted scopes:', scopeInfo?.scope || 'unknown');
+          if (typeof scopeInfo?.scope === 'string' && !scopeInfo.scope.includes('ZohoBooks.reports.READ')) {
+            throw new Error('Missing required scope: ZohoBooks.reports.READ. Regenerate refresh token with proper scopes.');
+          }
+        } catch (scopeErr) {
+          console.error('Zoho token scope verification failed:', (scopeErr as Error)?.message);
+          throw scopeErr;
+        }
         return this.accessToken;
       } catch (err: any) {
         // If rate-limited by Zoho during token refresh, back off and retry
@@ -220,6 +234,11 @@ class ZohoService {
       // Validate token before making request
       if (!token || token === 'undefined') {
         throw new Error('Invalid or missing access token');
+      }
+
+      // Validate organization before hitting reports endpoints
+      if (!this.organizationValidated && endpoint.startsWith('reports/')) {
+        await this.validateOrganization(token);
       }
       
       console.info(`Making Zoho API request to: ${endpoint}`);
@@ -296,6 +315,9 @@ class ZohoService {
 
       // If we get a 401, try refreshing the token once
       if (error.response?.status === 401) {
+        if (error.response?.data?.code === 57) {
+          console.error('Zoho API authorization error (code 57). Likely missing required scopes such as ZohoBooks.reports.READ.');
+        }
         console.info('Token expired, refreshing...');
         
         // Clear the current token and force a refresh
@@ -363,8 +385,56 @@ class ZohoService {
         data: error.response?.data,
         message: error.message
       });
+      if (error.response?.data?.code === 57) {
+        console.error('Zoho API authorization error (code 57). Verify organization_id and OAuth scopes (ZohoBooks.reports.READ).');
+      }
 
       throw error;
+    }
+  }
+
+  // Check granted scopes for current access token
+  private async checkTokenScopes(token: string): Promise<{ scope?: string } | null> {
+    try {
+      const url = `${this.ACCOUNTS_BASE}/oauth/v2/tokeninfo?token=${encodeURIComponent(token)}`;
+      const res = await axios.get(url, { timeout: 10000 });
+      return res.data as { scope?: string };
+    } catch (err: any) {
+      // Surface concise context but do not fail the main flow
+      const msg = axios.isAxiosError(err) ? err.response?.data || err.message : String(err);
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
+  }
+
+  // Validate the configured organization ID by calling organizations endpoint
+  private async validateOrganization(token: string): Promise<void> {
+    try {
+      const orgId = process.env.ZOHO_ORGANIZATION_ID;
+      if (!orgId) {
+        console.warn('ZOHO_ORGANIZATION_ID not set. Reports calls may fail.');
+        return;
+      }
+      const url = `${this.API_BASE}/books/v3/organizations`;
+      const res = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000
+      });
+      const orgs = (res.data?.organizations || []) as Array<{ organization_id?: string | number }>;
+      const found = orgs.some(o => String(o.organization_id) === String(orgId));
+      if (!found) {
+        console.error(`Provided organization_id=${orgId} not found in Zoho account. Fetched organizations: ${JSON.stringify(orgs)}`);
+      } else {
+        this.organizationValidated = true;
+        console.log(`Validated Zoho organization_id=${orgId}`);
+      }
+    } catch (err: any) {
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      const data = axios.isAxiosError(err) ? err.response?.data : undefined;
+      console.error('Failed to validate Zoho organization:', { status, data, message: err.message });
+      // Do not throw; allow request to proceed but logs will help diagnose
     }
   }
 

@@ -18,6 +18,17 @@ export async function POST(request: NextRequest) {
       }
 
       case 'import-data': {
+        // Auto-configure from env if not already configured
+        try {
+          const status = (payrollService as any).bamboohrConfig;
+          if (!status && process.env.BAMBOOHR_SUBDOMAIN && process.env.BAMBOOHR_API_KEY) {
+            await payrollService.configureBambooHR({
+              subdomain: process.env.BAMBOOHR_SUBDOMAIN,
+              apiKey: process.env.BAMBOOHR_API_KEY,
+              webhookSecret: process.env.BAMBOOHR_WEBHOOK_SECRET || undefined
+            });
+          }
+        } catch {}
         const importResult = await payrollService.importSalariesFromBambooHR();
         return NextResponse.json({ 
           success: true, 
@@ -28,7 +39,11 @@ export async function POST(request: NextRequest) {
       case 'test-connection': {
         // Test the BambooHR connection by trying to get company info
         const { configureBambooHR } = await import('../../../../lib/bamboohr');
-        const testConfig: BambooHRConfig = data;
+        const testConfig: BambooHRConfig = data || {
+          subdomain: process.env.BAMBOOHR_SUBDOMAIN || '',
+          apiKey: process.env.BAMBOOHR_API_KEY || '',
+          webhookSecret: process.env.BAMBOOHR_WEBHOOK_SECRET || undefined
+        };
         configureBambooHR(testConfig);
         
         const { getBambooHRService } = await import('../../../../lib/bamboohr');
@@ -47,6 +62,7 @@ export async function POST(request: NextRequest) {
         const testConfig: BambooHRConfig = data;
         configureTest(testConfig);
         const testService = getTestService();
+        // Handle pagination if BambooHR returns partial results over time; the directory returns all by default
         const employees = await testService.getAllEmployees();
         
         return NextResponse.json({ 

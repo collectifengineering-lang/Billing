@@ -15,17 +15,19 @@ export class BambooHRService {
 
   constructor(config: BambooHRConfig) {
     this.config = config;
-    this.baseUrl = `https://api.bamboohr.com/api/gateway.php/${config.subdomain}`;
+    // Use versioned BambooHR API base
+    this.baseUrl = `https://api.bamboohr.com/api/gateway.php/${config.subdomain}/v1`;
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = `${this.baseUrl}${endpoint}`;
+    const basic = Buffer.from(`${this.config.apiKey}:x`).toString('base64');
     const headers = {
-      'Authorization': `Basic ${btoa(`${this.config.apiKey}:x`)}`,
+      'Authorization': `Basic ${basic}`,
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       ...options.headers
-    };
+    } as Record<string, string>;
 
     try {
       const response = await fetch(url, {
@@ -34,7 +36,8 @@ export class BambooHRService {
       });
 
       if (!response.ok) {
-        throw new Error(`BambooHR API error: ${response.status} ${response.statusText}`);
+        const body = await response.text().catch(() => '');
+        throw new Error(`BambooHR API error: ${response.status} ${response.statusText} ${body ? `- ${body}` : ''}`);
       }
 
       return await response.json();
@@ -46,8 +49,23 @@ export class BambooHRService {
 
   // Employee Management
   async getAllEmployees(): Promise<BambooHREmployee[]> {
-    const response = await this.makeRequest('/employees/all');
-    return response.employees || [];
+    // Attempt to fetch all employees, handling pagination if the API limits to 500 per page
+    const all: BambooHREmployee[] = [];
+    let page = 1;
+    const pageSize = 500;
+    while (true) {
+      const suffix = page > 1 ? `?page=${page}` : '';
+      const response = await this.makeRequest(`/employees/directory${suffix}`);
+      const employees: BambooHREmployee[] = response.employees || [];
+      console.log(`BambooHR: fetched ${employees.length} employees from /v1/employees/directory (page ${page})`);
+      all.push(...employees);
+      if (employees.length < pageSize) {
+        break;
+      }
+      page += 1;
+    }
+    console.log(`BambooHR: total employees aggregated = ${all.length}`);
+    return all;
   }
 
   async getEmployee(employeeId: string): Promise<BambooHREmployee> {
@@ -167,6 +185,7 @@ export class BambooHRService {
   // Data Import Methods
   async importEmployees(): Promise<Employee[]> {
     const bamboohrEmployees = await this.getAllEmployees();
+    console.log(`BambooHR import: preparing to upsert ${bamboohrEmployees.length} employees`);
 
     return bamboohrEmployees.map(emp => ({
       id: emp.id,
@@ -182,12 +201,15 @@ export class BambooHRService {
 
   async importSalaries(): Promise<EmployeeSalary[]> {
     const employees = await this.getAllEmployees();
+    console.log(`BambooHR import: fetching compensation for ${employees.length} employees`);
     const salaries: EmployeeSalary[] = [];
 
     for (const employee of employees) {
       const compensations = await this.getEmployeeCompensation(employee.id);
 
       for (const comp of compensations) {
+        // Log the upsert intent; actual DB upsert occurs in saveEmployeeSalary
+        console.log(`BambooHR upsert salary -> employeeId=${comp.employeeId} effectiveDate=${comp.effectiveDate} annualSalary=${comp.annualSalary} hourlyRate=${comp.hourlyRate}`);
         salaries.push({
           employeeId: comp.employeeId,
           effectiveDate: comp.effectiveDate,
