@@ -42,7 +42,12 @@ export async function GET(request: NextRequest) {
           currentYearStart.toISOString().split('T')[0],
           now.toISOString().split('T')[0]
         );
-        console.log('✅ Financial metrics loaded:', financialMetrics);
+        console.log('✅ Financial metrics loaded - full object:', JSON.stringify(financialMetrics, null, 2));
+        
+        // Check if cash flow is 0 and log specific message
+        if (financialMetrics.cashFlow === 0) {
+          console.warn('💰 Cash Flow is 0 - verify data in Zoho for date range');
+        }
       } catch (error) {
         console.warn('⚠️ Failed to fetch financial metrics, using defaults:', error);
         financialMetrics = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
