@@ -60,6 +60,29 @@ export class PayrollService {
     };
   }
 
+  private toNumber(value: any): number {
+    if (typeof value === 'number') return value;
+    // Prisma Decimal has toNumber(); fall back to parseFloat
+    const maybeDecimal = value as { toNumber?: () => number };
+    if (maybeDecimal && typeof maybeDecimal.toNumber === 'function') {
+      return maybeDecimal.toNumber();
+    }
+    const parsed = parseFloat(String(value));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  private mapDbSalariesToDomain(dbSalaries: any[]): EmployeeSalary[] {
+    return (dbSalaries || []).map((s: any) => ({
+      employeeId: s.employeeId,
+      effectiveDate: s.effectiveDate,
+      endDate: s.endDate ?? undefined,
+      annualSalary: this.toNumber(s.annualSalary),
+      hourlyRate: this.toNumber(s.hourlyRate),
+      currency: s.currency ?? undefined,
+      notes: s.notes ?? undefined,
+    }));
+  }
+
   // Employee Management
   async addEmployee(employee: Employee): Promise<void> {
     // Save to database
@@ -139,7 +162,8 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries.filter((s: any) => s.employeeId === employeeId);
+      const employeeDbSalariesRaw = dbSalaries.filter((s: any) => s.employeeId === employeeId);
+      const employeeDbSalaries = this.mapDbSalariesToDomain(employeeDbSalariesRaw);
       if (employeeDbSalaries.length > 0) {
         this.salaries.set(employeeId, employeeDbSalaries);
         employeeSalaries = employeeDbSalaries;
@@ -163,7 +187,8 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries.filter((s: any) => s.employeeId === employeeId);
+      const employeeDbSalariesRaw = dbSalaries.filter((s: any) => s.employeeId === employeeId);
+      const employeeDbSalaries = this.mapDbSalariesToDomain(employeeDbSalariesRaw);
       if (employeeDbSalaries.length > 0) {
         this.salaries.set(employeeId, employeeDbSalaries);
         employeeSalaries = employeeDbSalaries;
