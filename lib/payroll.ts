@@ -83,6 +83,17 @@ export class PayrollService {
     }));
   }
 
+  private mapDbMultipliersToDomain(dbMultipliers: any[]): ProjectMultiplier[] {
+    return (dbMultipliers || []).map((m: any) => ({
+      projectId: m.projectId,
+      projectName: m.projectName,
+      multiplier: this.toNumber(m.multiplier),
+      effectiveDate: m.effectiveDate,
+      endDate: m.endDate ?? undefined,
+      notes: m.notes ?? undefined,
+    }));
+  }
+
   // Employee Management
   async addEmployee(employee: Employee): Promise<void> {
     // Save to database
@@ -228,7 +239,8 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers.filter((m: any) => m.projectId === projectId);
+      const projectDbMultipliersRaw = dbMultipliers.filter((m: any) => m.projectId === projectId);
+      const projectDbMultipliers = this.mapDbMultipliersToDomain(projectDbMultipliersRaw);
       if (projectDbMultipliers.length > 0) {
         this.multipliers.set(projectId, projectDbMultipliers);
         projectMultipliers = projectDbMultipliers;
@@ -252,7 +264,8 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers.filter((m: any) => m.projectId === projectId);
+      const projectDbMultipliersRaw = dbMultipliers.filter((m: any) => m.projectId === projectId);
+      const projectDbMultipliers = this.mapDbMultipliersToDomain(projectDbMultipliersRaw);
       if (projectDbMultipliers.length > 0) {
         this.multipliers.set(projectId, projectDbMultipliers);
         projectMultipliers = projectDbMultipliers;
