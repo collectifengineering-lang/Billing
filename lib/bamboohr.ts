@@ -347,10 +347,10 @@ export const importBambooHRData = async (): Promise<SalaryImport> => {
       source: result.source,
       importDate: result.importDate,
       recordsImported: result.recordsImported,
-      errorCount: result.errors.length
+      errorCount: result.errors?.length || 0
     });
     
-    if (result.errors.length > 0) {
+    if (result.errors && result.errors.length > 0) {
       console.warn('⚠️ BambooHR import had errors:', result.errors);
     }
     
