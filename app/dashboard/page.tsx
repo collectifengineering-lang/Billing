@@ -504,7 +504,7 @@ function DashboardPageContent() {
       const event = new CustomEvent('projectStatusChanged', {
         detail: {
           projectId,
-          status: 'active',
+          status: 'reopened',
           closedProjects: newClosedProjects
         }
       });
@@ -523,7 +523,7 @@ function DashboardPageContent() {
         const event = new CustomEvent('projectStatusChanged', {
           detail: {
             projectId,
-            status: 'active',
+            status: 'reopened',
             closedProjects: newClosedProjects
           }
         });

@@ -21,7 +21,8 @@ export interface BillingData {
   totalBilled: number;
   totalUnbilled: number;
   totalProjected: number;
-  isClosed?: boolean;
+  status?: string; // 'active' | 'closed' | 'completed' | 'on-hold'
+  isClosed?: boolean; // Keep for backward compatibility
   projectManagerId?: string;
   // Clockify integration fields
   clockifyData?: ClockifyTimeReport;

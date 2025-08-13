@@ -79,7 +79,7 @@ export const mockInvoices: ZohoInvoice[] = [
 
 export function getMockData() {
   const projections = initializeProjectionsTable(mockProjects);
-  const billingData = processBillingData(mockProjects, mockInvoices, projections);
+  const billingData = processBillingData(mockProjects, mockInvoices, projections, new Set());
   
   return {
     projects: mockProjects,

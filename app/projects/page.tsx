@@ -42,6 +42,15 @@ export default function ProjectsPage() {
         setClosedProjects(newClosedProjects);
         // Save to localStorage to persist the change
         localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
+        
+        // Update the project status in the projects array
+        setProjects(prevProjects => 
+          prevProjects.map(project => 
+            project.projectId === projectId 
+              ? { ...project, status: status === 'closed' ? 'closed' : 'active' }
+              : project
+          )
+        );
       }
     };
 
@@ -66,13 +75,13 @@ export default function ProjectsPage() {
       
       if (projectsData && invoicesData) {
         const projections = initializeProjectionsTable(projectsData);
-        const billingData = processBillingData(projectsData, invoicesData, projections);
+        const billingData = processBillingData(projectsData, invoicesData, projections, closedProjects);
         
         const projectSummaries: ProjectSummary[] = billingData.map((project: BillingData) => ({
           projectId: project.projectId,
           projectName: project.projectName,
           customerName: project.customerName,
-          status: 'active', // You can add status to BillingData if needed
+          status: project.status || 'active', // Use the status from BillingData
           totalBilled: project.totalBilled,
           totalUnbilled: project.totalUnbilled,
           totalProjected: project.totalProjected,
@@ -103,6 +112,16 @@ export default function ProjectsPage() {
     newClosedProjects.delete(projectId);
     setClosedProjects(newClosedProjects);
     safeLocalStorageSet('closedProjects', Array.from(newClosedProjects));
+    
+    // Update the project status in the projects array
+    setProjects(prevProjects => 
+      prevProjects.map(project => 
+        project.projectId === projectId 
+          ? { ...project, status: 'active' }
+          : project
+      )
+    );
+    
     toast.success('Project reopened successfully');
   };
 
@@ -111,13 +130,21 @@ export default function ProjectsPage() {
     newClosedProjects.add(projectId);
     setClosedProjects(newClosedProjects);
     safeLocalStorageSet('closedProjects', Array.from(newClosedProjects));
+    
+    // Update the project status in the projects array
+    setProjects(prevProjects => 
+      prevProjects.map(project => 
+        project.projectId === projectId 
+          ? { ...project, status: 'closed' }
+          : project
+      )
+    );
+    
     toast.success('Project closed successfully');
   };
 
-  const activeProjects = projects.filter(project => !closedProjects.has(project.projectId));
-  const closedProjectsList = projects.filter(project => closedProjects.has(project.projectId));
-
-  const filteredProjects = activeProjects
+  // Show all projects (both active and closed) but filter based on status filter
+  const filteredProjects = projects
     .filter(project => {
       const matchesSearch = 
         project.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -156,255 +183,321 @@ export default function ProjectsPage() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
-  const exportToCSV = () => {
-    const headers = ['Project Name', 'Customer', 'Status', 'Total Billed', 'Total Unbilled', 'Total Projected'];
-    const csvContent = [
-      headers.join(','),
-      ...filteredProjects.map(project => [
-        `"${project.projectName}"`,
-        `"${project.customerName}"`,
-        project.status,
-        project.totalBilled,
-        project.totalUnbilled,
-        project.totalProjected,
-      ].join(','))
-    ].join('\n');
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'closed':
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+      case 'active':
+        return 'bg-green-100 text-green-800 border-green-300';
+      default:
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+    }
+  };
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'projects-summary.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'closed':
+        return <FolderOpen className="w-4 h-4" />;
+      case 'active':
+        return <TrendingUp className="w-4 h-4" />;
+      default:
+        return <Clock className="w-4 h-4" />;
+    }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-xl text-gray-600 dark:text-gray-300">Loading projects...</p>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading projects...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="relative mb-12">
-          {/* Back Button - Top Left */}
-          <div className="absolute top-0 left-0">
-            <Link
-              href="/"
-              className="inline-flex items-center justify-center w-12 h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-full hover:bg-white dark:hover:bg-slate-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              <ArrowLeft className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-            </Link>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="text-gray-400 hover:text-gray-600">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+              <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={fetchProjectsData}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Refresh Data
+              </button>
+              <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </button>
+            </div>
           </div>
+        </div>
+      </div>
 
-          {/* Main Header Content */}
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4">
-              Projects Overview
-            </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Comprehensive project tracking, billing status, and performance metrics
-            </p>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filters and Search */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search projects or customers..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Projects Content */}
-        <div className="max-w-7xl mx-auto">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-xl flex items-center justify-center mr-4">
-                  <FolderOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Projects</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{projects.length}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-xl flex items-center justify-center mr-4">
-                  <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Billed</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    ${projects.reduce((sum, p) => sum + p.totalBilled, 0).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/40 rounded-xl flex items-center justify-center mr-4">
-                  <TrendingUp className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Projected</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    ${projects.reduce((sum, p) => sum + p.totalProjected, 0).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/40 rounded-xl flex items-center justify-center mr-4">
-                  <Clock className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Projects</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {projects.filter(p => !closedProjects.has(p.projectId)).length}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-6 mb-8">
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-              <div className="flex flex-col sm:flex-row gap-4 flex-1">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Search projects..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  />
-                </div>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={fetchProjectsData}
-                  disabled={loading}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl font-medium transition-colors duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
-                >
-                  <RotateCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  {loading ? 'Loading...' : 'Refresh'}
-                </button>
-                <button
-                  onClick={exportToCSV}
-                  className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors duration-200 shadow-lg hover:shadow-xl"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Projects Table */}
-          <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl overflow-hidden">
-            <div>
-              <table className="w-full divide-y divide-gray-200 dark:divide-slate-700">
-                <thead className="bg-gray-50 dark:bg-slate-700/50">
-                  <tr>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-1/4">
-                      Project
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-1/5">
-                      Customer
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
-                      Status
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                      Billed
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                      Unbilled
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                      Projected
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                  {filteredProjects.map((project) => (
-                    <tr key={project.projectId} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors duration-200">
-                      <td className="px-3 py-3">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white break-words max-w-xs">{project.projectName}</div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm text-gray-600 dark:text-gray-300 break-words max-w-32">{project.customerName}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          closedProjects.has(project.projectId)
-                            ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
-                            : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300'
-                        }`}>
-                          {closedProjects.has(project.projectId) ? 'Closed' : 'Active'}
+        {/* Projects Table */}
+        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('projectName')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Project</span>
+                      {sortBy === 'projectName' && (
+                        <span className="text-gray-400">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
                         </span>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm text-gray-900 dark:text-white">${project.totalBilled.toLocaleString()}</div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm text-gray-900 dark:text-white">${project.totalUnbilled.toLocaleString()}</div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm text-gray-900 dark:text-white">${project.totalProjected.toLocaleString()}</div>
-                      </td>
-                      <td className="px-3 py-3 text-sm font-medium">
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('customerName')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Customer</span>
+                      {sortBy === 'customerName' && (
+                        <span className="text-gray-400">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Status</span>
+                      {sortBy === 'status' && (
+                        <span className="text-gray-400">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('totalBilled')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Billed</span>
+                      {sortBy === 'totalBilled' && (
+                        <span className="text-gray-400">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('totalUnbilled')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Unbilled</span>
+                      {sortBy === 'totalUnbilled' && (
+                        <span className="text-gray-400">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('totalProjected')}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Projected</span>
+                      {sortBy === 'totalProjected' && (
+                        <span className="text-gray-400">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredProjects.map((project) => (
+                  <tr key={project.projectId} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="text-sm font-medium text-gray-900">
+                          {project.projectName}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{project.customerName}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeColor(project.status)}`}>
+                        {getStatusIcon(project.status)}
+                        <span className="ml-1">{project.status}</span>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(project.totalBilled)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(project.totalUnbilled)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatCurrency(project.totalProjected)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      {project.status === 'closed' ? (
+                        <button
+                          onClick={() => handleReopenProject(project.projectId)}
+                          className="text-blue-600 hover:text-blue-900 hover:bg-blue-50 px-3 py-1 rounded-md text-sm font-medium"
+                        >
+                          Reopen
+                        </button>
+                      ) : (
                         <button
                           onClick={() => handleCloseProject(project.projectId)}
-                          className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors duration-200 ${
-                            closedProjects.has(project.projectId)
-                              ? 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20'
-                              : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-                          }`}
+                          className="text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-1 rounded-md text-sm font-medium"
                         >
-                          {closedProjects.has(project.projectId) ? 'Reopen' : 'Close'}
+                          Close
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          {/* Empty State */}
-          {filteredProjects.length === 0 && !loading && (
+          
+          {filteredProjects.length === 0 && (
             <div className="text-center py-12">
-              <FolderOpen className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No projects found</h3>
-              <p className="text-gray-600 dark:text-gray-300">Try adjusting your search or filter criteria.</p>
+              <div className="text-gray-400 mb-4">
+                <Search className="w-12 h-12 mx-auto" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
+              <p className="text-gray-500">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'Try adjusting your search or filters'
+                  : 'No projects have been added yet'
+                }
+              </p>
             </div>
           )}
+        </div>
+
+        {/* Summary Stats */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <TrendingUp className="w-8 h-8 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Projects</p>
+                <p className="text-2xl font-semibold text-gray-900">{projects.length}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <DollarSign className="w-8 h-8 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Billed</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {formatCurrency(projects.reduce((sum, p) => sum + p.totalBilled, 0))}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Clock className="w-8 h-8 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total Unbilled</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {formatCurrency(projects.reduce((sum, p) => sum + p.totalUnbilled, 0))}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <FolderOpen className="w-8 h-8 text-gray-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Closed Projects</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {projects.filter(p => p.status === 'closed').length}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

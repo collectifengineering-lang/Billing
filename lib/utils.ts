@@ -49,7 +49,8 @@ export function getChartMonthRange(): string[] {
 export function processBillingData(
   projects: ZohoProject[],
   invoices: ZohoInvoice[],
-  projections: ProjectionsTable
+  projections: ProjectionsTable,
+  closedProjects?: Set<string>
 ): BillingData[] {
   // Handle undefined or null inputs
   const safeProjects = projects || [];
@@ -107,6 +108,10 @@ export function processBillingData(
     const totalUnbilled = monthlyData.reduce((sum, data) => sum + data.unbilled, 0);
     const totalProjected = monthlyData.reduce((sum, data) => sum + data.projected, 0);
 
+    // Determine project status
+    const isProjectClosed = closedProjects ? closedProjects.has(project.project_id) : false;
+    const status = isProjectClosed ? 'closed' : 'active';
+
     return {
       projectId: project.project_id,
       projectName: project.project_name,
@@ -116,6 +121,8 @@ export function processBillingData(
       totalBilled,
       totalUnbilled,
       totalProjected,
+      status,
+      isClosed: isProjectClosed, // Keep for backward compatibility
     };
   });
 }
