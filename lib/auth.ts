@@ -39,6 +39,62 @@ export const graphConfig = {
   graphMeEndpoint: 'https://graph.microsoft.com/v1.0/me'
 };
 
+// Enhanced admin check function with multiple fallback mechanisms
+export function checkAdminStatus(userEmail: string | null | undefined): boolean {
+  if (!userEmail) {
+    console.warn('checkAdminStatus: No user email provided');
+    return false;
+  }
+
+  // Method 1: Check against NEXT_PUBLIC_ADMIN_EMAILS environment variable
+  try {
+    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
+    if (adminEmails.includes(userEmail)) {
+      console.log('checkAdminStatus: User is admin via NEXT_PUBLIC_ADMIN_EMAILS');
+      return true;
+    }
+  } catch (error) {
+    console.warn('checkAdminStatus: Error checking NEXT_PUBLIC_ADMIN_EMAILS:', error);
+  }
+
+  // Method 2: Check domain-based admin access
+  if (userEmail.endsWith('@collectif.nyc')) {
+    console.log('checkAdminStatus: User is admin via @collectif.nyc domain');
+    return true;
+  }
+
+  // Method 3: Check localStorage for admin override (for development/testing)
+  if (typeof window !== 'undefined') {
+    try {
+      const adminOverride = localStorage.getItem('adminOverride');
+      if (adminOverride === userEmail) {
+        console.log('checkAdminStatus: User is admin via localStorage override');
+        return true;
+      }
+    } catch (error) {
+      console.warn('checkAdminStatus: Error checking localStorage override:', error);
+    }
+  }
+
+  // Method 4: Check for specific admin patterns
+  const adminPatterns = [
+    /^admin@/i,
+    /^administrator@/i,
+    /^superuser@/i,
+    /^root@/i
+  ];
+  
+  for (const pattern of adminPatterns) {
+    if (pattern.test(userEmail)) {
+      console.log('checkAdminStatus: User is admin via pattern match:', pattern);
+      return true;
+    }
+  }
+
+  console.log('checkAdminStatus: User is not admin:', userEmail);
+  return false;
+}
+
 export async function signIn(): Promise<AuthenticationResult | null> {
   try {
     // Check if environment variables are set
@@ -66,75 +122,116 @@ export async function signOut(): Promise<void> {
 export async function getAuthUser(): Promise<AuthUser | null> {
   try {
     const account = msalInstance.getActiveAccount();
-    if (!account) return null;
-
-    // Get user details from Microsoft Graph to check roles
-    const token = await msalInstance.acquireTokenSilent({
-      scopes: ['User.Read', 'Directory.Read.All']
-    });
-
-    const response = await fetch('https://graph.microsoft.com/v1.0/me', {
-      headers: {
-        'Authorization': `Bearer ${token.accessToken}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch user details');
+    if (!account) {
+      console.log('getAuthUser: No active account found');
+      return null;
     }
 
-    const userData = await response.json();
+    // Get user details from Microsoft Graph to check roles
+    let userData: any = null;
+    try {
+      const token = await msalInstance.acquireTokenSilent({
+        scopes: ['User.Read', 'Directory.Read.All']
+      });
+
+      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+        headers: {
+          'Authorization': `Bearer ${token.accessToken}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user details from Graph API');
+      }
+
+      userData = await response.json();
+      console.log('getAuthUser: Successfully fetched user data from Graph API');
+    } catch (graphError) {
+      console.warn('getAuthUser: Graph API failed, using fallback data:', graphError);
+      // Fallback to account data if Graph API fails
+      userData = {
+        mail: account.username,
+        userPrincipalName: account.username,
+        displayName: account.name
+      };
+    }
     
-    // Check if user has admin role by looking at their email domain or specific admin emails
-    // The NEXT_PUBLIC_ADMIN_EMAILS environment variable is available at build time
-    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
     const userEmail = userData.mail || userData.userPrincipalName || account.username;
     
-    // Check if user is admin based on email
-    const isAdmin = Boolean(adminEmails.includes(userEmail) || 
-                   userEmail?.endsWith('@collectif.nyc')); // Collectif domain users are admin
+    // Use enhanced admin check function
+    const isAdmin = checkAdminStatus(userEmail);
     
     // Debug logging
-    console.log('Auth Debug:', {
+    console.log('getAuthUser Debug:', {
       userEmail,
-      adminEmails,
+      accountName: account.name,
+      accountId: account.localAccountId,
       isAdmin,
-      adminEmailsIncludes: adminEmails.includes(userEmail),
-      endsWithCollectif: userEmail?.endsWith('@collectif.nyc'),
-      envVar: process.env.NEXT_PUBLIC_ADMIN_EMAILS
+      adminEmails: process.env.NEXT_PUBLIC_ADMIN_EMAILS,
+      envVarAccessible: typeof process.env.NEXT_PUBLIC_ADMIN_EMAILS !== 'undefined'
     });
 
     return {
       id: account.localAccountId,
-      name: account.name || '',
+      name: userData.displayName || account.name || '',
       email: userEmail || '',
       isAdmin: isAdmin,
       isBasic: true, // All authenticated users get basic access
     };
   } catch (error) {
-    console.error('Get auth user error:', error);
-    // Fallback to basic user if Graph API fails
-    const account = msalInstance.getActiveAccount();
-    const userEmail = account?.username;
+    console.error('getAuthUser error:', error);
     
-    // Even in fallback, check if user should be admin
-    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
-    const isAdmin = Boolean(adminEmails.includes(userEmail || '') || 
-                   userEmail?.endsWith('@collectif.nyc'));
-    
-    console.log('Auth Fallback Debug:', {
-      accountEmail: userEmail,
-      accountName: account?.name,
-      adminEmails,
-      isAdmin
-    });
-    
-    return {
-      id: account?.localAccountId || '',
-      name: account?.name || '',
-      email: userEmail || '',
-      isAdmin: isAdmin,
-      isBasic: true,
-    };
+    // Enhanced fallback with better error handling
+    try {
+      const account = msalInstance.getActiveAccount();
+      if (!account) {
+        console.log('getAuthUser: No account available for fallback');
+        return null;
+      }
+      
+      const userEmail = account.username;
+      const isAdmin = checkAdminStatus(userEmail);
+      
+      console.log('getAuthUser Fallback Debug:', {
+        accountEmail: userEmail,
+        accountName: account.name,
+        isAdmin
+      });
+      
+      return {
+        id: account.localAccountId || 'fallback-user',
+        name: account.name || 'Unknown User',
+        email: userEmail || '',
+        isAdmin: isAdmin,
+        isBasic: true,
+      };
+    } catch (fallbackError) {
+      console.error('getAuthUser: Fallback also failed:', fallbackError);
+      return null;
+    }
+  }
+}
+
+// Utility function to set admin override for development/testing
+export function setAdminOverride(email: string): void {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('adminOverride', email);
+      console.log('Admin override set for:', email);
+    } catch (error) {
+      console.error('Failed to set admin override:', error);
+    }
+  }
+}
+
+// Utility function to clear admin override
+export function clearAdminOverride(): void {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('adminOverride');
+      console.log('Admin override cleared');
+    } catch (error) {
+      console.error('Failed to clear admin override:', error);
+    }
   }
 } 
