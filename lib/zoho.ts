@@ -736,12 +736,12 @@ class ZohoService {
   async getCashFlow(startDate: string, endDate: string): Promise<any> {
     try {
       console.info(`💰 Fetching Zoho Cash Flow for ${startDate} to ${endDate}`);
-      const data = await this.makeRequest(`reports/cashflowstatement?from_date=${startDate}&to_date=${endDate}`);
+      const data = await this.makeRequest(`reports/cashflow?from_date=${startDate}&to_date=${endDate}`);
       const sizeBytes = JSON.stringify(data || {}).length;
       const keys = Object.keys(data || {}).length;
       console.info(`✅ Cash Flow data fetched successfully (keys: ${keys}, bytes: ${sizeBytes})`);
       if (!data || keys === 0) {
-        console.warn('No data for reports/cashflowstatement. Verify organization ID, date range (2025-01-01 to 2025-08-13), or data in Zoho dashboard.');
+        console.warn('No data for reports/cashflow. Verify organization ID, date range (2025-01-01 to 2025-08-13), or data in Zoho dashboard.');
       }
       return data;
     } catch (error) {
@@ -815,6 +815,51 @@ class ZohoService {
         this.getBalanceSheet(endDate)
       ]);
 
+      // Log raw response status and body length for each report
+      console.info('📊 Financial reports raw response details:', {
+        profitLoss: {
+          status: plData.status,
+          bodyLength: plData.status === 'fulfilled' ? JSON.stringify(plData.value || {}).length : 'N/A',
+          hasData: plData.status === 'fulfilled' && plData.value && Object.keys(plData.value || {}).length > 0
+        },
+        cashFlow: {
+          status: cfData.status,
+          bodyLength: cfData.status === 'fulfilled' ? JSON.stringify(cfData.value || {}).length : 'N/A',
+          hasData: cfData.status === 'fulfilled' && cfData.value && Object.keys(cfData.value || {}).length > 0
+        },
+        balanceSheet: {
+          status: bsData.status,
+          bodyLength: bsData.status === 'fulfilled' ? JSON.stringify(bsData.value || {}).length : 'N/A',
+          hasData: bsData.status === 'fulfilled' && bsData.value && Object.keys(bsData.value || {}).length > 0
+        }
+      });
+
+      // Check for 404 errors and log specific warnings
+      if (plData.status === 'rejected') {
+        const error = plData.reason as any;
+        if (error?.response?.status === 404) {
+          console.warn('⚠️ Profit & Loss returned 404 - Invalid endpoint - check Zoho API docs');
+        } else {
+          console.warn('⚠️ Profit & Loss data failed:', plData.reason);
+        }
+      }
+      if (cfData.status === 'rejected') {
+        const error = cfData.reason as any;
+        if (error?.response?.status === 404) {
+          console.warn('⚠️ Cash Flow returned 404 - Invalid endpoint - check Zoho API docs');
+        } else {
+          console.warn('⚠️ Cash Flow data failed:', cfData.reason);
+        }
+      }
+      if (bsData.status === 'rejected') {
+        const error = bsData.reason as any;
+        if (error?.response?.status === 404) {
+          console.warn('⚠️ Balance Sheet returned 404 - Invalid endpoint - check Zoho API docs');
+        } else {
+          console.warn('⚠️ Balance Sheet data failed:', bsData.reason);
+        }
+      }
+
       // Extract financial metrics from the responses with fallbacks
       const revenue = plData.status === 'fulfilled' ? (plData.value?.revenue?.total || 0) : 0;
       const expenses = plData.status === 'fulfilled' ? (plData.value?.expenses?.total || 0) : 0;
@@ -837,16 +882,6 @@ class ZohoService {
         cashFlow: cfData.status === 'fulfilled' ? '✅' : '❌',
         balanceSheet: bsData.status === 'fulfilled' ? '✅' : '❌'
       });
-
-      if (plData.status === 'rejected') {
-        console.warn('⚠️ Profit & Loss data failed:', plData.reason);
-      }
-      if (cfData.status === 'rejected') {
-        console.warn('⚠️ Cash Flow data failed:', cfData.reason);
-      }
-      if (bsData.status === 'rejected') {
-        console.warn('⚠️ Balance Sheet data failed:', bsData.reason);
-      }
 
       return {
         revenue,

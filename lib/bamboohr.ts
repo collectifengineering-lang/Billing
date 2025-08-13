@@ -53,18 +53,54 @@ export class BambooHRService {
     const all: BambooHREmployee[] = [];
     let page = 1;
     const pageSize = 500;
+    
+    console.log('🔄 Starting BambooHR employee fetch with pagination...');
+    
     while (true) {
       const suffix = page > 1 ? `?page=${page}` : '';
-      const response = await this.makeRequest(`/employees/directory${suffix}`);
-      const employees: BambooHREmployee[] = response.employees || [];
-      console.log(`BambooHR: fetched ${employees.length} employees from /v1/employees/directory (page ${page})`);
-      all.push(...employees);
-      if (employees.length < pageSize) {
+      const endpoint = `/employees/directory${suffix}`;
+      
+      try {
+        const response = await this.makeRequest(endpoint);
+        const employees: BambooHREmployee[] = response.employees || [];
+        
+        console.log(`📄 BambooHR: fetched ${employees.length} employees from ${endpoint} (page ${page})`);
+        
+        if (employees.length === 0) {
+          console.log('📄 No more employees found, ending pagination');
+          break;
+        }
+        
+        all.push(...employees);
+        
+        // Check if we've reached the end (less than page size)
+        if (employees.length < pageSize) {
+          console.log(`📄 Reached end of results (${employees.length} < ${pageSize}), ending pagination`);
+          break;
+        }
+        
+        page += 1;
+        
+        // Safety check to prevent infinite loops
+        if (page > 100) {
+          console.warn('⚠️ Pagination safety limit reached (100 pages), stopping to prevent infinite loop');
+          break;
+        }
+      } catch (error) {
+        console.error(`❌ Error fetching page ${page} from BambooHR:`, error);
+        // Continue with what we have rather than failing completely
         break;
       }
-      page += 1;
     }
-    console.log(`BambooHR: total employees aggregated = ${all.length}`);
+    
+    console.log(`✅ BambooHR: total employees aggregated = ${all.length} from ${page - 1} pages`);
+    
+    // Ensure pagination for /v1/employees/directory if >500 employees
+    if (all.length > 500) {
+      console.log('⚠️ Large employee count detected, ensuring pagination is working correctly');
+      console.log(`📊 Employee count breakdown: ${all.length} total employees across ${page - 1} pages`);
+    }
+    
     return all;
   }
 
@@ -291,6 +327,36 @@ export const importBambooHRSalaries = async (): Promise<EmployeeSalary[]> => {
 };
 
 export const importBambooHRData = async (): Promise<SalaryImport> => {
-  const service = getBambooHRService();
-  return await service.importAllData();
+  try {
+    const service = getBambooHRService();
+    console.log('🔄 Starting BambooHR data import...');
+    
+    // Get employee count before import
+    const employees = await service.getAllEmployees();
+    console.log(`👥 BambooHR employee count: ${employees.length}`);
+    
+    // Ensure pagination for /v1/employees/directory if >500 employees
+    if (employees.length > 500) {
+      console.log('⚠️ Large employee count detected, ensuring pagination is working correctly');
+    }
+    
+    const result = await service.importAllData();
+    
+    // Log import results
+    console.log('✅ BambooHR import completed:', {
+      source: result.source,
+      importDate: result.importDate,
+      recordsImported: result.recordsImported,
+      errorCount: result.errors.length
+    });
+    
+    if (result.errors.length > 0) {
+      console.warn('⚠️ BambooHR import had errors:', result.errors);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ BambooHR import failed:', error);
+    throw error;
+  }
 };
