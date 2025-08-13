@@ -1,8 +1,19 @@
--- Fix RLS Policy Performance Warnings
--- This script optimizes RLS policies to prevent re-evaluation of auth functions for each row
--- This resolves the Supabase "auth_rls_initplan" warnings
+-- Comprehensive Fix for All RLS Policy Performance Warnings
+-- This script optimizes ALL RLS policies to prevent re-evaluation of auth functions for each row
+-- This resolves ALL Supabase "auth_rls_initplan" warnings
 
--- Drop existing policies that cause performance issues
+-- Drop all existing policies that cause performance issues
+-- Core tables
+DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON "Projection";
+DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON "Status";
+DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON "Comment";
+DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON "SignedFee";
+DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON "AsrFee";
+DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON "ClosedProject";
+DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON "ProjectAssignment";
+DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON "ProjectManager";
+
+-- Employee-related tables
 DROP POLICY IF EXISTS "employees_select_policy" ON employees;
 DROP POLICY IF EXISTS "employees_insert_policy" ON employees;
 DROP POLICY IF EXISTS "employees_update_policy" ON employees;
@@ -28,7 +39,33 @@ DROP POLICY IF EXISTS "bamboohr_config_insert_policy" ON bamboohr_config;
 DROP POLICY IF EXISTS "bamboohr_config_update_policy" ON bamboohr_config;
 DROP POLICY IF EXISTS "bamboohr_config_delete_policy" ON bamboohr_config;
 
--- Recreate optimized policies using (select auth.role()) to prevent re-evaluation
+-- Recreate ALL policies with optimized format using (select auth.role()) to prevent re-evaluation
+
+-- Core table policies (using FOR ALL for simplicity)
+CREATE POLICY "Enable all operations for authenticated users" ON "Projection"
+    FOR ALL USING ((select auth.role()) = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON "Status"
+    FOR ALL USING ((select auth.role()) = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON "Comment"
+    FOR ALL USING ((select auth.role()) = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON "SignedFee"
+    FOR ALL USING ((select auth.role()) = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON "AsrFee"
+    FOR ALL USING ((select auth.role()) = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON "ClosedProject"
+    FOR ALL USING ((select auth.role()) = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON "ProjectAssignment"
+    FOR ALL USING ((select auth.role()) = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON "ProjectManager"
+    FOR ALL USING ((select auth.role()) = 'authenticated');
+
 -- Employees table policies
 CREATE POLICY "employees_select_policy" ON employees
 FOR SELECT USING ((select auth.role()) = 'authenticated');
@@ -94,7 +131,7 @@ FOR UPDATE USING ((select auth.role()) = 'authenticated');
 CREATE POLICY "bamboohr_config_delete_policy" ON bamboohr_config
 FOR DELETE USING ((select auth.role()) = 'authenticated');
 
--- Verify the policies were created correctly
+-- Verify all policies were created correctly
 SELECT 
   schemaname,
   tablename,
@@ -102,5 +139,19 @@ SELECT
   cmd,
   qual
 FROM pg_policies 
-WHERE tablename IN ('employees', 'employee_salaries', 'project_multipliers', 'employee_time_entries', 'bamboohr_config')
+WHERE tablename IN (
+  'Projection', 'Status', 'Comment', 'SignedFee', 'AsrFee', 'ClosedProject', 'ProjectAssignment', 'ProjectManager',
+  'employees', 'employee_salaries', 'project_multipliers', 'employee_time_entries', 'bamboohr_config'
+)
+ORDER BY tablename, policyname;
+
+-- Check for any remaining policies that might still use auth.role() directly
+SELECT 
+  schemaname,
+  tablename,
+  policyname,
+  qual
+FROM pg_policies 
+WHERE qual LIKE '%auth.role()%' 
+  AND qual NOT LIKE '%(select auth.role())%'
 ORDER BY tablename, policyname;

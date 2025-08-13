@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, DollarSign, Users, Calendar, Target, PieChart, Building2, Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, DollarSign, Users, Calendar, Target, PieChart, Building2, Clock, AlertTriangle, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -183,10 +183,40 @@ function DashboardPageContent() {
   const [loading, setLoading] = useState(true);
   const [projectLoading, setProjectLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [closedProjects, setClosedProjects] = useState<Set<string>>(new Set());
   
   // Use ref to prevent unnecessary API calls
   const currentProjectIdRef = useRef<string>('');
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const syncLocalStorageWithDatabase = async () => {
+    try {
+      const savedClosedProjects = localStorage.getItem('closedProjects');
+      if (savedClosedProjects) {
+        const localClosedProjects = JSON.parse(savedClosedProjects);
+        if (Array.isArray(localClosedProjects) && localClosedProjects.length > 0) {
+          console.log('Syncing localStorage closed projects with database...');
+          
+          // Add each project to the database
+          for (const projectId of localClosedProjects) {
+            try {
+              await fetch('/api/closed-projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId }),
+              });
+            } catch (error) {
+              console.error(`Failed to sync project ${projectId}:`, error);
+            }
+          }
+          
+          console.log('LocalStorage sync completed');
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing localStorage with database:', error);
+    }
+  };
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -196,6 +226,8 @@ function DashboardPageContent() {
           fetchDashboardData(),
           fetchProjects()
         ]);
+        await loadClosedProjects();
+        await syncLocalStorageWithDatabase();
       } catch (error) {
         console.error('Failed to initialize dashboard:', error);
         setError('Failed to initialize dashboard. Please refresh the page.');
@@ -412,6 +444,151 @@ function DashboardPageContent() {
     }
   };
 
+  const loadClosedProjects = async () => {
+    try {
+      // First try to load from database
+      const response = await fetch('/api/closed-projects');
+      if (response.ok) {
+        const dbClosedProjects = await response.json();
+        if (Array.isArray(dbClosedProjects)) {
+          setClosedProjects(new Set(dbClosedProjects));
+          // Update localStorage to match database
+          localStorage.setItem('closedProjects', JSON.stringify(dbClosedProjects));
+          return;
+        }
+      }
+      
+      // Fallback to localStorage if database fails
+      const savedClosedProjects = localStorage.getItem('closedProjects');
+      if (savedClosedProjects) {
+        const closedProjectsArray = JSON.parse(savedClosedProjects);
+        setClosedProjects(new Set(closedProjectsArray));
+      }
+    } catch (error) {
+      console.error('Error loading closed projects:', error);
+      // Fallback to localStorage
+      try {
+        const savedClosedProjects = localStorage.getItem('closedProjects');
+        if (savedClosedProjects) {
+          const closedProjectsArray = JSON.parse(savedClosedProjects);
+          setClosedProjects(new Set(closedProjectsArray));
+        }
+      } catch (localStorageError) {
+        console.error('Error loading from localStorage:', localStorageError);
+      }
+    }
+  };
+
+  const handleProjectReopen = async (projectId: string) => {
+    try {
+      // Remove from database
+      const response = await fetch('/api/closed-projects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to remove project from database');
+      }
+      
+      // Update local state
+      const newClosedProjects = new Set(closedProjects);
+      newClosedProjects.delete(projectId);
+      setClosedProjects(newClosedProjects);
+      
+      // Update localStorage
+      localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
+      
+      // Dispatch event for other components
+      const event = new CustomEvent('projectStatusChanged', {
+        detail: {
+          projectId,
+          status: 'active',
+          closedProjects: newClosedProjects
+        }
+      });
+      window.dispatchEvent(event);
+      
+      console.log(`Project ${projectId} reopened`);
+    } catch (error) {
+      console.error('Error reopening project:', error);
+      // Fallback to localStorage only
+      try {
+        const newClosedProjects = new Set(closedProjects);
+        newClosedProjects.delete(projectId);
+        setClosedProjects(newClosedProjects);
+        localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
+        
+        const event = new CustomEvent('projectStatusChanged', {
+          detail: {
+            projectId,
+            status: 'active',
+            closedProjects: newClosedProjects
+          }
+        });
+        window.dispatchEvent(event);
+      } catch (fallbackError) {
+        console.error('Fallback error:', fallbackError);
+      }
+    }
+  };
+
+  const handleProjectClose = async (projectId: string) => {
+    try {
+      // Add to database
+      const response = await fetch('/api/closed-projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to add project to database');
+      }
+      
+      // Update local state
+      const newClosedProjects = new Set(closedProjects);
+      newClosedProjects.add(projectId);
+      setClosedProjects(newClosedProjects);
+      
+      // Update localStorage
+      localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
+      
+      // Dispatch event for other components
+      const event = new CustomEvent('projectStatusChanged', {
+        detail: {
+          projectId,
+          status: 'closed',
+          closedProjects: newClosedProjects
+        }
+      });
+      window.dispatchEvent(event);
+      
+      console.log(`Project ${projectId} closed`);
+    } catch (error) {
+      console.error('Error closing project:', error);
+      // Fallback to localStorage only
+      try {
+        const newClosedProjects = new Set(closedProjects);
+        newClosedProjects.add(projectId);
+        setClosedProjects(newClosedProjects);
+        localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
+        
+        const event = new CustomEvent('projectStatusChanged', {
+          detail: {
+            projectId,
+            status: 'closed',
+            closedProjects: newClosedProjects
+          }
+        });
+        window.dispatchEvent(event);
+      } catch (fallbackError) {
+        console.error('Fallback error:', fallbackError);
+      }
+    }
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -535,11 +712,30 @@ function DashboardPageContent() {
               className="block w-80 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             >
               <option value="">All Projects (Company Overview)</option>
-              {Array.isArray(projects) && projects.map((project) => (
-                <option key={project?.project_id || 'unknown'} value={project?.project_id || ''}>
-                  {project?.project_name || 'Unknown Project'} - {project?.customer_name || 'Unknown Customer'}
-                </option>
-              ))}
+              {/* Active Projects */}
+              <optgroup label="Active Projects">
+                {Array.isArray(projects) && projects
+                  .filter(project => !closedProjects.has(project?.project_id || ''))
+                  .map((project) => (
+                    <option key={project?.project_id || 'unknown'} value={project?.project_id || ''}>
+                      {project?.project_name || 'Unknown Project'} - {project?.customer_name || 'Unknown Customer'}
+                    </option>
+                  ))}
+              </optgroup>
+              {/* Closed Projects */}
+              {Array.isArray(projects) && projects
+                .filter(project => closedProjects.has(project?.project_id || ''))
+                .length > 0 && (
+                <optgroup label="Closed Projects">
+                  {Array.isArray(projects) && projects
+                    .filter(project => closedProjects.has(project?.project_id || ''))
+                    .map((project) => (
+                      <option key={project?.project_id || 'unknown'} value={project?.project_id || ''}>
+                        {project?.project_name || 'Unknown Project'} - {project?.customer_name || 'Unknown Customer'} (Closed)
+                      </option>
+                    ))}
+                </optgroup>
+              )}
             </select>
             {projectLoading && (
               <div className="flex items-center text-sm text-gray-500">
@@ -548,6 +744,32 @@ function DashboardPageContent() {
               </div>
             )}
           </div>
+          
+          {/* Project Status Controls */}
+          {selectedProjectId && (
+            <div className="mt-3 flex items-center space-x-3">
+              {closedProjects.has(selectedProjectId) ? (
+                <button
+                  onClick={() => handleProjectReopen(selectedProjectId)}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reopen Project
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleProjectClose(selectedProjectId)}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Close Project
+                </button>
+              )}
+              <span className="text-sm text-gray-500">
+                Status: {closedProjects.has(selectedProjectId) ? 'Closed' : 'Active'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Error Display */}
@@ -641,6 +863,57 @@ function DashboardPageContent() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Project Status Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Project Status Overview</CardTitle>
+                <CardDescription>Active and closed projects</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-sm text-gray-700">Active Projects</h4>
+                    <div className="text-2xl font-bold text-green-600">
+                      {Array.isArray(projects) ? projects.filter(p => !closedProjects.has(p?.project_id || '')).length : 0}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Currently in progress
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-sm text-gray-700">Closed Projects</h4>
+                    <div className="text-2xl font-bold text-red-600">
+                      {closedProjects.size}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Completed or on hold
+                    </p>
+                  </div>
+                </div>
+                {closedProjects.size > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h5 className="font-medium text-sm text-gray-700 mb-2">Recently Closed Projects</h5>
+                    <div className="space-y-2">
+                      {Array.isArray(projects) && projects
+                        .filter(project => closedProjects.has(project?.project_id || ''))
+                        .slice(0, 3)
+                        .map((project) => (
+                          <div key={project?.project_id} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">{project?.project_name || 'Unknown Project'}</span>
+                            <button
+                              onClick={() => handleProjectReopen(project?.project_id || '')}
+                              className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                            >
+                              Reopen
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Multipliers and Overhead */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -947,8 +1220,11 @@ function DashboardPageContent() {
                     <h2 className="text-2xl font-bold text-gray-900">{projectMetrics?.projectName || 'Unknown Project'}</h2>
                     <p className="text-gray-600">{projectMetrics?.customerName || 'Unknown Customer'}</p>
                     <div className="flex items-center space-x-4 mt-2">
-                      <Badge variant={projectMetrics?.status === 'active' ? 'default' : 'secondary'}>
-                        {projectMetrics?.status || 'unknown'}
+                      <Badge 
+                        variant={closedProjects.has(selectedProjectId) ? 'secondary' : 'default'}
+                        className={closedProjects.has(selectedProjectId) ? 'bg-red-100 text-red-800 border-red-200' : ''}
+                      >
+                        {closedProjects.has(selectedProjectId) ? 'Closed' : 'Active'}
                       </Badge>
                       <span className="text-sm text-gray-500">
                         {projectMetrics?.startDate ? new Date(projectMetrics.startDate).toLocaleDateString() : 'Unknown Date'}
