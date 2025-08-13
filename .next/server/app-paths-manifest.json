@@ -1,1 +1,4 @@
-{}
+{
+  "/api/homepage-dashboard/route": "app/api/homepage-dashboard/route.js",
+  "/api/payroll/bamboohr/route": "app/api/payroll/bamboohr/route.js"
+}

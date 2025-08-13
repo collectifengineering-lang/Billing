@@ -736,12 +736,12 @@ class ZohoService {
   async getCashFlow(startDate: string, endDate: string): Promise<any> {
     try {
       console.info(`💰 Fetching Zoho Cash Flow for ${startDate} to ${endDate}`);
-      const data = await this.makeRequest(`reports/cashflowstatement?from_date=${startDate}&to_date=${endDate}`);
+      const data = await this.makeRequest(`reports/cashflow?from_date=${startDate}&to_date=${endDate}`);
       const sizeBytes = JSON.stringify(data || {}).length;
       const keys = Object.keys(data || {}).length;
       console.info(`✅ Cash Flow data fetched successfully (keys: ${keys}, bytes: ${sizeBytes})`);
       if (!data || keys === 0) {
-        console.warn('No data for reports/cashflowstatement. Verify organization ID, date range (2025-01-01 to 2025-08-13), or data in Zoho dashboard.');
+        console.warn('No data for reports/cashflow. Verify organization ID, date range (2025-01-01 to 2025-08-13), or data in Zoho dashboard.');
       }
       return data;
     } catch (error) {
@@ -814,6 +814,38 @@ class ZohoService {
         this.getCashFlow(startDate, endDate),
         this.getBalanceSheet(endDate)
       ]);
+
+      // Log raw response status and body length for each report
+      console.info('📊 Raw response details for financial reports:');
+      if (plData.status === 'fulfilled') {
+        const plBodyLength = JSON.stringify(plData.value || {}).length;
+        console.info(`  Profit & Loss: ✅ SUCCESS, body length: ${plBodyLength} bytes`);
+      } else {
+        console.error(`  Profit & Loss: ❌ FAILED, error: ${plData.reason}`);
+        if (plData.reason?.response?.status === 404) {
+          console.error('  Invalid endpoint - check Zoho API docs for reports/profitandloss');
+        }
+      }
+
+      if (cfData.status === 'fulfilled') {
+        const cfBodyLength = JSON.stringify(cfData.value || {}).length;
+        console.info(`  Cash Flow: ✅ SUCCESS, body length: ${cfBodyLength} bytes`);
+      } else {
+        console.error(`  Cash Flow: ❌ FAILED, error: ${cfData.reason}`);
+        if (cfData.reason?.response?.status === 404) {
+          console.error('  Invalid endpoint - check Zoho API docs for reports/cashflow');
+        }
+      }
+
+      if (bsData.status === 'fulfilled') {
+        const bsBodyLength = JSON.stringify(bsData.value || {}).length;
+        console.info(`  Balance Sheet: ✅ SUCCESS, body length: ${bsBodyLength} bytes`);
+      } else {
+        console.error(`  Balance Sheet: ❌ FAILED, error: ${bsData.reason}`);
+        if (bsData.reason?.response?.status === 404) {
+          console.error('  Invalid endpoint - check Zoho API docs for reports/balancesheet');
+        }
+      }
 
       // Extract financial metrics from the responses with fallbacks
       const revenue = plData.status === 'fulfilled' ? (plData.value?.revenue?.total || 0) : 0;

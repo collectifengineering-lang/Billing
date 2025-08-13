@@ -496,17 +496,22 @@ export class PayrollService {
     }
 
     try {
+      console.log('🚀 Starting BambooHR data import process...');
+      
       // Import employees from BambooHR
       const bamboohrEmployees = await importBambooHREmployees();
-      console.log(`BambooHR import: upserting ${bamboohrEmployees.length} employees to Supabase/Prisma`);
+      console.log(`📊 BambooHR import: Retrieved ${bamboohrEmployees.length} employees from BambooHR API`);
+      console.log(`🔄 BambooHR import: Beginning Supabase upsert for ${bamboohrEmployees.length} employees...`);
+      
       let employeeSuccess = 0;
       const employeeErrors: string[] = [];
       for (const employee of bamboohrEmployees) {
         try {
           await this.addEmployee(employee);
           employeeSuccess += 1;
+          console.log(`✅ Employee upsert success: ${employee.name} (${employee.id})`);
         } catch (e: any) {
-          console.error('BambooHR employee upsert failed:', {
+          console.error('❌ BambooHR employee upsert failed:', {
             id: employee.id,
             name: employee.name,
             error: e?.message || String(e)
@@ -514,18 +519,22 @@ export class PayrollService {
           employeeErrors.push(`emp:${employee.id}:${e?.message || e}`);
         }
       }
+      console.log(`📈 Employee import results: ${employeeSuccess} successes, ${employeeErrors.length} errors`);
 
       // Import salaries from BambooHR
       const bamboohrSalaries = await importBambooHRSalaries();
-      console.log(`BambooHR import: upserting ${bamboohrSalaries.length} salaries to Supabase/Prisma`);
+      console.log(`💰 BambooHR import: Retrieved ${bamboohrSalaries.length} salary records from BambooHR API`);
+      console.log(`🔄 BambooHR import: Beginning Supabase upsert for ${bamboohrSalaries.length} salary records...`);
+      
       let salarySuccess = 0;
       const salaryErrors: string[] = [];
       for (const salary of bamboohrSalaries) {
         try {
           await this.addSalary(salary);
           salarySuccess += 1;
+          console.log(`✅ Salary upsert success: Employee ${salary.employeeId}, effective ${salary.effectiveDate}, annual: $${salary.annualSalary}`);
         } catch (e: any) {
-          console.error('BambooHR salary upsert failed:', {
+          console.error('❌ BambooHR salary upsert failed:', {
             employeeId: salary.employeeId,
             effectiveDate: salary.effectiveDate,
             annualSalary: salary.annualSalary,
@@ -535,8 +544,11 @@ export class PayrollService {
           salaryErrors.push(`sal:${salary.employeeId}:${salary.effectiveDate}:${e?.message || e}`);
         }
       }
+      console.log(`📈 Salary import results: ${salarySuccess} successes, ${salaryErrors.length} errors`);
 
-      console.log(`BambooHR import completed: employees ok=${employeeSuccess}, salaries ok=${salarySuccess}, empErrors=${employeeErrors.length}, salErrors=${salaryErrors.length}`);
+      console.log(`🎉 BambooHR import completed successfully!`);
+      console.log(`📊 Final summary: Total employees processed=${bamboohrEmployees.length}, employees saved=${employeeSuccess}, salaries processed=${bamboohrSalaries.length}, salaries saved=${salarySuccess}`);
+      console.log(`⚠️ Error summary: Employee errors=${employeeErrors.length}, Salary errors=${salaryErrors.length}`);
 
       return {
         source: 'bamboohr',
@@ -545,6 +557,7 @@ export class PayrollService {
         errors: [...employeeErrors, ...salaryErrors]
       };
     } catch (error: any) {
+      console.error('❌ BambooHR import failed with fatal error:', error);
       return {
         source: 'bamboohr',
         importDate: new Date().toISOString(),
