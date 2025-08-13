@@ -180,7 +180,7 @@ export interface Employee {
 export interface EmployeeSalary {
   employeeId: string;
   effectiveDate: string; // YYYY-MM-DD format
-  endDate?: string; // YYYY-MM-DD format, null if current
+  endDate?: string | null; // YYYY-MM-DD format; can be null in DB when current
   annualSalary: number;
   hourlyRate: number; // Calculated from annual salary
   currency: string;

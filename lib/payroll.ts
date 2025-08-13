@@ -34,6 +34,66 @@ export class PayrollService {
     console.log('Payroll service initialized');
   }
 
+  private mapDbEmployeeToDomain(dbEmployee: any): Employee {
+    const statusValue = (dbEmployee.status || '').toLowerCase();
+    const status: 'active' | 'inactive' = statusValue === 'active' ? 'active' : 'inactive';
+    const toIsoDateString = (d: any | undefined | null): string | undefined => {
+      if (!d) return undefined;
+      if (typeof d === 'string') return d;
+      if (d instanceof Date) return d.toISOString();
+      try {
+        const asDate = new Date(d);
+        return isNaN(asDate.getTime()) ? undefined : asDate.toISOString();
+      } catch {
+        return undefined;
+      }
+    };
+    return {
+      id: dbEmployee.id,
+      name: dbEmployee.name,
+      email: dbEmployee.email,
+      status,
+      department: dbEmployee.department ?? undefined,
+      position: dbEmployee.position ?? undefined,
+      hireDate: toIsoDateString(dbEmployee.hireDate) || '',
+      terminationDate: toIsoDateString(dbEmployee.terminationDate),
+    };
+  }
+
+  private toNumber(value: any): number {
+    if (typeof value === 'number') return value;
+    // Prisma Decimal has toNumber(); fall back to parseFloat
+    const maybeDecimal = value as { toNumber?: () => number };
+    if (maybeDecimal && typeof maybeDecimal.toNumber === 'function') {
+      return maybeDecimal.toNumber();
+    }
+    const parsed = parseFloat(String(value));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  private mapDbSalariesToDomain(dbSalaries: any[]): EmployeeSalary[] {
+    return (dbSalaries || []).map((s: any) => ({
+      employeeId: s.employeeId,
+      effectiveDate: s.effectiveDate,
+      endDate: s.endDate ?? undefined,
+      annualSalary: this.toNumber(s.annualSalary),
+      hourlyRate: this.toNumber(s.hourlyRate),
+      currency: s.currency ?? undefined,
+      notes: s.notes ?? undefined,
+    }));
+  }
+
+  private mapDbMultipliersToDomain(dbMultipliers: any[]): ProjectMultiplier[] {
+    return (dbMultipliers || []).map((m: any) => ({
+      projectId: m.projectId,
+      projectName: m.projectName,
+      multiplier: this.toNumber(m.multiplier),
+      effectiveDate: m.effectiveDate,
+      endDate: m.endDate ?? undefined,
+      notes: m.notes ?? undefined,
+    }));
+  }
+
   // Employee Management
   async addEmployee(employee: Employee): Promise<void> {
     // Save to database
@@ -51,9 +111,8 @@ export class PayrollService {
       const dbEmployees = await dbGetAllEmployees();
       const dbEmployee = dbEmployees.find((emp: any) => emp.id === employeeId);
       if (dbEmployee) {
-        const normalized = this.normalizeEmployee(dbEmployee as any);
-        this.employees.set(employeeId, normalized);
-        employee = normalized;
+        this.employees.set(employeeId, dbEmployee);
+        employee = dbEmployee;
       }
     }
     return employee || null;
@@ -62,12 +121,11 @@ export class PayrollService {
   async getAllEmployees(): Promise<Employee[]> {
     // Load from database and sync memory
     const dbEmployees = await dbGetAllEmployees();
-    const normalizedEmployees = dbEmployees.map((emp: any) => this.normalizeEmployee(emp as any));
     // Update memory cache
-    for (const emp of normalizedEmployees) {
+    for (const emp of dbEmployees) {
       this.employees.set(emp.id, emp);
     }
-    return normalizedEmployees;
+    return dbEmployees;
   }
 
   async updateEmployee(employeeId: string, updates: Partial<Employee>): Promise<void> {
@@ -113,9 +171,7 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries
-        .filter((s: any) => s.employeeId === employeeId)
-        .map((s: any) => this.normalizeSalary(s));
+      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
       if (employeeDbSalaries.length > 0) {
         this.salaries.set(employeeId, employeeDbSalaries);
         employeeSalaries = employeeDbSalaries;
@@ -139,9 +195,7 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries
-        .filter((s: any) => s.employeeId === employeeId)
-        .map((s: any) => this.normalizeSalary(s));
+      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
       if (employeeDbSalaries.length > 0) {
         this.salaries.set(employeeId, employeeDbSalaries);
         employeeSalaries = employeeDbSalaries;
@@ -181,9 +235,7 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers
-        .filter((m: any) => m.projectId === projectId)
-        .map((m: any) => this.normalizeProjectMultiplier(m));
+      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
       if (projectDbMultipliers.length > 0) {
         this.multipliers.set(projectId, projectDbMultipliers);
         projectMultipliers = projectDbMultipliers;
@@ -207,9 +259,7 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers
-        .filter((m: any) => m.projectId === projectId)
-        .map((m: any) => this.normalizeProjectMultiplier(m));
+      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
       if (projectDbMultipliers.length > 0) {
         this.multipliers.set(projectId, projectDbMultipliers);
         projectMultipliers = projectDbMultipliers;
@@ -442,21 +492,51 @@ export class PayrollService {
     try {
       // Import employees from BambooHR
       const bamboohrEmployees = await importBambooHREmployees();
+      console.log(`BambooHR import: upserting ${bamboohrEmployees.length} employees to Supabase/Prisma`);
+      let employeeSuccess = 0;
+      const employeeErrors: string[] = [];
       for (const employee of bamboohrEmployees) {
-        await this.addEmployee(employee);
+        try {
+          await this.addEmployee(employee);
+          employeeSuccess += 1;
+        } catch (e: any) {
+          console.error('BambooHR employee upsert failed:', {
+            id: employee.id,
+            name: employee.name,
+            error: e?.message || String(e)
+          });
+          employeeErrors.push(`emp:${employee.id}:${e?.message || e}`);
+        }
       }
 
       // Import salaries from BambooHR
       const bamboohrSalaries = await importBambooHRSalaries();
+      console.log(`BambooHR import: upserting ${bamboohrSalaries.length} salaries to Supabase/Prisma`);
+      let salarySuccess = 0;
+      const salaryErrors: string[] = [];
       for (const salary of bamboohrSalaries) {
-        await this.addSalary(salary);
+        try {
+          await this.addSalary(salary);
+          salarySuccess += 1;
+        } catch (e: any) {
+          console.error('BambooHR salary upsert failed:', {
+            employeeId: salary.employeeId,
+            effectiveDate: salary.effectiveDate,
+            annualSalary: salary.annualSalary,
+            hourlyRate: salary.hourlyRate,
+            error: e?.message || String(e)
+          });
+          salaryErrors.push(`sal:${salary.employeeId}:${salary.effectiveDate}:${e?.message || e}`);
+        }
       }
+
+      console.log(`BambooHR import completed: employees ok=${employeeSuccess}, salaries ok=${salarySuccess}, empErrors=${employeeErrors.length}, salErrors=${salaryErrors.length}`);
 
       return {
         source: 'bamboohr',
         importDate: new Date().toISOString(),
-        recordsImported: bamboohrEmployees.length + bamboohrSalaries.length,
-        errors: []
+        recordsImported: employeeSuccess + salarySuccess,
+        errors: [...employeeErrors, ...salaryErrors]
       };
     } catch (error: any) {
       return {
