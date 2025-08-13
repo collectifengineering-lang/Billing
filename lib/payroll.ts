@@ -111,8 +111,9 @@ export class PayrollService {
       const dbEmployees = await dbGetAllEmployees();
       const dbEmployee = dbEmployees.find((emp: any) => emp.id === employeeId);
       if (dbEmployee) {
-        this.employees.set(employeeId, dbEmployee);
-        employee = dbEmployee;
+        const mapped = this.mapDbEmployeeToDomain(dbEmployee);
+        this.employees.set(employeeId, mapped);
+        employee = mapped;
       }
     }
     return employee || null;
@@ -122,10 +123,11 @@ export class PayrollService {
     // Load from database and sync memory
     const dbEmployees = await dbGetAllEmployees();
     // Update memory cache
-    for (const emp of dbEmployees) {
+    const mapped = dbEmployees.map((emp: any) => this.mapDbEmployeeToDomain(emp));
+    for (const emp of mapped) {
       this.employees.set(emp.id, emp);
     }
-    return dbEmployees;
+    return mapped;
   }
 
   async updateEmployee(employeeId: string, updates: Partial<Employee>): Promise<void> {
@@ -171,10 +173,11 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
+      const employeeDbSalaries = dbSalaries.filter((s: any) => s.employeeId === employeeId);
       if (employeeDbSalaries.length > 0) {
-        this.salaries.set(employeeId, employeeDbSalaries);
-        employeeSalaries = employeeDbSalaries;
+        const mapped = this.mapDbSalariesToDomain(employeeDbSalaries);
+        this.salaries.set(employeeId, mapped);
+        employeeSalaries = mapped;
       }
     }
     
@@ -195,10 +198,11 @@ export class PayrollService {
     if (!employeeSalaries || employeeSalaries.length === 0) {
       // Load from database
       const dbSalaries = await dbGetAllEmployeeSalaries();
-      const employeeDbSalaries = dbSalaries.filter(s => s.employeeId === employeeId);
+      const employeeDbSalaries = dbSalaries.filter((s: any) => s.employeeId === employeeId);
       if (employeeDbSalaries.length > 0) {
-        this.salaries.set(employeeId, employeeDbSalaries);
-        employeeSalaries = employeeDbSalaries;
+        const mapped = this.mapDbSalariesToDomain(employeeDbSalaries);
+        this.salaries.set(employeeId, mapped);
+        employeeSalaries = mapped;
       }
     }
     return employeeSalaries || [];
@@ -235,10 +239,11 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
+      const projectDbMultipliers = dbMultipliers.filter((m: any) => m.projectId === projectId);
       if (projectDbMultipliers.length > 0) {
-        this.multipliers.set(projectId, projectDbMultipliers);
-        projectMultipliers = projectDbMultipliers;
+        const mapped = this.mapDbMultipliersToDomain(projectDbMultipliers);
+        this.multipliers.set(projectId, mapped);
+        projectMultipliers = mapped;
       }
     }
     
@@ -259,10 +264,11 @@ export class PayrollService {
     if (!projectMultipliers || projectMultipliers.length === 0) {
       // Load from database
       const dbMultipliers = await dbGetAllProjectMultipliers();
-      const projectDbMultipliers = dbMultipliers.filter(m => m.projectId === projectId);
+      const projectDbMultipliers = dbMultipliers.filter((m: any) => m.projectId === projectId);
       if (projectDbMultipliers.length > 0) {
-        this.multipliers.set(projectId, projectDbMultipliers);
-        projectMultipliers = projectDbMultipliers;
+        const mapped = this.mapDbMultipliersToDomain(projectDbMultipliers);
+        this.multipliers.set(projectId, mapped);
+        projectMultipliers = mapped;
       }
     }
     return projectMultipliers || [];
