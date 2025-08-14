@@ -36,8 +36,8 @@ function convertPrismaEmployeeSalary(salary: any): EmployeeSalary {
     employeeId: salary.employeeId,
     effectiveDate: salary.effectiveDate,
     endDate: salary.endDate ?? undefined, // Convert null to undefined
-    annualSalary: salary.annualSalary,
-    hourlyRate: salary.hourlyRate,
+    annualSalary: salary.annualSalary.toNumber(), // Convert Decimal to number
+    hourlyRate: salary.hourlyRate.toNumber(), // Convert Decimal to number
     currency: salary.currency,
     notes: salary.notes ?? undefined // Convert null to undefined
   };
@@ -101,8 +101,8 @@ export class ClockifyImportService {
           employeeId: salary.employeeId,
           effectiveDate: salary.effectiveDate,
           endDate: salary.endDate,
-          annualSalary: salary.annualSalary,
-          hourlyRate: salary.hourlyRate,
+          annualSalary: salary.annualSalary.toNumber(), // Convert Decimal to number for logging
+          hourlyRate: salary.hourlyRate.toNumber(), // Convert Decimal to number for logging
           currency: salary.currency,
           notes: salary.notes
         });
@@ -116,8 +116,8 @@ export class ClockifyImportService {
           console.log(`✅ Converted salary for employee ${convertedSalary.employeeId}:`, {
             effectiveDate: convertedSalary.effectiveDate,
             endDate: convertedSalary.endDate,
-            annualSalary: convertedSalary.annualSalary,
-            hourlyRate: convertedSalary.hourlyRate
+            annualSalary: convertedSalary.annualSalary, // Already converted to number
+            hourlyRate: convertedSalary.hourlyRate // Already converted to number
           });
         }
       }
@@ -130,7 +130,7 @@ export class ClockifyImportService {
         console.log(`📋 Raw multiplier data for project ${mult.projectId}:`, {
           projectId: mult.projectId,
           projectName: mult.projectName,
-          multiplier: mult.multiplier,
+          multiplier: mult.multiplier.toNumber(), // Convert Decimal to number for logging
           effectiveDate: mult.effectiveDate,
           endDate: mult.endDate,
           notes: mult.notes
@@ -138,9 +138,12 @@ export class ClockifyImportService {
 
         const existing = this.multiplierMap.get(mult.projectId);
         if (!existing || new Date(mult.effectiveDate) > new Date(existing.effectiveDate)) {
-          this.multiplierMap.set(mult.projectId, { multiplier: mult.multiplier, effectiveDate: mult.effectiveDate });
+          this.multiplierMap.set(mult.projectId, { 
+            multiplier: mult.multiplier.toNumber(), // Convert Decimal to number
+            effectiveDate: mult.effectiveDate 
+          });
           
-          console.log(`✅ Loaded multiplier for project ${mult.projectId}: ${mult.multiplier}x`);
+          console.log(`✅ Loaded multiplier for project ${mult.projectId}: ${mult.multiplier.toNumber()}x`);
         }
       }
       console.log(`📈 Loaded ${this.multiplierMap.size} project multipliers`);
