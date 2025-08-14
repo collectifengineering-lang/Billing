@@ -290,6 +290,7 @@ export interface BambooHREmployee {
   firstName: string;
   lastName: string;
   displayName: string;
+  preferredName?: string;
   email: string;
   status: 'active' | 'inactive' | 'terminated';
   hireDate: string;
@@ -299,6 +300,11 @@ export interface BambooHREmployee {
   location?: string;
   supervisor?: string;
   employeeNumber?: string;
+  gender?: string;
+  workPhone?: string;
+  workPhoneExtension?: string;
+  skypeUsername?: string;
+  facebook?: string;
   customFields?: Record<string, any>;
 }
 
