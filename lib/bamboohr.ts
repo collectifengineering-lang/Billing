@@ -10,7 +10,7 @@ import {
 } from './types';
 
 // Import xml2js for XML parsing
-import { parseString } from 'xml2js';
+import { parseStringPromise } from 'xml2js';
 
 export class BambooHRService {
   private config: BambooHRConfig;
@@ -27,7 +27,7 @@ export class BambooHRService {
     const basic = Buffer.from(`${this.config.apiKey}:x`).toString('base64');
     const headers = {
       'Authorization': `Basic ${basic}`,
-      'Accept': 'application/json',
+      'Accept': 'application/json, application/xml',
       'Content-Type': 'application/json',
       ...options.headers
     } as Record<string, string>;
@@ -43,7 +43,24 @@ export class BambooHRService {
         throw new Error(`BambooHR API error: ${response.status} ${response.statusText} ${body ? `- ${body}` : ''}`);
       }
 
-      return await response.json();
+      // Check content type to determine parsing method
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (contentType.includes('application/xml') || contentType.includes('text/xml')) {
+        // Handle XML response
+        const xmlText = await response.text();
+        console.log(`📄 Parsing XML response from ${endpoint}`);
+        try {
+          const parsedXml = await parseStringPromise(xmlText, { explicitArray: false, mergeAttrs: true });
+          return parsedXml;
+        } catch (xmlError) {
+          console.error('❌ XML parsing failed:', xmlError);
+          throw new Error(`Failed to parse XML response: ${xmlError}`);
+        }
+      } else {
+        // Handle JSON response (default)
+        return await response.json();
+      }
     } catch (error) {
       console.error('BambooHR API request failed:', error);
       throw error;
@@ -65,7 +82,23 @@ export class BambooHRService {
       
       try {
         const response = await this.makeRequest(endpoint);
-        const employees: BambooHREmployee[] = response.employees || [];
+        
+        // Handle both XML and JSON responses for employee directory
+        let employees: BambooHREmployee[] = [];
+        
+        if (response.employees) {
+          // JSON response format
+          employees = response.employees;
+        } else if (response.employee) {
+          // XML response format - single employee or array
+          employees = Array.isArray(response.employee) ? response.employee : [response.employee];
+        } else if (response.directory && response.directory.employee) {
+          // Alternative XML format
+          employees = Array.isArray(response.directory.employee) ? response.directory.employee : [response.directory.employee];
+        } else {
+          console.log(`📄 No employee data found in response format:`, Object.keys(response));
+          employees = [];
+        }
         
         console.log(`📄 BambooHR: fetched ${employees.length} employees from ${endpoint} (page ${page})`);
         
@@ -114,7 +147,21 @@ export class BambooHRService {
 
   async getEmployeeDirectory(): Promise<BambooHREmployee[]> {
     const response = await this.makeRequest('/employees/directory');
-    return response.employees || [];
+    
+    // Handle both XML and JSON responses for employee directory
+    if (response.employees) {
+      // JSON response format
+      return response.employees;
+    } else if (response.employee) {
+      // XML response format - single employee or array
+      return Array.isArray(response.employee) ? response.employee : [response.employee];
+    } else if (response.directory && response.directory.employee) {
+      // Alternative XML format
+      return Array.isArray(response.directory.employee) ? response.directory.employee : [response.directory.employee];
+    } else {
+      console.log('📄 No employee data found in response format:', Object.keys(response));
+      return [];
+    }
   }
 
   // Compensation Management - Updated to use tables endpoint
