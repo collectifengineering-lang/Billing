@@ -150,7 +150,7 @@ export async function saveEmployee(employee: {
   status: string;
   department?: string;
   position?: string;
-  hireDate: string;
+  hireDate?: string | null;
   terminationDate?: string;
 }) {
   try {
@@ -164,7 +164,7 @@ export async function saveEmployee(employee: {
         status: employee.status,
         department: employee.department,
         position: employee.position,
-        hireDate: employee.hireDate,
+        hireDate: employee.hireDate || null,
         terminationDate: employee.terminationDate,
         updatedAt: new Date()
       },
@@ -175,7 +175,7 @@ export async function saveEmployee(employee: {
         status: employee.status,
         department: employee.department,
         position: employee.position,
-        hireDate: employee.hireDate,
+        hireDate: employee.hireDate || null,
         terminationDate: employee.terminationDate
       }
     });
@@ -197,7 +197,7 @@ export async function saveEmployee(employee: {
             status: employee.status,
             department: employee.department,
             position: employee.position,
-            hireDate: employee.hireDate,
+            hireDate: employee.hireDate || null,
             terminationDate: employee.terminationDate
           }
         });

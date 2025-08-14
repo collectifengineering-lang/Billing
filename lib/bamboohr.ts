@@ -349,18 +349,25 @@ export class BambooHRService {
   calculateHourlyRate(annualSalary: number, paySchedule: string): number {
     let hoursPerYear: number;
     
-    switch (paySchedule) {
+    switch (paySchedule.toLowerCase()) {
       case 'weekly':
         hoursPerYear = 52 * 40; // 40 hours per week
         break;
       case 'bi-weekly':
+      case 'biweekly':
         hoursPerYear = 26 * 80; // 80 hours per 2 weeks
         break;
       case 'semi-monthly':
+      case 'semimonthly':
         hoursPerYear = 24 * 86.67; // 86.67 hours per pay period
         break;
       case 'monthly':
+      case 'month':
         hoursPerYear = 12 * 173.33; // 173.33 hours per month
+        break;
+      case 'yearly':
+      case 'year':
+        hoursPerYear = 2080; // Standard 40-hour work week
         break;
       default:
         hoursPerYear = 2080; // Standard 40-hour work week
@@ -372,18 +379,25 @@ export class BambooHRService {
   calculateAnnualSalary(hourlyRate: number, paySchedule: string): number {
     let hoursPerYear: number;
     
-    switch (paySchedule) {
+    switch (paySchedule.toLowerCase()) {
       case 'weekly':
         hoursPerYear = 52 * 40; // 40 hours per week
         break;
       case 'bi-weekly':
+      case 'biweekly':
         hoursPerYear = 26 * 80; // 80 hours per 2 weeks
         break;
       case 'semi-monthly':
+      case 'semimonthly':
         hoursPerYear = 24 * 86.67; // 86.67 hours per pay period
         break;
       case 'monthly':
+      case 'month':
         hoursPerYear = 12 * 173.33; // 173.33 hours per month
+        break;
+      case 'yearly':
+      case 'year':
+        hoursPerYear = 2080; // Standard 40-hour work week
         break;
       default:
         hoursPerYear = 2080; // Standard 40-hour work week
