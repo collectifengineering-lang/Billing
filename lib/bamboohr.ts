@@ -31,6 +31,9 @@ export class BambooHRService {
       'Content-Type': 'application/json',
       ...options.headers
     } as Record<string, string>;
+    
+    console.log(`🔄 BambooHR API call to: ${endpoint}`);
+    console.log(`📡 URL: ${url}`);
 
     try {
       const response = await fetch(url, {
@@ -45,13 +48,15 @@ export class BambooHRService {
 
       // Check content type to determine parsing method
       const contentType = response.headers.get('content-type') || '';
+      console.log(`📋 Response content-type: ${contentType}`);
       
       if (contentType.includes('application/xml') || contentType.includes('text/xml')) {
         // Handle XML response
         const xmlText = await response.text();
-        console.log(`📄 Parsing XML response from ${endpoint}`);
+        console.log(`📄 Parsing XML response from ${endpoint} (${xmlText.length} characters)`);
         try {
           const parsedXml = await parseStringPromise(xmlText, { explicitArray: false, mergeAttrs: true });
+          console.log(`✅ XML parsed successfully. Structure:`, Object.keys(parsedXml));
           return parsedXml;
         } catch (xmlError) {
           console.error('❌ XML parsing failed:', xmlError);
@@ -59,7 +64,10 @@ export class BambooHRService {
         }
       } else {
         // Handle JSON response (default)
-        return await response.json();
+        console.log(`📄 Parsing JSON response from ${endpoint}`);
+        const jsonResponse = await response.json();
+        console.log(`✅ JSON parsed successfully. Structure:`, Object.keys(jsonResponse));
+        return jsonResponse;
       }
     } catch (error) {
       console.error('BambooHR API request failed:', error);
@@ -82,6 +90,7 @@ export class BambooHRService {
       
       try {
         const response = await this.makeRequest(endpoint);
+        console.log(`📊 BambooHR response structure for page ${page}:`, Object.keys(response));
         
         // Handle both XML and JSON responses for employee directory
         let employees: BambooHREmployee[] = [];
@@ -89,14 +98,18 @@ export class BambooHRService {
         if (response.employees) {
           // JSON response format
           employees = response.employees;
+          console.log(`✅ Using JSON format: employees array with ${employees.length} items`);
         } else if (response.employee) {
           // XML response format - single employee or array
           employees = Array.isArray(response.employee) ? response.employee : [response.employee];
+          console.log(`✅ Using XML format: employee field with ${employees.length} items`);
         } else if (response.directory && response.directory.employee) {
           // Alternative XML format
           employees = Array.isArray(response.directory.employee) ? response.directory.employee : [response.directory.employee];
+          console.log(`✅ Using XML format: directory.employee with ${employees.length} items`);
         } else {
           console.log(`📄 No employee data found in response format:`, Object.keys(response));
+          console.log(`🔍 Full response structure:`, JSON.stringify(response, null, 2));
           employees = [];
         }
         

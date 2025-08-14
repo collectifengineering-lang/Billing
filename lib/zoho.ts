@@ -37,7 +37,7 @@ class ZohoService {
   private accessToken: string | null = null;
   private tokenExpiry: number = 0;
   private refreshPromise: Promise<string> | null = null;
-  private readonly TOKEN_REFRESH_BUFFER = 5 * 60 * 1000; // 5 minutes buffer
+  private readonly TOKEN_REFRESH_BUFFER = 10 * 60 * 1000; // 10 minutes buffer (increased for better caching)
   private autoRefreshTimer: NodeJS.Timeout | null = null;
   private readonly AUTO_REFRESH_INTERVAL = 45 * 60 * 1000; // 45 minutes
   private lastRefreshTime: number = 0; // Track when auto-refresh was last triggered
@@ -49,7 +49,7 @@ class ZohoService {
   private requestCount: number = 0;
   private lastRequestTime: number = 0;
   private readonly MAX_REQUESTS_PER_MINUTE = 80; // Conservative limit (Zoho allows 100, we use 80)
-  private readonly MIN_REQUEST_INTERVAL = 3000; // 3 seconds between requests (was 2)
+  private readonly MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests (reduced for better performance)
   private retryCount: number = 0;
   private readonly MAX_RETRIES = 5; // Increased from 3 to 5
   private readonly BASE_DELAY = 5000; // Increased from 2000 to 5000ms base delay for exponential backoff
@@ -94,10 +94,24 @@ class ZohoService {
 
   private async getAccessToken(): Promise<string> {
     try {
-      // Check if we have a valid token and force refresh is not enabled
-      if (this.accessToken && Date.now() < this.tokenExpiry && process.env.ZOHO_FORCE_REFRESH !== 'true') {
-        console.log('Using existing valid token');
+      const now = Date.now();
+      const timeUntilExpiry = this.tokenExpiry - now;
+      
+      // Check if we have a valid token with sufficient buffer time
+      if (this.accessToken && timeUntilExpiry > this.TOKEN_REFRESH_BUFFER && process.env.ZOHO_FORCE_REFRESH !== 'true') {
+        const minutesLeft = Math.round(timeUntilExpiry / 60000);
+        console.log(`🔐 Using cached token (expires in ${minutesLeft} minutes)`);
         return this.accessToken;
+      }
+      
+      // Log token status for debugging
+      if (this.accessToken && timeUntilExpiry > 0) {
+        const minutesLeft = Math.round(timeUntilExpiry / 60000);
+        console.log(`⚠️ Token expires soon (${minutesLeft} minutes), refreshing proactively`);
+      } else if (this.accessToken) {
+        console.log('🔄 Token expired, refreshing...');
+      } else {
+        console.log('🆕 No token available, obtaining new one...');
       }
 
       console.log('Token expired or missing, refreshing...');
@@ -268,6 +282,10 @@ class ZohoService {
       await this.applyRateLimit();
       
       const token = await this.getAccessToken();
+      
+      // Log API call count for monitoring
+      this.requestCount++;
+      console.log(`📊 Zoho API call #${this.requestCount} to: ${endpoint}`);
       
       // Validate token before making request
       if (!token || token === 'undefined') {

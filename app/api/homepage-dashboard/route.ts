@@ -14,11 +14,15 @@ export async function GET(request: NextRequest) {
     const currentYearStart = new Date(currentYear, 0, 1);
     const lastYearStart = new Date(currentYear - 1, 0, 1);
     
-    console.log('📅 Date ranges calculated:', {
-      currentYear,
-      currentYearStart: currentYearStart.toISOString(),
-      lastYearStart: lastYearStart.toISOString()
-    });
+    // Use extended date range for Clockify to include 2024 data for better metrics
+    const extendedStartDate = new Date(2024, 0, 1); // Start from January 1, 2024
+    
+          console.log('📅 Date ranges calculated:', {
+        currentYear,
+        currentYearStart: currentYearStart.toISOString(),
+        lastYearStart: lastYearStart.toISOString(),
+        extendedStartDate: extendedStartDate.toISOString()
+      });
 
     // Initialize data containers
     let projects: any[] = [];
@@ -132,7 +136,7 @@ export async function GET(request: NextRequest) {
           clockifyService.getUser(),
           clockifyService.getProjects(),
           clockifyService.getAllTimeEntries(
-            currentYearStart.toISOString(),
+            extendedStartDate.toISOString(),
             now.toISOString()
           )
         ]);
