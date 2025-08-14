@@ -1,4 +1,5 @@
 import axios from 'axios';
+import pLimit from 'p-limit';
 
 export interface ZohoProject {
   project_id: string;
@@ -54,6 +55,9 @@ class ZohoService {
   private readonly MAX_RETRIES = 5; // Increased from 3 to 5
   private readonly BASE_DELAY = 5000; // Increased from 2000 to 5000ms base delay for exponential backoff
   private cachedAccessToken: string | null = null; // Fallback cached token
+  
+  // p-limit rate limiter for concurrent API calls
+  private readonly rateLimiter = pLimit(50); // Limit to 50 concurrent calls
 
   constructor() {
     // Start automatic token refresh
@@ -277,11 +281,13 @@ class ZohoService {
   }
 
   private async makeRequest(endpoint: string): Promise<any> {
-    try {
-      // Apply rate limiting
-      await this.applyRateLimit();
-      
-      const token = await this.getAccessToken();
+    // Use p-limit rate limiter to prevent 429 errors
+    return this.rateLimiter(async () => {
+      try {
+        // Apply rate limiting
+        await this.applyRateLimit();
+        
+        const token = await this.getAccessToken();
       
       // Log API call count for monitoring
       this.requestCount++;
@@ -446,7 +452,8 @@ class ZohoService {
       }
 
       throw error;
-    }
+      }
+    });
   }
 
   // Check granted scopes for current access token

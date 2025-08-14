@@ -82,7 +82,7 @@ model BambooHRConfig {
 model Employee {
   id              String            @id
   name            String
-  email           String
+  email           String?
   status          String            @default("active")
   department      String?
   position        String?

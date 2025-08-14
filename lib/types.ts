@@ -170,7 +170,7 @@ export interface EnhancedBillingData extends BillingData {
 export interface Employee {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   status: 'active' | 'inactive';
   department?: string;
   position?: string;

@@ -110,64 +110,77 @@ export class BambooHRService {
     return await this.getAllEmployees();
   }
 
-  // Compensation Management - Updated to use fields endpoint
+  // Compensation Management - Updated to use compensation tables endpoint
   async getEmployeeCompensation(employeeId: string): Promise<BamboohrCompensation[]> {
     try {
       console.log(`💰 Fetching compensation for employee ${employeeId}...`);
       
-      // Use the fields endpoint for compensation data
-      const endpoint = `/employees/${employeeId}?fields=payRate,payType,payPeriod,payPer,payCurrency`;
+      // Use the compensation tables endpoint for better salary data
+      const endpoint = `/employees/${employeeId}/tables/compensation`;
       const response = await this.makeRequest(endpoint);
       
-      console.log(`📊 Compensation response for employee ${employeeId}:`, JSON.stringify(response, null, 2));
+      console.log(`📊 Raw compensation response for employee ${employeeId}:`, JSON.stringify(response, null, 2));
       
-      if (response.employee) {
-        const emp = response.employee;
+      if (response.compensation && Array.isArray(response.compensation)) {
         const compensations: BamboohrCompensation[] = [];
         
-        // Map compensation fields to BamboohrCompensation
-        if (emp.payRate && emp.payType) {
-          let annualSalary = 0;
-          let hourlyRate = 0;
-          
-          if (emp.payType === 'salary') {
-            annualSalary = parseFloat(emp.payRate) || 0;
-            // Calculate hourly rate based on pay period
-            hourlyRate = this.calculateHourlyRate(annualSalary, emp.payPeriod || 'monthly');
-          } else if (emp.payType === 'hourly') {
-            hourlyRate = parseFloat(emp.payRate) || 0;
-            // Calculate annual salary based on pay period
-            annualSalary = this.calculateAnnualSalary(hourlyRate, emp.payPeriod || 'monthly');
+        for (const comp of response.compensation) {
+          try {
+            console.log(`🔍 Processing compensation record:`, JSON.stringify(comp, null, 2));
+            
+            let annualSalary = 0;
+            let hourlyRate = 0;
+            
+            // Map fields based on payType
+            if (comp.payRate && comp.payType) {
+              if (comp.payType === 'salary' || comp.payType === 'annual') {
+                annualSalary = parseFloat(comp.payRate) || 0;
+                // Calculate hourly rate based on pay period
+                hourlyRate = this.calculateHourlyRate(annualSalary, comp.payPeriod || 'monthly');
+              } else if (comp.payType === 'hourly') {
+                hourlyRate = parseFloat(comp.payRate) || 0;
+                // Calculate annual salary based on pay period
+                annualSalary = this.calculateAnnualSalary(hourlyRate, comp.payPeriod || 'monthly');
+              }
+              
+              const compensation: BamboohrCompensation = {
+                employeeId: employeeId,
+                effectiveDate: comp.effectiveDate || new Date().toISOString().split('T')[0],
+                endDate: comp.endDate,
+                annualSalary: annualSalary,
+                hourlyRate: hourlyRate,
+                currency: comp.payCurrency || 'USD',
+                payType: comp.payType,
+                paySchedule: comp.payPeriod || 'monthly'
+              };
+              
+              compensations.push(compensation);
+              console.log(`✅ Mapped compensation for employee ${employeeId}:`, {
+                payType: compensation.payType,
+                annualSalary: compensation.annualSalary,
+                hourlyRate: compensation.hourlyRate,
+                currency: compensation.currency,
+                paySchedule: compensation.paySchedule,
+                effectiveDate: compensation.effectiveDate
+              });
+            } else {
+              console.log(`⚠️ Missing payRate or payType for compensation record:`, comp);
+            }
+          } catch (error) {
+            console.error(`❌ Error processing compensation record for employee ${employeeId}:`, error);
           }
-          
-          const compensation: BamboohrCompensation = {
-            employeeId: employeeId,
-            effectiveDate: new Date().toISOString().split('T')[0], // Current date as effective
-            endDate: undefined,
-            annualSalary: annualSalary,
-            hourlyRate: hourlyRate,
-            currency: emp.payCurrency || 'USD',
-            payType: emp.payType,
-            paySchedule: emp.payPeriod || 'monthly'
-          };
-          
-          compensations.push(compensation);
-          console.log(`✅ Mapped compensation for employee ${employeeId}:`, {
-            payType: compensation.payType,
-            annualSalary: compensation.annualSalary,
-            hourlyRate: compensation.hourlyRate,
-            currency: compensation.currency,
-            paySchedule: compensation.paySchedule
-          });
-        } else {
-          console.log(`⚠️ No compensation data found for employee ${employeeId}`);
+        }
+        
+        if (compensations.length === 0) {
+          console.log(`⚠️ No valid compensation records found for employee ${employeeId}`);
         }
         
         return compensations;
+      } else {
+        console.log(`⚠️ No compensation data found for employee ${employeeId} - response structure:`, Object.keys(response));
+        console.log(`🔍 Full response:`, JSON.stringify(response, null, 2));
+        return [];
       }
-      
-      console.log(`⚠️ No employee data found for employee ${employeeId}`);
-      return [];
     } catch (error) {
       console.error(`❌ Error fetching compensation for employee ${employeeId}:`, error);
       return [];
@@ -309,7 +322,7 @@ export class BambooHRService {
           const employee: Employee = {
             id: emp.id,
             name: emp.preferredName || emp.displayName || `${emp.firstName} ${emp.lastName}`,
-            email: emp.email,
+            email: emp.email || null,
             status: emp.status === 'active' ? 'active' : 'inactive',
             department: emp.department,
             position: emp.jobTitle,

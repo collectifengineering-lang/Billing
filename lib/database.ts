@@ -146,7 +146,7 @@ export async function getBambooHRConfig(subdomain: string) {
 export async function saveEmployee(employee: {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   status: string;
   department?: string;
   position?: string;
