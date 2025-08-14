@@ -154,6 +154,8 @@ export async function saveEmployee(employee: {
   terminationDate?: string;
 }) {
   try {
+    console.log(`🔄 Attempting to upsert employee:`, JSON.stringify(employee, null, 2));
+    
     const result = await prisma.employee.upsert({
       where: { id: employee.id },
       update: {
@@ -178,10 +180,35 @@ export async function saveEmployee(employee: {
       }
     });
     
-    console.log(`Employee saved: ${employee.name} (${employee.id})`);
+    console.log(`✅ Employee saved: ${employee.name} (${employee.id})`);
     return result;
-  } catch (error) {
-    console.error('Error saving employee:', error);
+  } catch (error: any) {
+    console.error('❌ Error saving employee:', error);
+    
+    // Handle P2025 (record not found) error
+    if (error.code === 'P2025') {
+      console.log(`🔄 Record not found, attempting to create employee: ${employee.name} (${employee.id})`);
+      try {
+        const result = await prisma.employee.create({
+          data: {
+            id: employee.id,
+            name: employee.name,
+            email: employee.email,
+            status: employee.status,
+            department: employee.department,
+            position: employee.position,
+            hireDate: employee.hireDate,
+            terminationDate: employee.terminationDate
+          }
+        });
+        console.log(`✅ Employee created: ${employee.name} (${employee.id})`);
+        return result;
+      } catch (createError) {
+        console.error('❌ Error creating employee:', createError);
+        throw createError;
+      }
+    }
+    
     throw error;
   }
 }
@@ -197,6 +224,8 @@ export async function saveEmployeeSalary(salary: {
   source?: string;
 }) {
   try {
+    console.log(`🔄 Attempting to upsert employee salary:`, JSON.stringify(salary, null, 2));
+    
     const result = await prisma.employeeSalary.upsert({
       where: {
         employeeId_effectiveDate: {
@@ -225,10 +254,35 @@ export async function saveEmployeeSalary(salary: {
       }
     });
     
-    console.log(`Employee salary saved for ${salary.employeeId} effective ${salary.effectiveDate}`);
+    console.log(`✅ Employee salary saved for ${salary.employeeId} effective ${salary.effectiveDate}`);
     return result;
-  } catch (error) {
-    console.error('Error saving employee salary:', error);
+  } catch (error: any) {
+    console.error('❌ Error saving employee salary:', error);
+    
+    // Handle P2025 (record not found) error
+    if (error.code === 'P2025') {
+      console.log(`🔄 Record not found, attempting to create employee salary for ${salary.employeeId} effective ${salary.effectiveDate}`);
+      try {
+        const result = await prisma.employeeSalary.create({
+          data: {
+            employeeId: salary.employeeId,
+            effectiveDate: salary.effectiveDate,
+            endDate: salary.endDate,
+            annualSalary: salary.annualSalary,
+            hourlyRate: salary.hourlyRate,
+            currency: salary.currency || 'USD',
+            notes: salary.notes,
+            source: salary.source || 'bamboohr'
+          }
+        });
+        console.log(`✅ Employee salary created for ${salary.employeeId} effective ${salary.effectiveDate}`);
+        return result;
+      } catch (createError) {
+        console.error('❌ Error creating employee salary:', createError);
+        throw createError;
+      }
+    }
+    
     throw error;
   }
 }

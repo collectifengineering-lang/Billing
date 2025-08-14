@@ -92,6 +92,8 @@ model Employee {
   // Relations
   salaries        EmployeeSalary[]
   timeEntries     EmployeeTimeEntry[]
+  
+  @@map("employees")
 }
 
 model EmployeeSalary {
@@ -111,6 +113,8 @@ model EmployeeSalary {
   employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   
   @@unique([employeeId, effectiveDate])
+  
+  @@map("salaries")
 }
 
 model ProjectMultiplier {
