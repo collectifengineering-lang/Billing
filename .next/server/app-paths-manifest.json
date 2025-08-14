@@ -1,1 +1,3 @@
-{}
+{
+  "/api/payroll/bamboohr/route": "app/api/payroll/bamboohr/route.js"
+}
