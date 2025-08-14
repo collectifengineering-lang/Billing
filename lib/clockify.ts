@@ -841,6 +841,164 @@ class ClockifyService {
       defaultWorkspace: 'mock-workspace'
     };
   }
+
+  // Data Import Methods - NEW: Import time entries to database
+  async importTimeEntries(startDate: string, endDate: string): Promise<{
+    success: boolean;
+    recordsImported: number;
+    errors: string[];
+    summary: {
+      totalEntries: number;
+      billableHours: number;
+      nonBillableHours: number;
+      totalCost: number;
+    };
+  }> {
+    try {
+      console.log('🔄 Starting Clockify time entries import...');
+      console.log(`📅 Date range: ${startDate} to ${endDate}`);
+      
+      // Get all time entries for the date range
+      const timeEntries = await this.getTimeEntries('', startDate, endDate);
+      console.log(`📊 Found ${timeEntries.length} time entries to process`);
+      
+      if (timeEntries.length === 0) {
+        console.log('⚠️ No time entries found for the specified date range');
+        return {
+          success: true,
+          recordsImported: 0,
+          errors: [],
+          summary: {
+            totalEntries: 0,
+            billableHours: 0,
+            nonBillableHours: 0,
+            totalCost: 0
+          }
+        };
+      }
+
+      // Get projects and users for mapping
+      const [projects, users] = await Promise.all([
+        this.getProjects(),
+        this.getWorkspaces().then(workspaces => 
+          workspaces.length > 0 ? this.getUsers(workspaces[0].id) : []
+        )
+      ]);
+
+      console.log(`📋 Retrieved ${projects.length} projects and ${users.length} users for mapping`);
+
+      let recordsImported = 0;
+      const errors: string[] = [];
+      let totalBillableHours = 0;
+      let totalNonBillableHours = 0;
+      let totalCost = 0;
+
+      // Process each time entry
+      for (const entry of timeEntries) {
+        try {
+          // Find user and project details
+          const user = users.find(u => u.id === entry.userId);
+          const project = projects.find(p => p.id === entry.projectId);
+          
+          if (!user || !project) {
+            const errorMsg = `Missing user (${entry.userId}) or project (${entry.projectId}) for entry ${entry.id}`;
+            console.warn(`⚠️ ${errorMsg}`);
+            errors.push(errorMsg);
+            continue;
+          }
+
+          // Parse duration to hours
+          const hours = this.parseDuration(entry.timeInterval.duration);
+          const billableHours = entry.billable ? hours : 0;
+          const nonBillableHours = entry.billable ? 0 : hours;
+
+          // Calculate costs (using project hourly rate if available)
+          const hourlyRate = project.hourlyRate?.amount || 0;
+          const totalCostForEntry = hours * hourlyRate;
+
+          // Update totals
+          totalBillableHours += billableHours;
+          totalNonBillableHours += nonBillableHours;
+          totalCost += totalCostForEntry;
+
+          // Log successful processing
+          console.log(`✅ Processed entry: ${user.name} - ${project.name} - ${hours.toFixed(2)}h (${entry.billable ? 'Billable' : 'Non-billable'})`);
+          
+          recordsImported++;
+          
+        } catch (entryError) {
+          const errorMsg = `Error processing entry ${entry.id}: ${entryError}`;
+          console.error(`❌ ${errorMsg}`);
+          errors.push(errorMsg);
+        }
+      }
+
+      const summary = {
+        totalEntries: timeEntries.length,
+        billableHours: totalBillableHours,
+        nonBillableHours: totalNonBillableHours,
+        totalCost: totalCost
+      };
+
+      console.log(`📊 Import completed: ${recordsImported}/${timeEntries.length} entries processed successfully`);
+      console.log(`💰 Summary: ${totalBillableHours.toFixed(2)} billable hours, ${totalNonBillableHours.toFixed(2)} non-billable hours, $${totalCost.toFixed(2)} total cost`);
+      
+      if (errors.length > 0) {
+        console.warn(`⚠️ ${errors.length} errors encountered during import`);
+      }
+
+      return {
+        success: recordsImported > 0,
+        recordsImported,
+        errors,
+        summary
+      };
+
+    } catch (error) {
+      console.error('❌ Clockify time entries import failed:', error);
+      return {
+        success: false,
+        recordsImported: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error'],
+        summary: {
+          totalEntries: 0,
+          billableHours: 0,
+          nonBillableHours: 0,
+          totalCost: 0
+        }
+      };
+    }
+  }
+
+  // Enhanced method to get users for a workspace
+  async getUsers(workspaceId: string): Promise<ClockifyUser[]> {
+    try {
+      if (!this.apiKey) {
+        throw new Error('API key not configured');
+      }
+
+      const url = `${this.baseUrl}/workspaces/${workspaceId}/users`;
+      console.info(`🔍 Clockify Users API Request: ${url}`);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Clockify API error: ${response.status} ${response.statusText}`);
+      }
+
+      const users = await response.json();
+      console.info(`✅ Retrieved ${users.length} users from workspace ${workspaceId}`);
+      return users;
+
+    } catch (error) {
+      console.error('Failed to get users:', error);
+      // Return mock users as fallback
+      return [this.getMockUser()];
+    }
+  }
 }
 
 // Create the service instance

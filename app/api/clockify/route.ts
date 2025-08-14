@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clockifyService, fetchAllClockifyTimeSummaries } from '../../../lib/clockify';
+import { clockifyImportService, importClockifyTimeEntries } from '../../../lib/clockifyImport';
 import { enhanceBillingDataWithClockify } from '../../../lib/utils';
 
 // Force dynamic rendering to prevent static generation errors
@@ -80,6 +81,45 @@ export async function GET(request: NextRequest) {
         const workspaces = await clockifyService.getWorkspaces();
         return NextResponse.json({ workspaces });
 
+      case 'import-time-entries':
+        if (!startDate || !endDate) {
+          return NextResponse.json({
+            error: 'startDate and endDate are required for importing time entries',
+          }, { status: 400 });
+        }
+        
+        try {
+          console.log(`🔄 Starting Clockify time entries import for ${startDate} to ${endDate}`);
+          const importResult = await importClockifyTimeEntries(startDate, endDate);
+          
+          return NextResponse.json({
+            success: true,
+            message: 'Time entries import completed',
+            result: importResult
+          });
+        } catch (error: any) {
+          console.error('Clockify import error:', error);
+          return NextResponse.json({
+            success: false,
+            error: error.message || 'Failed to import time entries'
+          }, { status: 500 });
+        }
+
+      case 'import-stats':
+        try {
+          const stats = await clockifyImportService.getImportStatistics();
+          return NextResponse.json({
+            success: true,
+            stats
+          });
+        } catch (error: any) {
+          console.error('Clockify import stats error:', error);
+          return NextResponse.json({
+            success: false,
+            error: error.message || 'Failed to get import statistics'
+          }, { status: 500 });
+        }
+
       case 'test-connection':
         try {
           const user = await clockifyService.getUser();
@@ -118,7 +158,7 @@ export async function GET(request: NextRequest) {
 
       default:
         return NextResponse.json({
-          error: 'Invalid action. Supported actions: status, projects, time-summaries, user, workspaces, test-connection',
+          error: 'Invalid action. Supported actions: status, projects, time-summaries, user, workspaces, import-time-entries, import-stats, test-connection',
         }, { status: 400 });
     }
   } catch (error: any) {
