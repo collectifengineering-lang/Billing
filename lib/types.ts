@@ -215,6 +215,28 @@ export interface EmployeeTimeEntry {
   tags: string[];
 }
 
+// Database model interface that matches Prisma schema
+export interface EmployeeTimeEntryDB {
+  id?: number;
+  employeeId: string;
+  employeeName: string;
+  projectId: string;
+  projectName: string;
+  date: string;
+  hours: number;
+  billableHours: number;
+  nonBillableHours: number;
+  hourlyRate: number;
+  projectMultiplier: number;
+  totalCost: number;
+  billableValue: number;
+  efficiency: number;
+  description?: string;
+  tags: string[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface ProjectProfitabilityReport {
   projectId: string;
   projectName: string;

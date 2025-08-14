@@ -326,7 +326,7 @@ export class ClockifyImportService {
           totalBillableValue += billableValue;
 
           // Create time entry for database
-          const timeEntry: EmployeeTimeEntry = {
+          const timeEntry = {
             employeeId: entry.userId,
             employeeName: employee.name,
             projectId: entry.projectId,
