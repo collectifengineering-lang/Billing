@@ -701,10 +701,10 @@ class ZohoService {
       console.log(`📊 Zoho invoices fetched: ${invoices.length} total invoices`);
       
       if (invoices.length > 0) {
-        const statusCounts = invoices.reduce((acc: any, inv) => {
+        const statusCounts = invoices.reduce((acc: Record<string, number>, inv: ZohoInvoice) => {
           acc[inv.status] = (acc[inv.status] || 0) + 1;
           return acc;
-        }, {});
+        }, {} as Record<string, number>);
         
         console.log('📋 Invoice status breakdown:', statusCounts);
         

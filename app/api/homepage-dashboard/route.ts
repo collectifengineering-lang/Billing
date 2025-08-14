@@ -46,21 +46,21 @@ export async function GET(request: NextRequest) {
         console.log(`  - Total invoices: ${invoices.length}`);
         
         // Count by status
-        const statusCounts = invoices.reduce((acc: any, inv) => {
+        const statusCounts = invoices.reduce((acc: Record<string, number>, inv: any) => {
           acc[inv.status] = (acc[inv.status] || 0) + 1;
           return acc;
-        }, {});
+        }, {} as Record<string, number>);
         console.log('  - Status breakdown:', statusCounts);
         
         // Count by project
-        const projectCounts = invoices.reduce((acc: any, inv) => {
+        const projectCounts = invoices.reduce((acc: Record<string, number>, inv: any) => {
           acc[inv.project_id] = (acc[inv.project_id] || 0) + 1;
           return acc;
-        }, {});
+        }, {} as Record<string, number>);
         console.log(`  - Projects with invoices: ${Object.keys(projectCounts).length}`);
         
         // Amount analysis
-        const totalAmount = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+        const totalAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
         const avgAmount = totalAmount / invoices.length;
         console.log(`  - Total amount: $${totalAmount.toFixed(2)}`);
         console.log(`  - Average amount: $${avgAmount.toFixed(2)}`);
