@@ -19,7 +19,7 @@ export class BambooHRService {
   constructor(config: BambooHRConfig) {
     this.config = config;
     // Use versioned BambooHR API base
-    this.baseUrl = `https://api.bamboohr.com/api/gateway.php/${config.subdomain}/v1`;
+    this.baseUrl = `https://api.bamboohr.com/api/gateway.php/${this.config.subdomain}/v1`;
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
@@ -55,7 +55,12 @@ export class BambooHRService {
         const xmlText = await response.text();
         console.log(`📄 Parsing XML response from ${endpoint} (${xmlText.length} characters)`);
         try {
-          const parsedXml = await parseStringPromise(xmlText, { explicitArray: false, mergeAttrs: true });
+          const parsedXml = await parseStringPromise(xmlText, { 
+            explicitArray: false, 
+            mergeAttrs: true,
+            attrNameProcessors: [(name: string) => name.replace(/^@/, '')],
+            tagNameProcessors: [(name: string) => name.toLowerCase()]
+          });
           console.log(`✅ XML parsed successfully. Structure:`, Object.keys(parsedXml));
           return parsedXml;
         } catch (xmlError) {
@@ -75,82 +80,108 @@ export class BambooHRService {
     }
   }
 
-  // Employee Management
-  async getAllEmployees(): Promise<BambooHREmployee[]> {
-    // Attempt to fetch all employees, handling pagination if the API limits to 500 per page
-    const all: BambooHREmployee[] = [];
-    let page = 1;
-    const pageSize = 500;
-    
-    console.log('🔄 Starting BambooHR employee fetch with pagination...');
-    
-    while (true) {
-      const suffix = page > 1 ? `?page=${page}` : '';
-      const endpoint = `/employees/directory${suffix}`;
+  // Parse XML employee data from directory response
+  private parseEmployeeFromXml(employeeXml: any): BambooHREmployee {
+    try {
+      // Extract fields from XML structure
+      const fields = employeeXml.field || [];
+      const fieldMap: Record<string, any> = {};
       
-      try {
-        const response = await this.makeRequest(endpoint);
-        console.log(`📊 BambooHR response structure for page ${page}:`, Object.keys(response));
-        
-        // Handle both XML and JSON responses for employee directory
-        let employees: BambooHREmployee[] = [];
-        
-        if (response.employees) {
-          // JSON response format
-          employees = response.employees;
-          console.log(`✅ Using JSON format: employees array with ${employees.length} items`);
-        } else if (response.employee) {
-          // XML response format - single employee or array
-          employees = Array.isArray(response.employee) ? response.employee : [response.employee];
-          console.log(`✅ Using XML format: employee field with ${employees.length} items`);
-        } else if (response.directory && response.directory.employee) {
-          // Alternative XML format
-          employees = Array.isArray(response.directory.employee) ? response.directory.employee : [response.directory.employee];
-          console.log(`✅ Using XML format: directory.employee with ${employees.length} items`);
-        } else {
-          console.log(`📄 No employee data found in response format:`, Object.keys(response));
-          console.log(`🔍 Full response structure:`, JSON.stringify(response, null, 2));
-          employees = [];
-        }
-        
-        console.log(`📄 BambooHR: fetched ${employees.length} employees from ${endpoint} (page ${page})`);
-        
-        if (employees.length === 0) {
-          console.log('📄 No more employees found, ending pagination');
-          break;
-        }
-        
-        all.push(...employees);
-        
-        // Check if we've reached the end (less than page size)
-        if (employees.length < pageSize) {
-          console.log(`📄 Reached end of results (${employees.length} < ${pageSize}), ending pagination`);
-          break;
-        }
-        
-        page += 1;
-        
-        // Safety check to prevent infinite loops
-        if (page > 100) {
-          console.warn('⚠️ Pagination safety limit reached (100 pages), stopping to prevent infinite loop');
-          break;
-        }
-      } catch (error) {
-        console.error(`❌ Error fetching page ${page} from BambooHR:`, error);
-        // Continue with what we have rather than failing completely
-        break;
+      // Map XML fields to employee properties
+      if (Array.isArray(fields)) {
+        fields.forEach((field: any) => {
+          if (field.id && field._) {
+            fieldMap[field.id] = field._;
+          }
+        });
+      } else if (fields.id && fields._) {
+        // Single field case
+        fieldMap[fields.id] = fields._;
       }
+
+      // Map to BambooHREmployee interface
+      const employee: BambooHREmployee = {
+        id: employeeXml.id || '',
+        firstName: fieldMap.firstName || fieldMap['first-name'] || '',
+        lastName: fieldMap.lastName || fieldMap['last-name'] || '',
+        displayName: fieldMap.displayName || fieldMap['display-name'] || '',
+        email: fieldMap.email || '',
+        status: (fieldMap.status || 'active') as 'active' | 'inactive' | 'terminated',
+        hireDate: fieldMap.hireDate || fieldMap['hire-date'] || '',
+        terminationDate: fieldMap.terminationDate || fieldMap['termination-date'] || undefined,
+        department: fieldMap.department || '',
+        jobTitle: fieldMap.jobTitle || fieldMap['job-title'] || fieldMap.position || '',
+        location: fieldMap.location || '',
+        supervisor: fieldMap.supervisor || '',
+        employeeNumber: fieldMap.employeeNumber || fieldMap['employee-number'] || '',
+        customFields: fieldMap
+      };
+
+      console.log(`✅ Parsed employee from XML: ${employee.displayName} (${employee.id}) - ${employee.department}`);
+      return employee;
+    } catch (error) {
+      console.error('❌ Error parsing employee from XML:', error);
+      throw error;
     }
-    
-    console.log(`✅ BambooHR: total employees aggregated = ${all.length} from ${page - 1} pages`);
-    
-    // Ensure pagination for /v1/employees/directory if >500 employees
-    if (all.length > 500) {
-      console.log('⚠️ Large employee count detected, ensuring pagination is working correctly');
-      console.log(`📊 Employee count breakdown: ${all.length} total employees across ${page - 1} pages`);
+  }
+
+  // Employee Management - Updated to handle XML parsing
+  async getAllEmployees(): Promise<BambooHREmployee[]> {
+    try {
+      console.log('🔄 Starting BambooHR employee fetch...');
+      
+      const endpoint = '/employees/directory';
+      const response = await this.makeRequest(endpoint);
+      
+      console.log(`📊 BambooHR response structure:`, Object.keys(response));
+      
+      let employees: BambooHREmployee[] = [];
+      
+      if (response.directory && response.directory.employee) {
+        // XML response format: <directory><employee id="..."><field id="...">...</field></employee></directory>
+        const employeeArray = Array.isArray(response.directory.employee) 
+          ? response.directory.employee 
+          : [response.directory.employee];
+        
+        console.log(`📄 Found ${employeeArray.length} employees in XML directory response`);
+        
+        // Parse each employee from XML
+        for (const employeeXml of employeeArray) {
+          try {
+            const employee = this.parseEmployeeFromXml(employeeXml);
+            employees.push(employee);
+          } catch (error) {
+            console.error(`❌ Failed to parse employee XML:`, error);
+            // Continue with other employees
+          }
+        }
+      } else if (response.employees) {
+        // JSON response format (fallback)
+        employees = response.employees;
+        console.log(`✅ Using JSON format: employees array with ${employees.length} items`);
+      } else {
+        console.log(`📄 No employee data found in response format:`, Object.keys(response));
+        console.log(`🔍 Full response structure:`, JSON.stringify(response, null, 2));
+      }
+      
+      if (employees.length === 0) {
+        console.log('⚠️ No employees found in BambooHR - check if data exists');
+      } else {
+        console.log(`✅ Successfully parsed ${employees.length} employees from BambooHR`);
+        console.log(`📋 Sample employee:`, {
+          id: employees[0].id,
+          name: employees[0].displayName,
+          email: employees[0].email,
+          department: employees[0].department,
+          status: employees[0].status
+        });
+      }
+      
+      return employees;
+    } catch (error) {
+      console.error('❌ Error fetching employees from BambooHR:', error);
+      throw error;
     }
-    
-    return all;
   }
 
   async getEmployee(employeeId: string): Promise<BambooHREmployee> {
@@ -159,22 +190,7 @@ export class BambooHRService {
   }
 
   async getEmployeeDirectory(): Promise<BambooHREmployee[]> {
-    const response = await this.makeRequest('/employees/directory');
-    
-    // Handle both XML and JSON responses for employee directory
-    if (response.employees) {
-      // JSON response format
-      return response.employees;
-    } else if (response.employee) {
-      // XML response format - single employee or array
-      return Array.isArray(response.employee) ? response.employee : [response.employee];
-    } else if (response.directory && response.directory.employee) {
-      // Alternative XML format
-      return Array.isArray(response.directory.employee) ? response.directory.employee : [response.directory.employee];
-    } else {
-      console.log('📄 No employee data found in response format:', Object.keys(response));
-      return [];
-    }
+    return await this.getAllEmployees();
   }
 
   // Compensation Management - Updated to use tables endpoint
@@ -201,6 +217,7 @@ export class BambooHRService {
           paySchedule: comp.paySchedule || comp['pay-schedule'] || 'monthly'
         }));
         
+        console.log(`💰 Mapped ${compensations.length} compensation records for employee ${employeeId}`);
         return compensations;
       }
       
@@ -337,6 +354,12 @@ export class BambooHRService {
     try {
       console.log('🔄 Starting employee import from BambooHR...');
       const bamboohrEmployees = await this.getAllEmployees();
+      
+      if (bamboohrEmployees.length === 0) {
+        console.log('⚠️ No employees found in BambooHR - check if data exists');
+        return [];
+      }
+      
       console.log(`👥 BambooHR import: preparing to upsert ${bamboohrEmployees.length} employees`);
 
       const employees: Employee[] = [];
@@ -379,6 +402,12 @@ export class BambooHRService {
     try {
       console.log('🔄 Starting salary import from BambooHR...');
       const employees = await this.getAllEmployees();
+      
+      if (employees.length === 0) {
+        console.log('⚠️ No employees found in BambooHR - check if data exists');
+        return [];
+      }
+      
       console.log(`💰 BambooHR import: fetching compensation for ${employees.length} employees`);
       
       const salaries: EmployeeSalary[] = [];
@@ -510,24 +539,26 @@ export const importBambooHRData = async (): Promise<SalaryImport> => {
     const employees = await service.getAllEmployees();
     console.log(`👥 BambooHR employee count: ${employees.length}`);
     
-    // Ensure pagination for /v1/employees/directory if >500 employees
-    if (employees.length > 500) {
-      console.log('⚠️ Large employee count detected, ensuring pagination is working correctly');
-      console.log(`📊 Employee count breakdown: ${employees.length} total employees across multiple pages`);
+    if (employees.length === 0) {
+      console.log('⚠️ No employees found in BambooHR - check if data exists');
+      return {
+        source: 'bamboohr',
+        importDate: new Date().toISOString(),
+        recordsImported: 0,
+        errors: ['No employees found in BambooHR']
+      };
     }
     
     // Log employee details for debugging
-    if (employees.length > 0) {
-      console.log('📋 Sample employee data:', {
-        firstEmployee: {
-          id: employees[0].id,
-          name: employees[0].displayName,
-          email: employees[0].email,
-          department: employees[0].department,
-          status: employees[0].status
-        }
-      });
-    }
+    console.log('📋 Sample employee data:', {
+      firstEmployee: {
+        id: employees[0].id,
+        name: employees[0].displayName,
+        email: employees[0].email,
+        department: employees[0].department,
+        status: employees[0].status
+      }
+    });
     
     const result = await service.importAllData();
     
@@ -547,11 +578,6 @@ export const importBambooHRData = async (): Promise<SalaryImport> => {
         totalErrors: result.errors.length,
         errorTypes: result.errors.map(err => err.includes('rate limit') ? 'rate_limit' : 'other')
       });
-    }
-    
-    // Log pagination verification
-    if (employees.length > 500) {
-      console.log('✅ Pagination verification: Successfully fetched all employees across multiple pages');
     }
     
     return result;
