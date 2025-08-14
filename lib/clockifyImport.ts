@@ -30,6 +30,19 @@ function convertPrismaEmployee(emp: any): Employee {
   };
 }
 
+// Type conversion utility to handle Prisma null values for EmployeeSalary
+function convertPrismaEmployeeSalary(salary: any): EmployeeSalary {
+  return {
+    employeeId: salary.employeeId,
+    effectiveDate: salary.effectiveDate,
+    endDate: salary.endDate ?? undefined, // Convert null to undefined
+    annualSalary: salary.annualSalary,
+    hourlyRate: salary.hourlyRate,
+    currency: salary.currency,
+    notes: salary.notes ?? undefined // Convert null to undefined
+  };
+}
+
 export class ClockifyImportService {
   private employeeMap: Map<string, Employee> = new Map();
   private salaryMap: Map<string, EmployeeSalary> = new Map();
@@ -83,9 +96,29 @@ export class ClockifyImportService {
       // Build salary map (use most recent salary per employee)
       this.salaryMap.clear();
       for (const salary of salaries) {
-        const existing = this.salaryMap.get(salary.employeeId);
-        if (!existing || new Date(salary.effectiveDate) > new Date(existing.effectiveDate)) {
-          this.salaryMap.set(salary.employeeId, salary);
+        // Log raw salary data for debugging
+        console.log(`📋 Raw salary data for ${salary.employeeId}:`, {
+          employeeId: salary.employeeId,
+          effectiveDate: salary.effectiveDate,
+          endDate: salary.endDate,
+          annualSalary: salary.annualSalary,
+          hourlyRate: salary.hourlyRate,
+          currency: salary.currency,
+          notes: salary.notes
+        });
+
+        // Convert Prisma salary data to our interface
+        const convertedSalary = convertPrismaEmployeeSalary(salary);
+        const existing = this.salaryMap.get(convertedSalary.employeeId);
+        if (!existing || new Date(convertedSalary.effectiveDate) > new Date(existing.effectiveDate)) {
+          this.salaryMap.set(convertedSalary.employeeId, convertedSalary);
+          
+          console.log(`✅ Converted salary for employee ${convertedSalary.employeeId}:`, {
+            effectiveDate: convertedSalary.effectiveDate,
+            endDate: convertedSalary.endDate,
+            annualSalary: convertedSalary.annualSalary,
+            hourlyRate: convertedSalary.hourlyRate
+          });
         }
       }
       console.log(`💰 Loaded ${this.salaryMap.size} employee salaries`);
@@ -93,9 +126,21 @@ export class ClockifyImportService {
       // Build project multiplier map
       this.multiplierMap.clear();
       for (const mult of multipliers) {
+        // Log raw multiplier data for debugging
+        console.log(`📋 Raw multiplier data for project ${mult.projectId}:`, {
+          projectId: mult.projectId,
+          projectName: mult.projectName,
+          multiplier: mult.multiplier,
+          effectiveDate: mult.effectiveDate,
+          endDate: mult.endDate,
+          notes: mult.notes
+        });
+
         const existing = this.multiplierMap.get(mult.projectId);
         if (!existing || new Date(mult.effectiveDate) > new Date(existing.effectiveDate)) {
           this.multiplierMap.set(mult.projectId, mult.multiplier);
+          
+          console.log(`✅ Loaded multiplier for project ${mult.projectId}: ${mult.multiplier}x`);
         }
       }
       console.log(`📈 Loaded ${this.multiplierMap.size} project multipliers`);
