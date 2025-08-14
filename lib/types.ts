@@ -212,7 +212,7 @@ export interface EmployeeTimeEntry {
   billableValue: number; // billableHours * hourlyRate * multiplier
   efficiency: number; // billableHours / hours
   description?: string;
-  tags?: string[];
+  tags: string[];
 }
 
 export interface ProjectProfitabilityReport {

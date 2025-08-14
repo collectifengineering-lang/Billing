@@ -341,7 +341,7 @@ export class ClockifyImportService {
             billableValue,
             efficiency: hours > 0 ? billableHours / hours : 0,
             description: entry.description || 'Imported from Clockify',
-            tags: entry.tags?.map((tag: ClockifyTag) => tag.name || tag.id || '') || []
+            tags: (entry.tags?.map((tag: ClockifyTag) => tag.name || tag.id || '') || []).filter(Boolean) as string[]
           };
 
           // Save to database
