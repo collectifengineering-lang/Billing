@@ -116,7 +116,7 @@ model EmployeeSalary {
   
   @@unique([employeeId, effectiveDate])
   
-  @@map("salaries")
+  @@map("employee_salaries")
 }
 
 model ProjectMultiplier {
@@ -131,6 +131,8 @@ model ProjectMultiplier {
   updatedAt     DateTime @updatedAt @map("updated_at")
   
   @@unique([projectId, effectiveDate])
+  
+  @@map("project_multipliers")
 }
 
 model EmployeeTimeEntry {
@@ -157,4 +159,6 @@ model EmployeeTimeEntry {
   employee         Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   
   @@unique([employeeId, projectId, date])
+  
+  @@map("employee_time_entries")
 }
