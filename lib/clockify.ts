@@ -24,6 +24,9 @@ export interface ClockifyTimeEntry {
   customFieldValues: any[];
   type: string;
   tags: any[];
+  // Additional properties added during data processing
+  userName?: string;
+  projectName?: string;
 }
 
 export interface ClockifyProject {
@@ -714,9 +717,9 @@ class ClockifyService {
         totalHours,
         billableHours,
         nonBillableHours,
-        totalAmount: totalHours * (project.hourlyRate?.amount || 0),
-        billableAmount: billableHours * (project.hourlyRate?.amount || 0),
-        nonBillableAmount: nonBillableHours * (project.hourlyRate?.amount || 0),
+        totalAmount: totalHours * (typeof project.hourlyRate === 'object' ? project.hourlyRate.amount : (project.hourlyRate || 0)),
+        billableAmount: billableHours * (typeof project.hourlyRate === 'object' ? project.hourlyRate.amount : (project.hourlyRate || 0)),
+        nonBillableAmount: nonBillableHours * (typeof project.hourlyRate === 'object' ? project.hourlyRate.amount : (project.hourlyRate || 0)),
         entries: timeEntries,
         period: { start: startDate, end: endDate }
       };
@@ -887,7 +890,7 @@ class ClockifyService {
           const nonBillableHours = entry.billable ? 0 : hours;
 
           // Calculate costs (using project hourly rate if available)
-          const hourlyRate = project.hourlyRate?.amount || 0;
+          const hourlyRate = typeof project.hourlyRate === 'object' ? project.hourlyRate.amount : (project.hourlyRate || 0);
           const totalCostForEntry = hours * hourlyRate;
 
           // Update totals

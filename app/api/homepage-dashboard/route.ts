@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
         let averageHourlyRate = 125; // Default
         if (billableEntries.length > 0) {
           const totalRate = billableEntries.reduce((sum, entry) => {
-            const rate = entry.hourlyRate?.amount || 150;
+            const rate = typeof entry.hourlyRate === 'object' ? entry.hourlyRate.amount : (entry.hourlyRate || 150);
             return sum + rate;
           }, 0);
           averageHourlyRate = totalRate / billableEntries.length;

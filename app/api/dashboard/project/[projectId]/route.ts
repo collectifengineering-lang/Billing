@@ -71,14 +71,19 @@ export async function GET(
               return sum + parseDuration(duration);
             }, 0);
             
+            // Get hourly rate from user's time entries or use default
+            const userHourlyRate = userEntries.length > 0 
+              ? (typeof userEntries[0]?.hourlyRate === 'object' ? userEntries[0].hourlyRate.amount : (userEntries[0]?.hourlyRate || 150))
+              : 150;
+            
             return {
               employeeId: user.id,
               employeeName: user.name,
               totalHours: userHours,
               billableHours: userBillableHours,
-              hourlyRate: user.hourlyRate?.amount || 150,
-              totalCost: userHours * (user.hourlyRate?.amount || 150),
-              billableValue: userBillableHours * (user.hourlyRate?.amount || 150),
+              hourlyRate: userHourlyRate,
+              totalCost: userHours * userHourlyRate,
+              billableValue: userBillableHours * userHourlyRate,
               efficiency: userHours > 0 ? userBillableHours / userHours : 0
             };
           });
@@ -89,8 +94,8 @@ export async function GET(
             hours: parseDuration(entry.timeInterval?.duration || 'PT0H'),
             billableHours: entry.billable ? parseDuration(entry.timeInterval?.duration || 'PT0H') : 0,
             description: entry.description || 'No description',
-            hourlyRate: entry.hourlyRate?.amount || 150,
-            totalValue: parseDuration(entry.timeInterval?.duration || 'PT0H') * (entry.hourlyRate?.amount || 150)
+            hourlyRate: typeof entry.hourlyRate === 'object' ? entry.hourlyRate.amount : (entry.hourlyRate || 150),
+            totalValue: parseDuration(entry.timeInterval?.duration || 'PT0H') * (typeof entry.hourlyRate === 'object' ? entry.hourlyRate.amount : (entry.hourlyRate || 150))
           }));
           
           totalHours = timeEntries.reduce((sum, entry) => sum + entry.hours, 0);
