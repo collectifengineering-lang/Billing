@@ -675,33 +675,7 @@ class ClockifyService {
     }
   }
 
-  async getUsers(): Promise<any[]> {
-    try {
-      if (!this.workspaceId) {
-        throw new Error('Workspace ID not configured');
-      }
-      return await this.makeRequest(`/workspaces/${this.workspaceId}/users`);
-    } catch (error) {
-      console.error('Failed to get Clockify users:', error);
-      // Return mock user data when Clockify fails
-      return [
-        {
-          id: 'mock-user-1',
-          name: 'Mock User 1',
-          email: 'user1@example.com',
-          status: 'ACTIVE',
-          hourlyRate: { amount: 100, currency: 'USD' }
-        },
-        {
-          id: 'mock-user-2',
-          name: 'Mock User 2',
-          email: 'user2@example.com',
-          status: 'ACTIVE',
-          hourlyRate: { amount: 120, currency: 'USD' }
-        }
-      ];
-    }
-  }
+
 
   async getProjectTimeReport(projectId: string, startDate: string, endDate: string): Promise<ClockifyTimeReport | null> {
     try {
