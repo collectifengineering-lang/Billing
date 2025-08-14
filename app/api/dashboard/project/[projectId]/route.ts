@@ -45,7 +45,13 @@ export async function GET(
       if (clockifyConfig.configured) {
         // Try to get real data from Clockify
         try {
-          const users = await clockifyService.getUsers();
+          // Get workspace ID first
+          const workspaces = await clockifyService.getWorkspaces();
+          if (workspaces.length === 0) {
+            throw new Error('No workspaces available');
+          }
+          
+          const users = await clockifyService.getUsers(workspaces[0].id);
           const projectTimeEntries = await clockifyService.getTimeEntries(
             projectId,
             new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(), // Last year
