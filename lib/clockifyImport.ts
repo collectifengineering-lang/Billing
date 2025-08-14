@@ -46,10 +46,10 @@ export class ClockifyImportService {
           name: emp.name,
           email: emp.email,
           status: (emp.status === 'active' || emp.status === 'inactive') ? emp.status : 'active',
-          department: emp.department,
-          position: emp.position,
-          hireDate: emp.hireDate,
-          terminationDate: emp.terminationDate
+          department: emp.department || undefined,
+          position: emp.position || undefined,
+          hireDate: emp.hireDate || undefined,
+          terminationDate: emp.terminationDate || undefined
         };
         this.employeeMap.set(emp.id, employee);
       }

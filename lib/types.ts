@@ -170,7 +170,7 @@ export interface EnhancedBillingData extends BillingData {
 export interface Employee {
   id: string;
   name: string;
-  email?: string | null;
+  email?: string;
   status: 'active' | 'inactive';
   department?: string;
   position?: string;
@@ -181,7 +181,7 @@ export interface Employee {
 export interface EmployeeSalary {
   employeeId: string;
   effectiveDate: string; // YYYY-MM-DD format
-  endDate?: string | null; // YYYY-MM-DD format; can be null in DB when current
+  endDate?: string; // YYYY-MM-DD format; can be undefined in DB when current
   annualSalary: number;
   hourlyRate: number; // Calculated from annual salary
   currency: string;
