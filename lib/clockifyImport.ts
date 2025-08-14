@@ -37,10 +37,21 @@ export class ClockifyImportService {
         getAllProjectMultipliers()
       ]);
 
-      // Build employee map
+      // Build employee map with proper type casting
       this.employeeMap.clear();
       for (const emp of employees) {
-        this.employeeMap.set(emp.id, emp);
+        // Ensure the status field is properly typed as 'active' | 'inactive'
+        const employee: Employee = {
+          id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          status: (emp.status === 'active' || emp.status === 'inactive') ? emp.status : 'active',
+          department: emp.department,
+          position: emp.position,
+          hireDate: emp.hireDate,
+          terminationDate: emp.terminationDate
+        };
+        this.employeeMap.set(emp.id, employee);
       }
       console.log(`👥 Loaded ${employees.length} employees`);
 

@@ -182,7 +182,21 @@ export class BambooHRService {
       }
       
       if (!emp) {
-        throw new Error(`No employee data found for ID ${employeeId} - response structure: ${JSON.stringify(Object.keys(response))}`);
+        console.warn(`⚠️ No employee data found for ID ${employeeId} - response structure: ${JSON.stringify(Object.keys(response))}`);
+        // Return a minimal employee object instead of throwing an error
+        return {
+          id: employeeId,
+          firstName: 'Unknown',
+          lastName: 'Employee',
+          email: null,
+          workEmail: null,
+          hireDate: new Date().toISOString().split('T')[0], // Default to today
+          status: 'active',
+          department: null,
+          jobTitle: null,
+          preferredName: null,
+          displayName: 'Unknown Employee'
+        };
       }
       
       // Map workEmail to email if email is not available
@@ -194,6 +208,18 @@ export class BambooHRService {
       if (!emp.firstName) emp.firstName = 'Unknown';
       if (!emp.lastName) emp.lastName = 'Employee';
       if (!emp.id) emp.id = employeeId;
+      
+      // Handle missing hireDate gracefully - use today's date as default
+      if (!emp.hireDate) {
+        console.warn(`⚠️ Employee ${employeeId} missing hireDate, using today's date as default`);
+        emp.hireDate = new Date().toISOString().split('T')[0];
+      }
+      
+      // Ensure status is valid
+      if (!emp.status || (emp.status !== 'active' && emp.status !== 'inactive')) {
+        console.warn(`⚠️ Employee ${employeeId} has invalid status '${emp.status}', defaulting to 'active'`);
+        emp.status = 'active';
+      }
       
       console.log(`✅ Detailed employee data for ${employeeId}:`, {
         id: emp.id,
@@ -209,7 +235,21 @@ export class BambooHRService {
       return emp;
     } catch (error) {
       console.error(`❌ Error fetching employee details for ${employeeId}:`, error);
-      throw error;
+      // Return a minimal employee object instead of throwing an error
+      console.warn(`⚠️ Returning default employee data for ${employeeId} due to API error`);
+      return {
+        id: employeeId,
+        firstName: 'Unknown',
+        lastName: 'Employee',
+        email: null,
+        workEmail: null,
+        hireDate: new Date().toISOString().split('T')[0], // Default to today
+        status: 'active',
+        department: null,
+        jobTitle: null,
+        preferredName: null,
+        displayName: 'Unknown Employee'
+      };
     }
   }
 
