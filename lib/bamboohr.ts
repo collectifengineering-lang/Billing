@@ -21,7 +21,7 @@ export class BambooHRService {
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = `${this.baseUrl}${endpoint}`;
-    const basic = Buffer.from(`${this.config.apiKey}:x`).toString('base64');
+    const basic = btoa(`${this.config.apiKey}:x`);
     const headers = {
       'Authorization': `Basic ${basic}`,
       'Accept': 'application/json',
@@ -55,25 +55,26 @@ export class BambooHRService {
     }
   }
 
-  // Employee Management - Updated to use JSON and fetch compensation
+  // Employee Management - Updated to fetch detailed information after directory call
   async getAllEmployees(): Promise<BambooHREmployee[]> {
     try {
       console.log('🔄 Starting BambooHR employee fetch...');
       
+      // First, get the employee directory
       const endpoint = '/employees/directory';
       const response = await this.makeRequest(endpoint);
       
-      console.log(`📊 Raw response data:`, JSON.stringify(response, null, 2));
+      console.log(`📊 Raw directory response data:`, JSON.stringify(response, null, 2));
       
       let employees: BambooHREmployee[] = [];
       
       if (response.employees && Array.isArray(response.employees)) {
         employees = response.employees;
-        console.log(`✅ Found ${employees.length} employees in JSON response`);
+        console.log(`✅ Found ${employees.length} employees in directory response`);
         
         // Log sample employee data for debugging
         if (employees.length > 0) {
-          console.log(`📋 Sample employee data:`, {
+          console.log(`📋 Sample directory employee data:`, {
             id: employees[0].id,
             firstName: employees[0].firstName,
             lastName: employees[0].lastName,
@@ -84,33 +85,102 @@ export class BambooHRService {
           });
         }
       } else {
-        console.log(`📄 No employee data found in response format:`, Object.keys(response));
-        console.log(`🔍 Full response structure:`, JSON.stringify(response, null, 2));
+        console.log(`📄 No employee data found in directory response format:`, Object.keys(response));
+        console.log(`🔍 Full directory response structure:`, JSON.stringify(response, null, 2));
+        return [];
       }
       
       if (employees.length === 0) {
-        console.log('⚠️ No employees found in BambooHR - verify data exists and API permissions');
-      } else {
-        console.log(`✅ Successfully parsed ${employees.length} employees from BambooHR`);
+        console.log('⚠️ No employees found in BambooHR directory - verify data exists and API permissions');
+        return [];
+      }
+
+      // Now fetch detailed information for each employee to get missing fields
+      console.log(`🔄 Fetching detailed information for ${employees.length} employees...`);
+      
+      const detailedEmployees = await Promise.all(
+        employees.map(async (emp) => {
+          try {
+            const detailedEmp = await this.getEmployeeDetails(emp.id);
+            console.log(`✅ Fetched details for employee ${emp.id}: ${detailedEmp.firstName} ${detailedEmp.lastName}`);
+            return detailedEmp;
+          } catch (error) {
+            console.error(`❌ Error fetching details for employee ${emp.id}:`, error);
+            // Return the basic employee data if detailed fetch fails
+            return emp;
+          }
+        })
+      );
+
+      console.log(`✅ Successfully fetched detailed information for ${detailedEmployees.length} employees`);
+      
+      // Log sample detailed employee data
+      if (detailedEmployees.length > 0) {
+        const sample = detailedEmployees[0];
+        console.log(`📋 Sample detailed employee data:`, {
+          id: sample.id,
+          firstName: sample.firstName,
+          lastName: sample.lastName,
+          email: sample.email,
+          hireDate: sample.hireDate,
+          status: sample.status,
+          department: sample.department,
+          jobTitle: sample.jobTitle
+        });
       }
       
-      return employees;
+      return detailedEmployees;
     } catch (error) {
       console.error('❌ Error fetching employees from BambooHR:', error);
       throw error;
     }
   }
 
+  // New method to fetch detailed employee information
+  async getEmployeeDetails(employeeId: string): Promise<BambooHREmployee> {
+    try {
+      console.log(`🔍 Fetching detailed information for employee ${employeeId}...`);
+      
+      // Request specific fields that are missing from directory endpoint
+      const fields = 'hireDate,terminationDate,status,department,jobTitle,workEmail,firstName,lastName,displayName,preferredName,email';
+      const endpoint = `/employees/${employeeId}?fields=${fields}`;
+      
+      const response = await this.makeRequest(endpoint);
+      
+      if (response.employees && response.employees.length > 0) {
+        const emp = response.employees[0];
+        
+        // Map workEmail to email if email is not available
+        if (!emp.email && emp.workEmail) {
+          emp.email = emp.workEmail;
+        }
+        
+        console.log(`✅ Detailed employee data for ${employeeId}:`, {
+          hireDate: emp.hireDate,
+          status: emp.status,
+          department: emp.department,
+          email: emp.email
+        });
+        
+        return emp;
+      } else {
+        throw new Error(`No employee data found for ID ${employeeId}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error fetching employee details for ${employeeId}:`, error);
+      throw error;
+    }
+  }
+
   async getEmployee(employeeId: string): Promise<BambooHREmployee> {
-    const response = await this.makeRequest(`/employees/${employeeId}`);
-    return response.employee;
+    return await this.getEmployeeDetails(employeeId);
   }
 
   async getEmployeeDirectory(): Promise<BambooHREmployee[]> {
     return await this.getAllEmployees();
   }
 
-  // Compensation Management - Updated to use compensation tables endpoint
+  // Compensation Management - Fixed parsing and field mappings
   async getEmployeeCompensation(employeeId: string): Promise<BamboohrCompensation[]> {
     try {
       console.log(`💰 Fetching compensation for employee ${employeeId}...`);
@@ -121,66 +191,88 @@ export class BambooHRService {
       
       console.log(`📊 Raw compensation response for employee ${employeeId}:`, JSON.stringify(response, null, 2));
       
-      if (response.compensation && Array.isArray(response.compensation)) {
-        const compensations: BamboohrCompensation[] = [];
-        
-        for (const comp of response.compensation) {
-          try {
-            console.log(`🔍 Processing compensation record:`, JSON.stringify(comp, null, 2));
-            
-            let annualSalary = 0;
-            let hourlyRate = 0;
-            
-            // Map fields based on payType
-            if (comp.payRate && comp.payType) {
-              if (comp.payType === 'salary' || comp.payType === 'annual') {
-                annualSalary = parseFloat(comp.payRate) || 0;
-                // Calculate hourly rate based on pay period
-                hourlyRate = this.calculateHourlyRate(annualSalary, comp.payPeriod || 'monthly');
-              } else if (comp.payType === 'hourly') {
-                hourlyRate = parseFloat(comp.payRate) || 0;
-                // Calculate annual salary based on pay period
-                annualSalary = this.calculateAnnualSalary(hourlyRate, comp.payPeriod || 'monthly');
-              }
-              
-              const compensation: BamboohrCompensation = {
-                employeeId: employeeId,
-                effectiveDate: comp.effectiveDate || new Date().toISOString().split('T')[0],
-                endDate: comp.endDate,
-                annualSalary: annualSalary,
-                hourlyRate: hourlyRate,
-                currency: comp.payCurrency || 'USD',
-                payType: comp.payType,
-                paySchedule: comp.payPeriod || 'monthly'
-              };
-              
-              compensations.push(compensation);
-              console.log(`✅ Mapped compensation for employee ${employeeId}:`, {
-                payType: compensation.payType,
-                annualSalary: compensation.annualSalary,
-                hourlyRate: compensation.hourlyRate,
-                currency: compensation.currency,
-                paySchedule: compensation.paySchedule,
-                effectiveDate: compensation.effectiveDate
-              });
-            } else {
-              console.log(`⚠️ Missing payRate or payType for compensation record:`, comp);
-            }
-          } catch (error) {
-            console.error(`❌ Error processing compensation record for employee ${employeeId}:`, error);
-          }
-        }
-        
-        if (compensations.length === 0) {
-          console.log(`⚠️ No valid compensation records found for employee ${employeeId}`);
-        }
-        
-        return compensations;
+      // Handle both array and object with compensation property
+      let compensationData: any[] = [];
+      
+      if (Array.isArray(response)) {
+        // Direct array response
+        compensationData = response;
+        console.log(`📊 Direct array response with ${compensationData.length} compensation records`);
+      } else if (response.compensation && Array.isArray(response.compensation)) {
+        // Object with compensation property
+        compensationData = response.compensation;
+        console.log(`📊 Object response with ${compensationData.length} compensation records`);
       } else {
         console.log(`⚠️ No compensation data found for employee ${employeeId} - response structure:`, Object.keys(response));
         console.log(`🔍 Full response:`, JSON.stringify(response, null, 2));
         return [];
       }
+      
+      if (compensationData.length === 0) {
+        console.log(`⚠️ No compensation records found for employee ${employeeId}`);
+        return [];
+      }
+
+      const compensations: BamboohrCompensation[] = [];
+      
+      for (const comp of compensationData) {
+        try {
+          console.log(`🔍 Processing compensation record:`, JSON.stringify(comp, null, 2));
+          
+          // Fixed field mappings based on actual API response structure
+          const payRate = comp.rate?.value || comp.payRate || comp.amount;
+          const payType = comp.type?.toLowerCase() || comp.payType;
+          const payPeriod = comp.paySchedule || comp.paidPer || comp.payPeriod || 'monthly';
+          
+          if (!payRate || !payType) {
+            console.log(`⚠️ Missing payRate or payType for compensation record:`, comp);
+            continue;
+          }
+          
+          let annualSalary = 0;
+          let hourlyRate = 0;
+          
+          // Map fields based on payType
+          if (payType === 'salary' || payType === 'annual') {
+            annualSalary = parseFloat(payRate) || 0;
+            // Calculate hourly rate based on pay period
+            hourlyRate = this.calculateHourlyRate(annualSalary, payPeriod);
+          } else if (payType === 'hourly') {
+            hourlyRate = parseFloat(payRate) || 0;
+            // Calculate annual salary based on pay period
+            annualSalary = this.calculateAnnualSalary(hourlyRate, payPeriod);
+          }
+          
+          const compensation: BamboohrCompensation = {
+            employeeId: employeeId,
+            effectiveDate: comp.effectiveDate || comp.startDate || new Date().toISOString().split('T')[0],
+            endDate: comp.endDate || comp.stopDate,
+            annualSalary: annualSalary,
+            hourlyRate: hourlyRate,
+            currency: comp.currency || comp.payCurrency || 'USD',
+            payType: payType,
+            paySchedule: payPeriod
+          };
+          
+          compensations.push(compensation);
+          console.log(`✅ Mapped compensation for employee ${employeeId}:`, {
+            payType: compensation.payType,
+            annualSalary: compensation.annualSalary,
+            hourlyRate: compensation.hourlyRate,
+            currency: compensation.currency,
+            paySchedule: compensation.paySchedule,
+            effectiveDate: compensation.effectiveDate
+          });
+        } catch (error) {
+          console.error(`❌ Error processing compensation record for employee ${employeeId}:`, error);
+        }
+      }
+      
+      if (compensations.length === 0) {
+        console.log(`⚠️ No valid compensation records found for employee ${employeeId}`);
+      }
+      
+      return compensations;
     } catch (error) {
       console.error(`❌ Error fetching compensation for employee ${employeeId}:`, error);
       return [];
@@ -300,7 +392,7 @@ export class BambooHRService {
     return hourlyRate * hoursPerYear;
   }
 
-  // Data Import Methods - Enhanced with JSON parsing and compensation fetching
+  // Data Import Methods - Enhanced with detailed employee fetching and proper field mapping
   async importEmployees(): Promise<Employee[]> {
     try {
       console.log('🔄 Starting employee import from BambooHR...');
@@ -319,22 +411,31 @@ export class BambooHRService {
 
       for (const emp of bamboohrEmployees) {
         try {
+          // Map workEmail to email if email is not available
+          const email = emp.email || emp.workEmail || undefined;
+          
           const employee: Employee = {
             id: emp.id,
             name: emp.preferredName || emp.displayName || `${emp.firstName} ${emp.lastName}`,
-            email: emp.email || null,
+            email: email,
             status: emp.status === 'active' ? 'active' : 'inactive',
-            department: emp.department,
-            position: emp.jobTitle,
-            hireDate: emp.hireDate,
-            terminationDate: emp.terminationDate
+            department: emp.department || undefined,
+            position: emp.jobTitle || undefined,
+            hireDate: emp.hireDate || undefined, // Now optional in schema
+            terminationDate: emp.terminationDate || undefined
           };
           
           employees.push(employee);
           successCount++;
           
-          // Log successful employee mapping
-          console.log(`✅ Employee mapped: ${employee.name} (${emp.id}) - ${emp.department}`);
+          // Log successful employee mapping with fetched fields
+          console.log(`✅ Employee mapped: ${employee.name} (${emp.id})`, {
+            email: employee.email,
+            department: employee.department,
+            position: employee.position,
+            hireDate: employee.hireDate,
+            status: employee.status
+          });
         } catch (error) {
           errorCount++;
           console.error(`❌ Error mapping employee ${emp.id}:`, error);
@@ -342,6 +443,19 @@ export class BambooHRService {
       }
 
       console.log(`📊 Employee import results: ${successCount} successful, ${errorCount} errors`);
+      
+      // Log summary of fetched fields
+      const employeesWithHireDate = employees.filter(e => e.hireDate).length;
+      const employeesWithEmail = employees.filter(e => e.email).length;
+      const employeesWithDepartment = employees.filter(e => e.department).length;
+      
+      console.log(`📋 Field completion summary:`, {
+        totalEmployees: employees.length,
+        withHireDate: employeesWithHireDate,
+        withEmail: employeesWithEmail,
+        withDepartment: employeesWithDepartment
+      });
+      
       return employees;
     } catch (error) {
       console.error('❌ Employee import failed:', error);
@@ -442,7 +556,8 @@ export class BambooHRService {
     const employees = await this.getAllEmployees();
     return employees.filter(emp => 
       (emp.preferredName || emp.displayName || `${emp.firstName} ${emp.lastName}`).toLowerCase().includes(query.toLowerCase()) ||
-      emp.email.toLowerCase().includes(query.toLowerCase())
+      (emp.email && emp.email.toLowerCase().includes(query.toLowerCase())) ||
+      (emp.workEmail && emp.workEmail.toLowerCase().includes(query.toLowerCase()))
     );
   }
 
@@ -505,8 +620,8 @@ export const importBambooHRData = async (): Promise<SalaryImport> => {
       firstEmployee: {
         id: employees[0].id,
         name: employees[0].preferredName || employees[0].displayName || `${employees[0].firstName} ${employees[0].lastName}`,
-        email: employees[0].email,
-        department: employees[0].department,
+        email: employees[0].email || employees[0].workEmail || 'No email',
+        department: employees[0].department || 'No department',
         status: employees[0].status
       }
     });

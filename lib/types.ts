@@ -174,7 +174,7 @@ export interface Employee {
   status: 'active' | 'inactive';
   department?: string;
   position?: string;
-  hireDate: string;
+  hireDate?: string;
   terminationDate?: string;
 }
 
@@ -291,9 +291,10 @@ export interface BambooHREmployee {
   lastName: string;
   displayName: string;
   preferredName?: string;
-  email: string;
+  email?: string;
+  workEmail?: string;
   status: 'active' | 'inactive' | 'terminated';
-  hireDate: string;
+  hireDate?: string;
   terminationDate?: string;
   department?: string;
   jobTitle?: string;
