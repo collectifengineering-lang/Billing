@@ -2,6 +2,37 @@ import { clockifyService } from './clockify';
 import { saveEmployeeTimeEntry, getAllEmployees, getAllEmployeeSalaries, getAllProjectMultipliers } from './database';
 import { EmployeeTimeEntry, Employee, EmployeeSalary } from './types';
 
+// Type interfaces for Clockify data to avoid implicit any
+interface ClockifyTag {
+  name: string;
+  id?: string;
+}
+
+interface ClockifyTimeEntry {
+  id: string;
+  userId: string;
+  projectId: string;
+  billable: boolean;
+  description?: string;
+  tags?: ClockifyTag[];
+  timeInterval: {
+    start: string;
+    end?: string;
+    duration: string;
+  };
+}
+
+interface ClockifyUser {
+  id: string;
+  name: string;
+  email?: string;
+}
+
+interface ClockifyProject {
+  id: string;
+  name: string;
+}
+
 export interface ClockifyImportResult {
   success: boolean;
   recordsImported: number;
@@ -17,7 +48,16 @@ export interface ClockifyImportResult {
 }
 
 // Type conversion utility to handle Prisma null values
-function convertPrismaEmployee(emp: any): Employee {
+function convertPrismaEmployee(emp: { 
+  id: string; 
+  name: string; 
+  email: string | null; 
+  status: string; 
+  department: string | null; 
+  position: string | null; 
+  hireDate: string | null; 
+  terminationDate: string | null; 
+}): Employee {
   return {
     id: emp.id,
     name: emp.name,
@@ -31,7 +71,15 @@ function convertPrismaEmployee(emp: any): Employee {
 }
 
 // Type conversion utility to handle Prisma null values for EmployeeSalary
-function convertPrismaEmployeeSalary(salary: any): EmployeeSalary {
+function convertPrismaEmployeeSalary(salary: { 
+  employeeId: string; 
+  effectiveDate: string; 
+  endDate: string | null; 
+  annualSalary: { toNumber(): number }; 
+  hourlyRate: { toNumber(): number }; 
+  currency: string; 
+  notes: string | null; 
+}): EmployeeSalary {
   return {
     employeeId: salary.employeeId,
     effectiveDate: salary.effectiveDate,
@@ -66,7 +114,16 @@ export class ClockifyImportService {
 
       // Build employee map with proper type casting
       this.employeeMap.clear();
-      for (const emp of employees) {
+      for (const emp of employees as Array<{
+        id: string; 
+        name: string; 
+        email: string | null; 
+        status: string; 
+        department: string | null; 
+        position: string | null; 
+        hireDate: string | null; 
+        terminationDate: string | null; 
+      }>) {
         // Log raw employee data for debugging
         console.log(`📋 Raw employee data for ${emp.id}:`, {
           id: emp.id,
@@ -95,7 +152,15 @@ export class ClockifyImportService {
 
       // Build salary map (use most recent salary per employee)
       this.salaryMap.clear();
-      for (const salary of salaries) {
+      for (const salary of salaries as Array<{
+        employeeId: string; 
+        effectiveDate: string; 
+        endDate: string | null; 
+        annualSalary: { toNumber(): number }; 
+        hourlyRate: { toNumber(): number }; 
+        currency: string; 
+        notes: string | null; 
+      }>) {
         // Log raw salary data for debugging
         console.log(`📋 Raw salary data for ${salary.employeeId}:`, {
           employeeId: salary.employeeId,
@@ -125,7 +190,14 @@ export class ClockifyImportService {
 
       // Build project multiplier map
       this.multiplierMap.clear();
-      for (const mult of multipliers) {
+      for (const mult of multipliers as Array<{
+        projectId: string; 
+        projectName: string; 
+        multiplier: { toNumber(): number }; 
+        effectiveDate: string; 
+        endDate: string | null; 
+        notes: string | null; 
+      }>) {
         // Log raw multiplier data for debugging
         console.log(`📋 Raw multiplier data for project ${mult.projectId}:`, {
           projectId: mult.projectId,
@@ -149,7 +221,7 @@ export class ClockifyImportService {
       console.log(`📈 Loaded ${this.multiplierMap.size} project multipliers`);
 
       console.log('✅ Data mappings initialized successfully');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('❌ Failed to initialize data mappings:', error);
       throw error;
     }
@@ -204,11 +276,11 @@ export class ClockifyImportService {
       let totalBillableValue = 0;
 
       // Process each time entry
-      for (const entry of timeEntries) {
+      for (const entry of timeEntries as ClockifyTimeEntry[]) {
         try {
           // Find user and project details
-          const user = users.find(u => u.id === entry.userId);
-          const project = projects.find(p => p.id === entry.projectId);
+          const user = users.find((u: ClockifyUser) => u.id === entry.userId);
+          const project = projects.find((p: ClockifyProject) => p.id === entry.projectId);
           
           if (!user || !project) {
             const errorMsg = `Missing user (${entry.userId}) or project (${entry.projectId}) for entry ${entry.id}`;
@@ -269,7 +341,7 @@ export class ClockifyImportService {
             billableValue,
             efficiency: hours > 0 ? billableHours / hours : 0,
             description: entry.description || 'Imported from Clockify',
-            tags: entry.tags?.map(tag => tag.name || tag) || []
+            tags: entry.tags?.map((tag: ClockifyTag) => tag.name || tag.id || '') || []
           };
 
           // Save to database
@@ -279,8 +351,8 @@ export class ClockifyImportService {
           
           recordsImported++;
           
-        } catch (entryError) {
-          const errorMsg = `Error processing entry ${entry.id}: ${entryError}`;
+        } catch (entryError: unknown) {
+          const errorMsg = `Error processing entry ${entry.id}: ${entryError instanceof Error ? entryError.message : String(entryError)}`;
           console.error(`❌ ${errorMsg}`);
           errors.push(errorMsg);
           recordsSkipped++;
@@ -311,13 +383,13 @@ export class ClockifyImportService {
         summary
       };
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('❌ Clockify time entries import failed:', error);
       return {
         success: false,
         recordsImported: 0,
         recordsSkipped: 0,
-        errors: [error instanceof Error ? error.message : 'Unknown error'],
+        errors: [error instanceof Error ? error.message : String(error)],
         summary: {
           totalEntries: 0,
           billableHours: 0,
