@@ -147,25 +147,66 @@ export class BambooHRService {
       
       const response = await this.makeRequest(endpoint);
       
+      // Log raw response for debugging
+      console.log(`📊 Raw employee details response for ${employeeId}:`, JSON.stringify(response, null, 2));
+      
+      // Handle different response structures - BambooHR API can return data in various formats
+      let emp: any = null;
+      
       if (response.employees && response.employees.length > 0) {
-        const emp = response.employees[0];
-        
-        // Map workEmail to email if email is not available
-        if (!emp.email && emp.workEmail) {
-          emp.email = emp.workEmail;
-        }
-        
-        console.log(`✅ Detailed employee data for ${employeeId}:`, {
-          hireDate: emp.hireDate,
-          status: emp.status,
-          department: emp.department,
-          email: emp.email
-        });
-        
-        return emp;
+        // Standard response format
+        emp = response.employees[0];
+      } else if (response.employee) {
+        // Single employee response format
+        emp = response.employee;
+      } else if (response.id && response.firstName) {
+        // Direct employee object response
+        emp = response;
+      } else if (Array.isArray(response) && response.length > 0) {
+        // Array response format
+        emp = response[0];
       } else {
-        throw new Error(`No employee data found for ID ${employeeId}`);
+        // Log the response structure for debugging
+        console.log(`⚠️ Unexpected response structure for employee ${employeeId}:`, Object.keys(response));
+        console.log(`🔍 Full response:`, JSON.stringify(response, null, 2));
+        
+        // Try to extract employee data from the response
+        if (response && typeof response === 'object') {
+          // Check if any of the expected fields exist
+          const hasEmployeeFields = response.id || response.firstName || response.lastName || response.email;
+          if (hasEmployeeFields) {
+            emp = response;
+            console.log(`✅ Extracted employee data from response structure for ${employeeId}`);
+          }
+        }
       }
+      
+      if (!emp) {
+        throw new Error(`No employee data found for ID ${employeeId} - response structure: ${JSON.stringify(Object.keys(response))}`);
+      }
+      
+      // Map workEmail to email if email is not available
+      if (!emp.email && emp.workEmail) {
+        emp.email = emp.workEmail;
+      }
+      
+      // Ensure required fields have fallback values
+      if (!emp.firstName) emp.firstName = 'Unknown';
+      if (!emp.lastName) emp.lastName = 'Employee';
+      if (!emp.id) emp.id = employeeId;
+      
+      console.log(`✅ Detailed employee data for ${employeeId}:`, {
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        hireDate: emp.hireDate,
+        status: emp.status,
+        department: emp.department,
+        email: emp.email,
+        workEmail: emp.workEmail
+      });
+      
+      return emp;
     } catch (error) {
       console.error(`❌ Error fetching employee details for ${employeeId}:`, error);
       throw error;
@@ -422,11 +463,22 @@ export class BambooHRService {
       const employees: Employee[] = [];
       let successCount = 0;
       let errorCount = 0;
+      let skippedCount = 0;
 
       for (const emp of bamboohrEmployees) {
         try {
           // Map workEmail to email if email is not available
           const email = emp.email || emp.workEmail || undefined;
+          
+          // Handle missing hireDate - set a default value to avoid P2011 errors
+          let hireDate = emp.hireDate;
+          if (!hireDate) {
+            // Set a default hire date (e.g., 1 year ago) to avoid null constraint violations
+            const defaultDate = new Date();
+            defaultDate.setFullYear(defaultDate.getFullYear() - 1);
+            hireDate = defaultDate.toISOString().split('T')[0];
+            console.log(`⚠️ Employee ${emp.id} missing hireDate, using default: ${hireDate}`);
+          }
           
           const employee: Employee = {
             id: emp.id,
@@ -435,7 +487,7 @@ export class BambooHRService {
             status: emp.status === 'active' ? 'active' : 'inactive',
             department: emp.department || undefined,
             position: emp.jobTitle || undefined,
-            hireDate: emp.hireDate || undefined, // Now optional in schema
+            hireDate: hireDate, // Now has a default value if missing
             terminationDate: emp.terminationDate || undefined
           };
           
@@ -456,7 +508,7 @@ export class BambooHRService {
         }
       }
 
-      console.log(`📊 Employee import results: ${successCount} successful, ${errorCount} errors`);
+      console.log(`📊 Employee import results: ${successCount} successful, ${errorCount} errors, ${skippedCount} skipped`);
       
       // Log summary of fetched fields
       const employeesWithHireDate = employees.filter(e => e.hireDate).length;
@@ -467,7 +519,8 @@ export class BambooHRService {
         totalEmployees: employees.length,
         withHireDate: employeesWithHireDate,
         withEmail: employeesWithEmail,
-        withDepartment: employeesWithDepartment
+        withDepartment: employeesWithDepartment,
+        missingHireDate: employees.length - employeesWithHireDate
       });
       
       return employees;
@@ -492,15 +545,35 @@ export class BambooHRService {
       const salaries: EmployeeSalary[] = [];
       let successCount = 0;
       let errorCount = 0;
+      let skippedCount = 0;
       let totalCompensationRecords = 0;
 
       for (const employee of employees) {
         try {
+          // Skip employees with critical missing data
+          if (!employee.id) {
+            console.log(`⚠️ Skipping employee with missing ID:`, employee);
+            skippedCount++;
+            continue;
+          }
+          
           const compensations = await this.getEmployeeCompensation(employee.id);
           totalCompensationRecords += compensations.length;
 
+          if (compensations.length === 0) {
+            console.log(`⚠️ No compensation data found for employee ${employee.id} (${employee.firstName} ${employee.lastName})`);
+            continue;
+          }
+
           for (const comp of compensations) {
             try {
+              // Validate compensation data before creating salary record
+              if (!comp.annualSalary || !comp.hourlyRate) {
+                console.log(`⚠️ Skipping compensation record with missing salary data for employee ${comp.employeeId}:`, comp);
+                skippedCount++;
+                continue;
+              }
+              
               // Log the upsert intent; actual DB upsert occurs in saveEmployeeSalary
               console.log(`💰 Salary record: employeeId=${comp.employeeId} effectiveDate=${comp.effectiveDate} annualSalary=${comp.annualSalary} hourlyRate=${comp.hourlyRate}`);
               
@@ -527,7 +600,20 @@ export class BambooHRService {
         }
       }
 
-      console.log(`📊 Salary import results: ${successCount} successful, ${errorCount} errors, ${totalCompensationRecords} total compensation records`);
+      console.log(`📊 Salary import results: ${successCount} successful, ${errorCount} errors, ${skippedCount} skipped, ${totalCompensationRecords} total compensation records`);
+      
+      // Log summary of salary import
+      if (salaries.length > 0) {
+        const totalSalary = salaries.reduce((sum, s) => sum + s.annualSalary, 0);
+        const avgSalary = totalSalary / salaries.length;
+        console.log(`💰 Salary import summary:`, {
+          totalSalaries: salaries.length,
+          totalAnnualSalary: totalSalary.toFixed(2),
+          averageSalary: avgSalary.toFixed(2),
+          successRate: ((successCount / (successCount + errorCount + skippedCount)) * 100).toFixed(2) + '%'
+        });
+      }
+      
       return salaries;
     } catch (error) {
       console.error('❌ Salary import failed:', error);
