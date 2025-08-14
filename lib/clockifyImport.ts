@@ -16,6 +16,20 @@ export interface ClockifyImportResult {
   };
 }
 
+// Type conversion utility to handle Prisma null values
+function convertPrismaEmployee(emp: any): Employee {
+  return {
+    id: emp.id,
+    name: emp.name,
+    email: emp.email ?? undefined, // Convert null to undefined
+    status: (emp.status === 'active' || emp.status === 'inactive') ? emp.status : 'active',
+    department: emp.department ?? undefined, // Convert null to undefined
+    position: emp.position ?? undefined, // Convert null to undefined
+    hireDate: emp.hireDate ?? undefined, // Convert null to undefined
+    terminationDate: emp.terminationDate ?? undefined // Convert null to undefined
+  };
+}
+
 export class ClockifyImportService {
   private employeeMap: Map<string, Employee> = new Map();
   private salaryMap: Map<string, EmployeeSalary> = new Map();
@@ -40,18 +54,29 @@ export class ClockifyImportService {
       // Build employee map with proper type casting
       this.employeeMap.clear();
       for (const emp of employees) {
-        // Ensure the status field is properly typed as 'active' | 'inactive'
-        const employee: Employee = {
+        // Log raw employee data for debugging
+        console.log(`📋 Raw employee data for ${emp.id}:`, {
           id: emp.id,
           name: emp.name,
           email: emp.email,
-          status: (emp.status === 'active' || emp.status === 'inactive') ? emp.status : 'active',
-          department: emp.department || undefined,
-          position: emp.position || undefined,
-          hireDate: emp.hireDate || undefined,
-          terminationDate: emp.terminationDate || undefined
-        };
+          status: emp.status,
+          department: emp.department,
+          position: emp.position,
+          hireDate: emp.hireDate,
+          terminationDate: emp.terminationDate
+        });
+
+        // Convert Prisma employee data to our interface
+        const employee = convertPrismaEmployee(emp);
         this.employeeMap.set(emp.id, employee);
+        
+        console.log(`✅ Converted employee: ${employee.name} (${employee.id})`, {
+          email: employee.email,
+          department: employee.department,
+          position: employee.position,
+          hireDate: employee.hireDate,
+          status: employee.status
+        });
       }
       console.log(`👥 Loaded ${employees.length} employees`);
 
