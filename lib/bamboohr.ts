@@ -188,13 +188,13 @@ export class BambooHRService {
           id: employeeId,
           firstName: 'Unknown',
           lastName: 'Employee',
-          email: null,
-          workEmail: null,
+          email: undefined,
+          workEmail: undefined,
           hireDate: new Date().toISOString().split('T')[0], // Default to today
           status: 'active',
-          department: null,
-          jobTitle: null,
-          preferredName: null,
+          department: undefined,
+          jobTitle: undefined,
+          preferredName: undefined,
           displayName: 'Unknown Employee'
         };
       }
@@ -241,13 +241,13 @@ export class BambooHRService {
         id: employeeId,
         firstName: 'Unknown',
         lastName: 'Employee',
-        email: null,
-        workEmail: null,
+        email: undefined,
+        workEmail: undefined,
         hireDate: new Date().toISOString().split('T')[0], // Default to today
         status: 'active',
-        department: null,
-        jobTitle: null,
-        preferredName: null,
+        department: undefined,
+        jobTitle: undefined,
+        preferredName: undefined,
         displayName: 'Unknown Employee'
       };
     }
