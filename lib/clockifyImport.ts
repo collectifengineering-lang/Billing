@@ -46,7 +46,7 @@ function convertPrismaEmployeeSalary(salary: any): EmployeeSalary {
 export class ClockifyImportService {
   private employeeMap: Map<string, Employee> = new Map();
   private salaryMap: Map<string, EmployeeSalary> = new Map();
-  private multiplierMap: Map<string, number> = new Map();
+  private multiplierMap: Map<string, { multiplier: number, effectiveDate: string }> = new Map();
 
   constructor() {
     console.log('🔄 Initializing Clockify Import Service...');
@@ -138,7 +138,7 @@ export class ClockifyImportService {
 
         const existing = this.multiplierMap.get(mult.projectId);
         if (!existing || new Date(mult.effectiveDate) > new Date(existing.effectiveDate)) {
-          this.multiplierMap.set(mult.projectId, mult.multiplier);
+          this.multiplierMap.set(mult.projectId, { multiplier: mult.multiplier, effectiveDate: mult.effectiveDate });
           
           console.log(`✅ Loaded multiplier for project ${mult.projectId}: ${mult.multiplier}x`);
         }
@@ -232,7 +232,8 @@ export class ClockifyImportService {
           }
 
           // Get project multiplier
-          const projectMultiplier = this.multiplierMap.get(entry.projectId) || 1.0;
+          const multiplierData = this.multiplierMap.get(entry.projectId);
+          const projectMultiplier = multiplierData ? multiplierData.multiplier : 1.0;
 
           // Parse duration to hours
           const hours = this.parseDuration(entry.timeInterval.duration);
