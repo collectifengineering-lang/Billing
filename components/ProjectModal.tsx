@@ -8,17 +8,22 @@ import { Badge } from '@/components/ui/badge';
 
 interface ProjectDetails {
   id: string;
-  name: string;
-  customer: string;
-  status: 'active' | 'completed' | 'on-hold';
-  startDate: string;
+  name?: string;
+  customer?: string;
+  status?: 'active' | 'completed' | 'on-hold';
+  startDate?: string;
   endDate?: string;
-  budget: number;
-  billed: number;
-  hours: number;
-  efficiency: number;
-  revenue: number;
-  profitMargin: number;
+  budget?: number;
+  billed?: number;
+  hours?: number;
+  efficiency?: number;
+  revenue?: number;
+  profitMargin?: number;
+  multiplier?: number;
+  projectId?: string; // Alternative ID field
+  totalHours?: number; // Clockify data
+  billableHours?: number; // Clockify data
+  entryCount?: number; // Clockify data
 }
 
 interface ProjectModalProps {
@@ -100,12 +105,12 @@ export default function ProjectModal({ isOpen, onClose, project }: ProjectModalP
               {/* Project Status */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <Badge className={`${getStatusColor(project.status)} border`}>
-                    {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+                  <Badge className={`${getStatusColor(project.status || 'unknown')} border`}>
+                    {project.status?.charAt(0).toUpperCase() + (project.status || '').slice(1)}
                   </Badge>
                   <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
                     <Calendar className="h-4 w-4" />
-                    <span>{new Date(project.startDate).toLocaleDateString()}</span>
+                    <span>{new Date(project.startDate || '').toLocaleDateString()}</span>
                     {project.endDate && (
                       <>
                         <span>-</span>
@@ -117,7 +122,7 @@ export default function ProjectModal({ isOpen, onClose, project }: ProjectModalP
                 <div className="text-right">
                   <p className="text-sm text-gray-600 dark:text-gray-300">Budget</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {formatCurrency(project.budget)}
+                    {formatCurrency(project.budget || 0)}
                   </p>
                 </div>
               </div>
@@ -131,7 +136,7 @@ export default function ProjectModal({ isOpen, onClose, project }: ProjectModalP
                       <div>
                         <p className="text-sm text-blue-600 dark:text-blue-400">Revenue</p>
                         <p className="text-xl font-bold text-blue-900 dark:text-blue-100">
-                          {formatCurrency(project.revenue)}
+                          {formatCurrency(project.revenue || 0)}
                         </p>
                       </div>
                     </div>
@@ -145,7 +150,7 @@ export default function ProjectModal({ isOpen, onClose, project }: ProjectModalP
                       <div>
                         <p className="text-sm text-green-600 dark:text-green-400">Hours</p>
                         <p className="text-xl font-bold text-green-900 dark:text-green-100">
-                          {project.hours}h
+                          {project.hours || 0}h
                         </p>
                       </div>
                     </div>
@@ -159,7 +164,7 @@ export default function ProjectModal({ isOpen, onClose, project }: ProjectModalP
                       <div>
                         <p className="text-sm text-purple-600 dark:text-purple-400">Efficiency</p>
                         <p className="text-xl font-bold text-purple-900 dark:text-purple-100">
-                          {formatPercentage(project.efficiency)}
+                          {formatPercentage(project.efficiency || 0)}
                         </p>
                       </div>
                     </div>
@@ -173,7 +178,7 @@ export default function ProjectModal({ isOpen, onClose, project }: ProjectModalP
                       <div>
                         <p className="text-sm text-orange-600 dark:text-orange-400">Profit Margin</p>
                         <p className="text-xl font-bold text-orange-900 dark:text-orange-100">
-                          {formatPercentage(project.profitMargin)}
+                          {formatPercentage(project.profitMargin || 0)}
                         </p>
                       </div>
                     </div>
@@ -192,24 +197,56 @@ export default function ProjectModal({ isOpen, onClose, project }: ProjectModalP
                     <div className="text-center">
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Budget</p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatCurrency(project.budget)}
+                        {formatCurrency(project.budget || 0)}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Amount Billed</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {formatCurrency(project.billed)}
+                        {formatCurrency(project.billed || 0)}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Remaining</p>
                       <p className="text-2xl font-bold text-blue-600">
-                        {formatCurrency(project.budget - project.billed)}
+                        {formatCurrency((project.budget || 0) - (project.billed || 0))}
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Clockify Time Tracking Data */}
+              {(project.totalHours || project.billableHours || project.entryCount) && (
+                <Card className="border-0 shadow-lg">
+                  <CardHeader>
+                    <CardTitle className="text-xl font-bold">Time Tracking (Clockify)</CardTitle>
+                    <CardDescription>Project time tracking data from Clockify</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Hours</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {(project.totalHours || 0).toFixed(1)}h
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Billable Hours</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {(project.billableHours || 0).toFixed(1)}h
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Time Entries</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {project.entryCount || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Project Actions */}
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-slate-700">

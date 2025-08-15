@@ -19,7 +19,8 @@ import {
   CheckCircle,
   AlertTriangle,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import ProjectModal from '@/components/ProjectModal';
 import HighPerformanceTable from '@/components/HighPerformanceTable';
@@ -227,15 +228,62 @@ export default function HomePage() {
 
   const handleProjectClick = (projectId: string) => {
     if (!Array.isArray(topProjects) || !projectId) return;
-    const project = topProjects.find(p => p.id === projectId);
+    const project = topProjects.find(p => p.id === projectId || p.projectId === projectId);
     if (project) {
-      setSelectedProject(project);
+      // Transform the project data to match what the modal expects
+      const transformedProject = {
+        id: project.id || project.projectId || projectId,
+        name: project.name || project.projectName || 'Unknown Project',
+        customer: project.customer || 'Unknown Customer',
+        status: project.status || 'active',
+        startDate: project.startDate || new Date().toISOString(),
+        endDate: project.endDate,
+        budget: project.budget || 0,
+        billed: project.billed || 0,
+        hours: project.hours || project.totalHours || 0,
+        efficiency: project.efficiency || 0,
+        revenue: project.revenue || 0,
+        profitMargin: project.profitMargin || 0,
+        multiplier: project.multiplier || 0,
+        totalHours: project.totalHours || 0,
+        billableHours: project.billableHours || 0,
+        entryCount: project.entryCount || 0
+      };
+      setSelectedProject(transformedProject);
       setIsModalOpen(true);
     }
   };
 
   const handleUpdateProjections = (newProjections: any) => {
     setProjections(newProjections);
+  };
+
+  const handleClockifySync = async () => {
+    try {
+      console.log('🔄 Starting Clockify sync...');
+      const response = await fetch('/api/clockify/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
+          endDate: new Date().toISOString()
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Clockify sync completed:', result);
+        // Refresh the page to show updated data
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        console.error('❌ Clockify sync failed:', error);
+        alert(`Clockify sync failed: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('❌ Clockify sync error:', error);
+      alert('Failed to sync Clockify data');
+    }
   };
 
   const tabVariants = {
@@ -340,6 +388,13 @@ export default function HomePage() {
                 <Building2 className="h-5 w-5 mr-2" />
                 Project Information
               </Link>
+              <button
+                onClick={handleClockifySync}
+                className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors duration-200 shadow-lg hover:shadow-xl"
+              >
+                <RefreshCw className="h-5 w-5 mr-2" />
+                Sync Clockify
+              </button>
             </div>
           </div>
         </motion.div>

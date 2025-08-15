@@ -495,15 +495,35 @@ class ClockifyService {
         try {
           // Handle duration conversion - Reports API returns duration in seconds as number
           let duration = 'PT0H0M';
+          
+          // First try to use the duration field if it's valid
           if (entry.duration !== undefined && entry.duration !== null) {
-            if (typeof entry.duration === 'number') {
+            if (typeof entry.duration === 'number' && entry.duration > 0) {
               // Convert seconds to ISO 8601 duration format
               const hours = Math.floor(entry.duration / 3600);
               const minutes = Math.floor((entry.duration % 3600) / 60);
               duration = `PT${hours}H${minutes}M`;
-            } else if (typeof entry.duration === 'string') {
-              // If it's already a string, use it directly
+            } else if (typeof entry.duration === 'string' && entry.duration !== 'PT0H0M') {
+              // If it's already a string and not zero, use it directly
               duration = entry.duration;
+            }
+          }
+          
+          // If duration is still zero, calculate it from start and end times
+          if (duration === 'PT0H0M' && entry.timeInterval?.start && entry.timeInterval?.end) {
+            try {
+              const startTime = new Date(entry.timeInterval.start);
+              const endTime = new Date(entry.timeInterval.end);
+              
+              if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime()) && endTime > startTime) {
+                const diffMs = endTime.getTime() - startTime.getTime();
+                const diffHours = diffMs / (1000 * 60 * 60);
+                const hours = Math.floor(diffHours);
+                const minutes = Math.floor((diffHours - hours) * 60);
+                duration = `PT${hours}H${minutes}M`;
+              }
+            } catch (timeError) {
+              console.warn(`⚠️ Error calculating duration from start/end times for entry ${index}:`, timeError);
             }
           }
 
@@ -606,15 +626,35 @@ class ClockifyService {
           try {
             // Handle duration conversion - User API might also return duration as number
             let duration = 'PT0H0M';
+            
+            // First try to use the duration field if it's valid
             if (entry.duration !== undefined && entry.duration !== null) {
-              if (typeof entry.duration === 'number') {
+              if (typeof entry.duration === 'number' && entry.duration > 0) {
                 // Convert seconds to ISO 8601 duration format
                 const hours = Math.floor(entry.duration / 3600);
                 const minutes = Math.floor((entry.duration % 3600) / 60);
                 duration = `PT${hours}H${minutes}M`;
-              } else if (typeof entry.duration === 'string') {
-                // If it's already a string, use it directly
+              } else if (typeof entry.duration === 'string' && entry.duration !== 'PT0H0M') {
+                // If it's already a string and not zero, use it directly
                 duration = entry.duration;
+              }
+            }
+            
+            // If duration is still zero, calculate it from start and end times
+            if (duration === 'PT0H0M' && entry.timeInterval?.start && entry.timeInterval?.end) {
+              try {
+                const startTime = new Date(entry.timeInterval.start);
+                const endTime = new Date(entry.timeInterval.end);
+                
+                if (!isNaN(startTime.getTime()) && !isNaN(endTime.getTime()) && endTime > startTime) {
+                  const diffMs = endTime.getTime() - startTime.getTime();
+                  const diffHours = diffMs / (1000 * 60 * 60);
+                  const hours = Math.floor(diffHours);
+                  const minutes = Math.floor((diffHours - hours) * 60);
+                  duration = `PT${hours}H${minutes}M`;
+                }
+              } catch (timeError) {
+                console.warn(`⚠️ Error calculating duration from start/end times for fallback entry ${index}:`, timeError);
               }
             }
 

@@ -1,0 +1,5 @@
+{
+  "/api/test-clockify/route": "app/api/test-clockify/route.js",
+  "/api/top-projects/route": "app/api/top-projects/route.js",
+  "/api/homepage-dashboard/route": "app/api/homepage-dashboard/route.js"
+}

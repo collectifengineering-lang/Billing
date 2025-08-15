@@ -127,7 +127,11 @@ export async function GET(request: NextRequest) {
     // Fetch Clockify data
     try {
       console.log('🔄 Starting Clockify data fetch...');
+      console.log('🔑 Environment check - CLOCKIFY_API_KEY:', process.env.CLOCKIFY_API_KEY ? '✅ Set' : '❌ Missing');
+      console.log('🔑 Environment check - CLOCKIFY_WORKSPACE_ID:', process.env.CLOCKIFY_WORKSPACE_ID ? '✅ Set' : '❌ Missing');
+      
       const clockifyConfig = clockifyService.getConfigurationStatus();
+      console.log('📋 Clockify config status:', clockifyConfig);
       
       if (clockifyConfig.configured) {
         console.log('⏰ Clockify configured, fetching real data...');
@@ -184,6 +188,13 @@ export async function GET(request: NextRequest) {
         };
 
         console.log('✅ Clockify data calculated:', clockifyData);
+    console.log('📊 Clockify billing calculations:', {
+      billableHours: clockifyData.billableHours,
+      averageHourlyRate: clockifyData.averageHourlyRate,
+      totalTimeValue: clockifyData.totalTimeValue,
+      calculatedBilled: clockifyData.billableHours * clockifyData.averageHourlyRate * 0.7,
+      calculatedUnbilled: clockifyData.billableHours * clockifyData.averageHourlyRate * 0.3
+    });
       } else {
         console.log('🎭 Clockify not configured, using mock data');
         clockifyData = {
@@ -221,12 +232,48 @@ export async function GET(request: NextRequest) {
     const paidInvoices = invoices.filter(inv => inv.status === 'paid') || [];
     const outstandingInvoices = invoices.filter(inv => inv.status === 'sent' || inv.status === 'viewed') || [];
     
-    const totalBilled = paidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
-    const totalUnbilled = outstandingInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    // Calculate billing from Zoho invoices
+    const zohoTotalBilled = paidInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    const zohoTotalUnbilled = outstandingInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    
+    // Calculate billing from Clockify time tracking (if available)
+    let clockifyTotalBilled = 0;
+    let clockifyTotalUnbilled = 0;
+    
+    if (clockifyData && clockifyData.totalHours > 0) {
+      // Use Clockify data to calculate billable amounts
+      const clockifyBillableAmount = clockifyData.billableHours * clockifyData.averageHourlyRate;
+      
+      // If we have Clockify data, use it as the primary source
+      // Otherwise fall back to Zoho data
+      if (clockifyData.totalHours > 0) {
+        clockifyTotalBilled = clockifyBillableAmount * 0.7; // Assume 70% of billable time is invoiced
+        clockifyTotalUnbilled = clockifyBillableAmount * 0.3; // Assume 30% is unbilled
+      }
+    }
+    
+    // Use the higher value between Zoho and Clockify, or combine them
+    const totalBilled = Math.max(zohoTotalBilled, clockifyTotalBilled) || zohoTotalBilled;
+    const totalUnbilled = Math.max(zohoTotalUnbilled, clockifyTotalUnbilled) || zohoTotalUnbilled;
+    
+    console.log('💰 Final billing calculations:', {
+      zohoTotalBilled,
+      zohoTotalUnbilled,
+      clockifyTotalBilled,
+      clockifyTotalUnbilled,
+      finalTotalBilled: totalBilled,
+      finalTotalUnbilled: totalUnbilled
+    });
 
-    // Use financial metrics from Zoho if available
-    const ytdRevenue = financialMetrics?.revenue || totalBilled;
+    // Use financial metrics from Zoho if available, but prioritize Clockify data
+    let ytdRevenue = financialMetrics?.revenue || totalBilled;
     const ytdExpenses = financialMetrics?.expenses || 0;
+    
+    // If we have Clockify data, use it to calculate YTD revenue
+    if (clockifyData && clockifyData.totalTimeValue > 0) {
+      const clockifyYtdRevenue = clockifyData.totalTimeValue;
+      ytdRevenue = Math.max(ytdRevenue, clockifyYtdRevenue);
+    }
 
     // Get top performing projects - ensure we always return an array
     let topPerformingProjects: string[] = [];

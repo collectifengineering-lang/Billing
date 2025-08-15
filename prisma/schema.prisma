@@ -65,6 +65,57 @@ model ProjectManager {
   color     String
 }
 
+// Clockify Integration Tables
+model ClockifyTimeEntry {
+  id          String   @id
+  description String?
+  userId      String
+  userName    String?
+  projectId   String
+  projectName String?
+  billable    Boolean  @default(false)
+  startTime   DateTime
+  endTime     DateTime?
+  duration    String   // ISO 8601 duration format
+  hourlyRate  Float?
+  costRate    Float?
+  tags        String[] // Array of tag names
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("clockify_time_entries")
+}
+
+model ClockifyProject {
+  id          String   @id
+  name        String
+  workspaceId String
+  clientId    String?
+  clientName  String?
+  billable    Boolean  @default(true)
+  archived    Boolean  @default(false)
+  hourlyRate  Float?
+  budget      Float?
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("clockify_projects")
+}
+
+model ClockifyUser {
+  id          String   @id
+  name        String
+  email       String
+  workspaceId String
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("clockify_users")
+}
+
 // BambooHR Integration Tables
 model BambooHRConfig {
   id            Int      @id @default(autoincrement())
