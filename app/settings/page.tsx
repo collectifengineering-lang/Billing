@@ -5,7 +5,6 @@ import useSWR from 'swr';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { ArrowLeft, Target, Settings, Users, Clock, Database, Key } from 'lucide-react';
-import AdminOnly from '@/components/AdminOnly';
 
 function SettingsPageContent() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -410,9 +409,5 @@ function SettingsPageContent() {
 }
 
 export default function SettingsPage() {
-  return (
-    <AdminOnly>
-      <SettingsPageContent />
-    </AdminOnly>
-  );
+  return <SettingsPageContent />;
 } 
