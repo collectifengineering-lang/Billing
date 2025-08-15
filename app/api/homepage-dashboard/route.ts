@@ -265,14 +265,27 @@ export async function GET(request: NextRequest) {
       finalTotalUnbilled: totalUnbilled
     });
 
-    // Use financial metrics from Zoho if available, but prioritize Clockify data
+    console.log('📊 Zoho Books financial data:', {
+      revenue: financialMetrics?.revenue,
+      expenses: financialMetrics?.expenses,
+      operatingIncome: financialMetrics?.operatingIncome,
+      grossProfit: financialMetrics?.grossProfit,
+      netProfit: financialMetrics?.netProfit,
+      cashFlow: financialMetrics?.cashFlow
+    });
+
+    // Use financial metrics from Zoho Books as the primary source for financial data
     let ytdRevenue = financialMetrics?.revenue || totalBilled;
     const ytdExpenses = financialMetrics?.expenses || 0;
+    const ytdOperatingIncome = financialMetrics?.operatingIncome || 0;
+    const ytdGrossProfit = financialMetrics?.grossProfit || 0;
+    const ytdNetProfit = financialMetrics?.netProfit || 0;
+    const ytdCashFlow = financialMetrics?.cashFlow || 0;
     
-    // If we have Clockify data, use it to calculate YTD revenue
-    if (clockifyData && clockifyData.totalTimeValue > 0) {
+    // Only use Clockify data if Zoho financial data is not available
+    if (!financialMetrics?.revenue && clockifyData && clockifyData.totalTimeValue > 0) {
       const clockifyYtdRevenue = clockifyData.totalTimeValue;
-      ytdRevenue = Math.max(ytdRevenue, clockifyYtdRevenue);
+      ytdRevenue = clockifyYtdRevenue;
     }
 
     // Get top performing projects - ensure we always return an array
@@ -315,6 +328,10 @@ export async function GET(request: NextRequest) {
       ytdRevenue: ytdRevenue || 0,
       ytdExpenses: ytdExpenses || 0,
       ytdProfit: (ytdRevenue || 0) - (ytdExpenses || 0),
+      ytdOperatingIncome: ytdOperatingIncome || 0,
+      ytdGrossProfit: ytdGrossProfit || 0,
+      ytdNetProfit: ytdNetProfit || 0,
+      ytdCashFlow: ytdCashFlow || 0,
       warnings: zohoAuthFailed ? ['Zoho authentication failed due to rate limits. Showing partial data.'] : [],
       zohoApiCallCount
     };

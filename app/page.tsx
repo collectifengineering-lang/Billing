@@ -20,7 +20,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ExternalLink,
-  RefreshCw
+  Info
 } from 'lucide-react';
 import ProjectModal from '@/components/ProjectModal';
 import HighPerformanceTable from '@/components/HighPerformanceTable';
@@ -46,6 +46,10 @@ interface DashboardStats {
   ytdRevenue: number;
   ytdExpenses: number;
   ytdProfit: number;
+  ytdOperatingIncome: number;
+  ytdGrossProfit: number;
+  ytdNetProfit: number;
+  ytdCashFlow: number;
 }
 
 interface ProjectData {
@@ -311,33 +315,7 @@ export default function HomePage() {
     setProjections(newProjections);
   };
 
-  const handleClockifySync = async () => {
-    try {
-      console.log('🔄 Starting Clockify sync...');
-      const response = await fetch('/api/clockify/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
-          endDate: new Date().toISOString()
-        })
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Clockify sync completed:', result);
-        // Refresh the page to show updated data
-        window.location.reload();
-      } else {
-        const error = await response.json();
-        console.error('❌ Clockify sync failed:', error);
-        alert(`Clockify sync failed: ${error.message}`);
-      }
-    } catch (error) {
-      console.error('❌ Clockify sync error:', error);
-      alert('Failed to sync Clockify data');
-    }
-  };
+
 
   const tabVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -450,13 +428,7 @@ export default function HomePage() {
                 <Building2 className="h-5 w-5 mr-2" />
                 Project Information
               </Link>
-              <button
-                onClick={handleClockifySync}
-                className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors duration-200 shadow-lg hover:shadow-xl"
-              >
-                <RefreshCw className="h-5 w-5 mr-2" />
-                Sync Clockify
-              </button>
+
             </div>
           </div>
         </motion.div>
@@ -595,7 +567,7 @@ export default function HomePage() {
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                   <motion.div
                     variants={cardVariants}
                     initial="hidden"
@@ -606,7 +578,29 @@ export default function HomePage() {
                       <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium opacity-90 mb-1">Total Revenue</p>
+                            <p className="text-sm font-medium opacity-90 mb-1">Zoho Books Operating Income</p>
+                            <p className="text-3xl font-bold">
+                              {formatCurrency(stats.ytdOperatingIncome)}
+                            </p>
+                            <p className="text-sm opacity-80 mt-2">YTD Operating Income (Accrual Basis)</p>
+                          </div>
+                          <DollarSign className="h-12 w-12 opacity-80" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div
+                    variants={cardVariants}
+                    initial="hidden"
+                    animate="visible"
+                    transition={{ delay: 0.45 }}
+                  >
+                    <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-xl">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium opacity-90 mb-1">Project Billing Total</p>
                             <p className="text-3xl font-bold">
                               {formatCurrency(stats.totalBilled + stats.totalUnbilled)}
                             </p>
@@ -644,13 +638,13 @@ export default function HomePage() {
                     variants={cardVariants}
                     initial="hidden"
                     animate="visible"
-                    transition={{ delay: 0.6 }}
+                    transition={{ delay: 0.55 }}
                   >
                     <Card className="bg-gradient-to-r from-violet-500 to-violet-600 text-white border-0 shadow-xl">
                       <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium opacity-90 mb-1">Active Rate</p>
+                            <p className="text-sm font-medium opacity-80 mb-1">Active Rate</p>
                             <p className="text-3xl font-bold">
                               {formatPercentage(stats.activeProjects / stats.totalProjects)}
                             </p>
@@ -663,6 +657,168 @@ export default function HomePage() {
                   </motion.div>
                 </div>
 
+                {/* Reconciliation Section */}
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: 0.6 }}
+                >
+                  <Card className="bg-gradient-to-r from-amber-500 to-amber-600 text-white border-0 shadow-xl">
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold">Revenue Reconciliation</h3>
+                          <AlertTriangle className="h-6 w-6 opacity-80" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="opacity-90 font-medium">Zoho Books Operating Income:</p>
+                            <p className="text-2xl font-bold">{formatCurrency(stats.ytdOperatingIncome)}</p>
+                            <p className="opacity-80 text-xs">Accrual basis financial data</p>
+                          </div>
+                          <div>
+                            <p className="opacity-90 font-medium">Project Billing Total:</p>
+                            <p className="text-2xl font-bold">{formatCurrency(stats.totalBilled + stats.totalUnbilled)}</p>
+                            <p className="opacity-80 text-xs">Project-based billing data</p>
+                          </div>
+                        </div>
+                        <div className="border-t border-white/20 pt-3">
+                          <p className="opacity-90 font-medium">Difference:</p>
+                          <p className="text-xl font-bold">
+                            {formatCurrency(stats.ytdOperatingIncome - (stats.totalBilled + stats.totalUnbilled))}
+                          </p>
+                          <p className="opacity-80 text-xs">
+                            This difference represents additional revenue sources, timing differences, or data synchronization gaps
+                          </p>
+                          <p className="opacity-80 text-xs mt-1">
+                            <strong>Note:</strong> Zoho Books data is the authoritative source for financial reporting
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Comprehensive Financial Metrics */}
+                {stats.ytdOperatingIncome > 0 ? (
+                  <motion.div
+                    variants={cardVariants}
+                    initial="hidden"
+                    animate="visible"
+                    transition={{ delay: 0.7 }}
+                  >
+                    <Card className="bg-gradient-to-r from-slate-700 to-slate-800 text-white border-0 shadow-xl">
+                      <CardContent className="p-6">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold">Zoho Books Financial Metrics (YTD)</h3>
+                            <BarChart3 className="h-6 w-6 opacity-80" />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <p className="opacity-90 font-medium">Revenue:</p>
+                              <p className="text-xl font-bold">{formatCurrency(stats.ytdRevenue)}</p>
+                            </div>
+                            <div>
+                              <p className="opacity-90 font-medium">Expenses:</p>
+                              <p className="text-xl font-bold">{formatCurrency(stats.ytdExpenses)}</p>
+                            </div>
+                            <div>
+                              <p className="opacity-90 font-medium">Gross Profit:</p>
+                              <p className="text-xl font-bold">{formatCurrency(stats.ytdGrossProfit)}</p>
+                            </div>
+                            <div>
+                              <p className="opacity-90 font-medium">Operating Income:</p>
+                              <p className="text-xl font-bold">{formatCurrency(stats.ytdOperatingIncome)}</p>
+                            </div>
+                            <div>
+                              <p className="opacity-90 font-medium">Net Profit:</p>
+                              <p className="text-xl font-bold">{formatCurrency(stats.ytdNetProfit)}</p>
+                            </div>
+                            <div>
+                              <p className="opacity-90 font-medium">Cash Flow:</p>
+                              <p className="text-xl font-bold">{formatCurrency(stats.ytdCashFlow)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    variants={cardVariants}
+                    initial="hidden"
+                    animate="visible"
+                    transition={{ delay: 0.7 }}
+                  >
+                    <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white border-0 shadow-xl">
+                      <CardContent className="p-6">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold">⚠️ Zoho Books Data Not Available</h3>
+                            <AlertTriangle className="h-6 w-6 opacity-80" />
+                          </div>
+                          <div className="text-sm">
+                            <p className="opacity-90">
+                              Unable to fetch financial data from Zoho Books. This could be due to:
+                            </p>
+                            <ul className="list-disc list-inside mt-2 opacity-80 text-xs">
+                              <li>API authentication issues</li>
+                              <li>Rate limiting</li>
+                              <li>Network connectivity problems</li>
+                              <li>Missing or expired API tokens</li>
+                            </ul>
+                            <p className="mt-2 opacity-80 text-xs">
+                              Showing project billing data only. Please check your Zoho Books integration.
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {/* Data Source Information */}
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: 0.8 }}
+                >
+                  <Card className="bg-gray-100 border-0 shadow-xl">
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold text-gray-800">Data Source Information</h3>
+                          <Info className="h-6 w-6 text-gray-600" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                          <div>
+                            <p className="font-medium">Primary Financial Data:</p>
+                            <p className="text-sm">Zoho Books API (Accrual Basis)</p>
+                            <p className="text-xs text-gray-500">Real-time financial metrics</p>
+                          </div>
+                          <div>
+                            <p className="font-medium">Project Billing Data:</p>
+                            <p className="text-sm">Zoho Projects + Clockify</p>
+                            <p className="text-xs text-gray-500">Project-based time tracking</p>
+                          </div>
+                          <div>
+                            <p className="font-medium">Update Frequency:</p>
+                            <p className="text-sm">Real-time via API calls</p>
+                            <p className="text-xs text-gray-500">Refreshed on each page load</p>
+                          </div>
+                          <div>
+                            <p className="font-medium">Data Reconciliation:</p>
+                            <p className="text-sm">Automatic calculation</p>
+                            <p className="text-xs text-gray-500">Shows differences and gaps</p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
 
               </motion.div>
             </AnimatePresence>

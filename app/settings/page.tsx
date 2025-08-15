@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
-import { ArrowLeft, Target, Settings, Users, Clock, Database, Key } from 'lucide-react';
+import { ArrowLeft, Target, Settings, Users, Clock, Database, Key, RefreshCw } from 'lucide-react';
 
 function SettingsPageContent() {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -71,6 +71,40 @@ function SettingsPageContent() {
         configured: false,
         error: 'Failed to connect to Clockify'
       });
+    }
+  };
+
+  const handleClockifySync = async () => {
+    try {
+      console.log('🔄 Starting Clockify sync...');
+      toast.loading('Syncing Clockify data...');
+      
+      const response = await fetch('/api/clockify/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
+          endDate: new Date().toISOString()
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Clockify sync completed:', result);
+        toast.dismiss();
+        toast.success('Clockify data synced successfully!');
+        // Refresh the page to show updated data
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        console.error('❌ Clockify sync failed:', error);
+        toast.dismiss();
+        toast.error(`Clockify sync failed: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('❌ Clockify sync error:', error);
+      toast.dismiss();
+      toast.error('Failed to sync Clockify data');
     }
   };
 
@@ -376,13 +410,20 @@ function SettingsPageContent() {
                 </div>
               )}
 
-              {/* Connection Test Button */}
-              <div>
+              {/* Connection Test and Sync Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={testClockifyConnection}
                   className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors duration-200 shadow-lg hover:shadow-xl"
                 >
                   Test Connection
+                </button>
+                <button
+                  onClick={handleClockifySync}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
+                >
+                  <RefreshCw className="h-5 w-5 mr-2" />
+                  Sync Clockify
                 </button>
               </div>
 
