@@ -115,22 +115,28 @@ export async function GET(request: NextRequest) {
         }
       } catch (error) {
         console.error('❌ Failed to fetch financial metrics:', error);
+        
+        // Type guard to check if error has response property
+        const hasResponse = (err: unknown): err is { response: { status?: number; statusText?: string; data?: any } } => {
+          return typeof err === 'object' && err !== null && 'response' in err;
+        };
+        
         console.error('Error details:', {
           message: error instanceof Error ? error.message : 'Unknown error',
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
+          status: hasResponse(error) ? error.response?.status : undefined,
+          statusText: hasResponse(error) ? error.response?.statusText : undefined,
+          data: hasResponse(error) ? error.response?.data : undefined,
           stack: error instanceof Error ? error.stack : undefined
         });
         
         // Provide specific guidance based on error type
-        if (error.response?.status === 404) {
+        if (hasResponse(error) && error.response?.status === 404) {
           console.error('🔍 404 Error: Reports endpoints not found. Check if your Zoho Books plan includes financial reporting.');
-        } else if (error.response?.status === 401) {
+        } else if (hasResponse(error) && error.response?.status === 401) {
           console.error('🔐 401 Error: Authentication failed. Check OAuth scopes and token validity.');
-        } else if (error.response?.status === 403) {
+        } else if (hasResponse(error) && error.response?.status === 403) {
           console.error('🚫 403 Error: Access forbidden. Check if Reports module is enabled in your Zoho Books account.');
-        } else if (error.response?.status === 429) {
+        } else if (hasResponse(error) && error.response?.status === 429) {
           console.error('⏰ 429 Error: Rate limited. Zoho API rate limits exceeded.');
         }
         

@@ -1,6 +1,11 @@
 import axios from 'axios';
 import pLimit from 'p-limit';
 
+// Type guard for errors with response property
+const hasResponse = (err: unknown): err is { response: { status?: number; statusText?: string; data?: any; headers?: any } } => {
+  return typeof err === 'object' && err !== null && 'response' in err;
+};
+
 export interface ZohoProject {
   project_id: string;
   project_name: string; // Changed from name to project_name
@@ -147,15 +152,15 @@ class ZohoService {
       // Log specific error details for debugging
       if (axios.isAxiosError(error)) {
         console.error('Axios error details:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
+          status: hasResponse(error) ? error.response?.status : undefined,
+          statusText: hasResponse(error) ? error.response?.statusText : undefined,
+          data: hasResponse(error) ? error.response?.data : undefined,
           message: error.message,
-          headers: error.response?.headers // Log headers for rate limit info
+          headers: hasResponse(error) ? error.response?.headers : undefined // Log headers for rate limit info
         });
         
         // Log rate limit headers if available
-        if (error.response?.headers) {
+        if (hasResponse(error) && error.response?.headers) {
           const rateLimitHeaders = {
             'X-Rate-Limit': error.response.headers['x-rate-limit'],
             'X-Rate-Limit-Remaining': error.response.headers['x-rate-limit-remaining'],
@@ -224,8 +229,8 @@ class ZohoService {
       } catch (err: any) {
         // If rate-limited by Zoho during token refresh, implement exponential backoff
         const isAxios = axios.isAxiosError(err);
-        const status = isAxios ? err.response?.status : undefined;
-        const description = isAxios ? (err.response?.data as any)?.error_description : undefined;
+        const status = isAxios && hasResponse(err) ? err.response?.status : undefined;
+        const description = isAxios && hasResponse(err) ? (err.response?.data as any)?.error_description : undefined;
         
         if (status === 400 && typeof description === 'string' && description.toLowerCase().includes('too many requests')) {
           // Exponential backoff: delay = base * 2^attempt
@@ -344,7 +349,7 @@ class ZohoService {
       }
     } catch (error: any) {
       // Handle rate limiting (400 with specific error message)
-      if (error.response?.status === 400 && 
+      if (hasResponse(error) && error.response?.status === 400 && 
           error.response?.data?.error_description?.includes('too many requests')) {
         
         console.warn('Zoho rate limit hit, implementing exponential backoff...');
@@ -361,7 +366,7 @@ class ZohoService {
       }
 
       // Handle 429 Too Many Requests (explicit rate limit)
-      if (error.response?.status === 429) {
+      if (hasResponse(error) && error.response?.status === 429) {
         console.warn('Zoho 429 rate limit hit, implementing exponential backoff...');
         await this.handleRateLimit();
         
@@ -376,8 +381,8 @@ class ZohoService {
       }
 
       // If we get a 401, try refreshing the token once
-      if (error.response?.status === 401) {
-        if (error.response?.data?.code === 57) {
+      if (hasResponse(error) && error.response?.status === 401) {
+        if (hasResponse(error) && error.response?.data?.code === 57) {
           console.error('Zoho API authorization error (code 57). Likely missing required scopes such as ZohoBooks.reports.READ.');
         }
         console.info('Token expired, refreshing...');
@@ -416,22 +421,22 @@ class ZohoService {
           // Log detailed refresh error information
           if (axios.isAxiosError(refreshError)) {
             console.error('Token refresh Axios error details:', {
-              status: refreshError.response?.status,
-              statusText: refreshError.response?.statusText,
-              data: refreshError.response?.data,
+              status: hasResponse(refreshError) ? refreshError.response?.status : undefined,
+              statusText: hasResponse(refreshError) ? refreshError.response?.statusText : undefined,
+              data: hasResponse(refreshError) ? refreshError.response?.data : undefined,
               message: refreshError.message,
               endpoint: endpoint
             });
           }
           
           // Check if it's a rate limiting issue during token refresh
-          if (refreshError.response?.status === 400 && 
+          if (hasResponse(refreshError) && refreshError.response?.status === 400 && 
               refreshError.response?.data?.error_description?.includes('too many requests')) {
             throw new Error(`Zoho token refresh rate limited: ${endpoint}. Please wait before retrying.`);
           }
           
           // Check if it's an authentication issue during token refresh
-          if (refreshError.response?.status === 400 && 
+          if (hasResponse(refreshError) && refreshError.response?.status === 400 && 
               refreshError.response?.data?.error_description?.includes('invalid')) {
             throw new Error(`Zoho token refresh failed - invalid credentials: ${endpoint}. Check your OAuth configuration.`);
           }
@@ -442,12 +447,12 @@ class ZohoService {
 
       // Log the error details for debugging
       console.error(`Zoho API request failed for ${endpoint}:`, {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
+        status: hasResponse(error) ? error.response?.status : undefined,
+        statusText: hasResponse(error) ? error.response?.statusText : undefined,
+        data: hasResponse(error) ? error.response?.data : undefined,
         message: error.message
       });
-      if (error.response?.data?.code === 57) {
+      if (hasResponse(error) && error.response?.data?.code === 57) {
         console.error('Zoho API authorization error (code 57). Verify organization_id and OAuth scopes (ZohoBooks.reports.READ).');
       }
 
@@ -464,7 +469,7 @@ class ZohoService {
       return res.data as { scope?: string };
     } catch (err: any) {
       // Surface concise context but do not fail the main flow
-      const msg = axios.isAxiosError(err) ? err.response?.data || err.message : String(err);
+      const msg = axios.isAxiosError(err) ? (hasResponse(err) ? err.response?.data : undefined) || err.message : String(err);
       throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
     }
   }
@@ -494,8 +499,8 @@ class ZohoService {
         console.log(`Validated Zoho organization_id=${orgId}`);
       }
     } catch (err: any) {
-      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
-      const data = axios.isAxiosError(err) ? err.response?.data : undefined;
+      const status = axios.isAxiosError(err) ? (hasResponse(err) ? err.response?.status : undefined) : undefined;
+      const data = axios.isAxiosError(err) ? (hasResponse(err) ? err.response?.data : undefined) : undefined;
       console.error('Failed to validate Zoho organization:', { status, data, message: err.message });
       // Do not throw; allow request to proceed but logs will help diagnose
     }
@@ -927,7 +932,7 @@ class ZohoService {
       // Check for 404 errors and log specific warnings
       if (plData.status === 'rejected') {
         const error = plData.reason as any;
-        if (error?.response?.status === 404) {
+        if (hasResponse(error) && error.response?.status === 404) {
           console.warn('⚠️ Profit & Loss returned 404 - Invalid endpoint - check Zoho API docs');
         } else {
           console.warn('⚠️ Profit & Loss data failed:', plData.reason);
@@ -935,7 +940,7 @@ class ZohoService {
       }
       if (cfData.status === 'rejected') {
         const error = cfData.reason as any;
-        if (error?.response?.status === 404) {
+        if (hasResponse(error) && error.response?.status === 404) {
           console.warn('⚠️ Cash Flow returned 404 - Invalid endpoint - check Zoho API docs');
         } else {
           console.warn('⚠️ Cash Flow data failed:', cfData.reason);
@@ -943,7 +948,7 @@ class ZohoService {
       }
       if (bsData.status === 'rejected') {
         const error = bsData.reason as any;
-        if (error?.response?.status === 404) {
+        if (hasResponse(error) && error.response?.status === 404) {
           console.warn('⚠️ Balance Sheet returned 404 - Invalid endpoint - check Zoho API docs');
         } else {
           console.warn('⚠️ Balance Sheet data failed:', bsData.reason);
