@@ -86,6 +86,11 @@ export async function GET(request: NextRequest) {
       // Get financial metrics for current year
       try {
         console.log('💰 Fetching financial metrics...');
+        console.log('📅 Date range:', {
+          start: currentYearStart.toISOString().split('T')[0],
+          end: now.toISOString().split('T')[0]
+        });
+        
         zohoApiCallCount++;
         financialMetrics = await zohoService.getFinancialMetrics(
           currentYearStart.toISOString().split('T')[0],
@@ -96,12 +101,39 @@ export async function GET(request: NextRequest) {
         // Log the full financialMetrics object after fetch to confirm values
         console.log('📊 Full financialMetrics object:', JSON.stringify(financialMetrics, null, 2));
         
+        // Check if we got meaningful data
+        if (financialMetrics?.operatingIncome === 0 && financialMetrics?.revenue === 0) {
+          console.warn('⚠️ Financial metrics returned all zeros - this might indicate an issue');
+          console.warn('   - Check if Zoho Books has financial data for the date range');
+          console.warn('   - Verify OAuth scopes include ZohoBooks.reports.READ');
+          console.warn('   - Check if Reports module is enabled in your Zoho Books account');
+        }
+        
         // If cashFlow is 0, log warning to verify data in Zoho
         if (financialMetrics?.cashFlow === 0) {
           console.warn('⚠️ Cash Flow is 0 - verify data in Zoho for date range');
         }
       } catch (error) {
-        console.warn('⚠️ Failed to fetch financial metrics, using defaults:', error);
+        console.error('❌ Failed to fetch financial metrics:', error);
+        console.error('Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        
+        // Provide specific guidance based on error type
+        if (error.response?.status === 404) {
+          console.error('🔍 404 Error: Reports endpoints not found. Check if your Zoho Books plan includes financial reporting.');
+        } else if (error.response?.status === 401) {
+          console.error('🔐 401 Error: Authentication failed. Check OAuth scopes and token validity.');
+        } else if (error.response?.status === 403) {
+          console.error('🚫 403 Error: Access forbidden. Check if Reports module is enabled in your Zoho Books account.');
+        } else if (error.response?.status === 429) {
+          console.error('⏰ 429 Error: Rate limited. Zoho API rate limits exceeded.');
+        }
+        
         financialMetrics = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
       }
     } catch (error) {
