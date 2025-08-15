@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    console.info('🔄 Fetching top projects data...');
+    console.info('🔄 Fetching bottom projects data...');
     
     // Get date range from query parameters or use defaults
     const { searchParams } = new URL(request.url);
@@ -149,11 +149,11 @@ export async function GET(request: NextRequest) {
       }
     });
     
-    // Convert to array and sort by total hours
-    const topProjects = Array.from(projectStats.values())
+    // Convert to array and sort by total hours (ascending for bottom projects)
+    const bottomProjects = Array.from(projectStats.values())
       .filter(project => !project.archived) // Filter out archived projects
-      .sort((a, b) => b.totalHours - a.totalHours)
-      .slice(0, 10) // Top 10 projects
+      .sort((a, b) => a.totalHours - b.totalHours) // Sort by ascending hours
+      .slice(0, 10) // Bottom 10 projects
       .map(project => ({
         ...project,
         name: project.projectName, // Ensure 'name' field exists for compatibility
@@ -161,13 +161,13 @@ export async function GET(request: NextRequest) {
         efficiency: project.totalHours > 0 ? (project.billableHours / project.totalHours) * 100 : 0
       }));
     
-    console.info(`📊 Calculated stats for ${topProjects.length} top projects`);
+    console.info(`📊 Calculated stats for ${bottomProjects.length} bottom projects`);
     
     // Return successful response
     return NextResponse.json({
       success: true,
       data: {
-        topProjects,
+        bottomProjects,
         timeEntriesCount: timeEntries.length,
         projectsCount: projects.length,
         dateRange: { start: startDate, end: endDate }
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
     });
     
   } catch (error: any) {
-    console.error('❌ Error in top-projects API:', {
+    console.error('❌ Error in bottom-projects API:', {
       message: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString()
@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
     // Return error response with helpful information
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch top projects data',
+      error: 'Failed to fetch bottom projects data',
       message: error.message || 'An unexpected error occurred',
       details: {
         clockifyStatus: 'Failed to process time entries',

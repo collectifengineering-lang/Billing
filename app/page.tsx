@@ -97,6 +97,7 @@ type ProjectDetails = {
 export default function HomePage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topProjects, setTopProjects] = useState<ProjectData[]>([]);
+  const [bottomProjects, setBottomProjects] = useState<ProjectData[]>([]);
   const [selectedTab, setSelectedTab] = useState('projections-table');
   const [selectedProject, setSelectedProject] = useState<ProjectDetails | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -113,6 +114,14 @@ export default function HomePage() {
       setTopProjects([]);
     }
   }, [topProjects]);
+
+  // Monitor bottomProjects state to ensure it's always an array
+  useEffect(() => {
+    if (bottomProjects && !Array.isArray(bottomProjects)) {
+      console.warn('bottomProjects is not an array, resetting to empty array:', bottomProjects);
+      setBottomProjects([]);
+    }
+  }, [bottomProjects]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -133,9 +142,10 @@ export default function HomePage() {
           console.log('Database setup error, continuing with existing schema:', setupError);
         }
         
-        const [dashboardResponse, topProjectsResponse, projectsResponse] = await Promise.all([
+        const [dashboardResponse, topProjectsResponse, bottomProjectsResponse, projectsResponse] = await Promise.all([
           fetch('/api/homepage-dashboard'),
           fetch('/api/top-projects'),
+          fetch('/api/bottom-projects'),
           fetch('/api/projects')
         ]);
 
@@ -147,12 +157,17 @@ export default function HomePage() {
           throw new Error('Failed to fetch top projects data');
         }
 
+        if (!bottomProjectsResponse.ok) {
+          throw new Error('Failed to fetch bottom projects data');
+        }
+
         if (!projectsResponse.ok) {
           throw new Error('Failed to fetch projects data');
         }
 
         const dashboardData = await dashboardResponse.json();
         const topProjectsData = await topProjectsResponse.json();
+        const bottomProjectsData = await bottomProjectsResponse.json();
         const projectsData = await projectsResponse.json();
 
         // Validate and set dashboard stats
@@ -171,6 +186,16 @@ export default function HomePage() {
         } else {
           console.warn('Invalid topProjects data received, setting empty array:', topProjectsData);
           setTopProjects([]);
+        }
+
+        // Validate and set bottom projects with proper error handling
+        console.log('Raw bottomProjectsData:', bottomProjectsData);
+        if (bottomProjectsData && bottomProjectsData.success && bottomProjectsData.data && Array.isArray(bottomProjectsData.data.bottomProjects)) {
+          console.log('Setting bottomProjects:', bottomProjectsData.data.bottomProjects);
+          setBottomProjects(bottomProjectsData.data.bottomProjects);
+        } else {
+          console.warn('Invalid bottomProjects data received, setting empty array:', bottomProjectsData);
+          setBottomProjects([]);
         }
         
         // Transform Zoho projects to billing data format
@@ -364,6 +389,15 @@ export default function HomePage() {
 
   // Prepare chart data for top projects
   const topProjectsChartData = (Array.isArray(topProjects) ? topProjects : []).slice(0, 5).map(project => ({
+    name: project.name || 'Unknown Project',
+    hours: project.hours || 0,
+    revenue: project.revenue || 0,
+    efficiency: Math.round((project.efficiency || 0) * 100),
+    multiplier: project.multiplier || 0
+  }));
+
+  // Prepare chart data for bottom projects
+  const bottomProjectsChartData = (Array.isArray(bottomProjects) ? bottomProjects : []).slice(0, 5).map(project => ({
     name: project.name || 'Unknown Project',
     hours: project.hours || 0,
     revenue: project.revenue || 0,
@@ -1112,16 +1146,10 @@ export default function HomePage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {Array.isArray(topProjects) && topProjects.length > 0 ? (
+                      {bottomProjectsChartData.length > 0 ? (
                         <div className="h-80">
                           <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={topProjects.slice(-5).reverse().map(project => ({
-                              name: project.name || 'Unknown Project',
-                              hours: project.hours || 0,
-                              revenue: project.revenue || 0,
-                              efficiency: Math.round((project.efficiency || 0) * 100),
-                              multiplier: project.multiplier || 0
-                            }))} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                            <BarChart data={bottomProjectsChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                               <XAxis dataKey="name" />
                               <YAxis />
                               <Tooltip 
@@ -1167,8 +1195,8 @@ export default function HomePage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {Array.isArray(topProjects) && topProjects.length > 0 ? (
-                          topProjects.slice(-5).reverse().map((project, index) => (
+                        {Array.isArray(bottomProjects) && bottomProjects.length > 0 ? (
+                          bottomProjects.map((project, index) => (
                             <motion.div
                               key={project.id || project.projectId || `project-${index}`}
                               initial={{ opacity: 0, x: -20 }}
@@ -1180,7 +1208,7 @@ export default function HomePage() {
                               <div className="flex items-center space-x-4">
                                 <div className="flex-shrink-0">
                                   <div className="w-10 h-10 bg-gradient-to-r from-red-400 to-red-600 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-sm font-bold">{Array.isArray(topProjects) ? topProjects.length - index : 0}</span>
+                                    <span className="text-white text-sm font-bold">{index + 1}</span>
                                   </div>
                                 </div>
                                 <div>
