@@ -1,25 +1,37 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Get the admin emails from environment
-    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS;
-    const adminEmailsArray = adminEmails?.split(',').map(email => email.trim()) || [];
+    // Get the user email from query parameters or headers
+    const { searchParams } = new URL(request.url);
+    const userEmail = searchParams.get('email');
     
+    if (!userEmail) {
+      return NextResponse.json({
+        success: false,
+        error: 'User email is required'
+      }, { status: 400 });
+    }
+
+    // Check admin status using the same logic as the client
+    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
+    const isAdmin = adminEmails.includes(userEmail) || userEmail.endsWith('@collectif.nyc');
+
     return NextResponse.json({
       success: true,
+      userEmail,
+      isAdmin,
       adminEmails,
-      adminEmailsArray,
-      envVarExists: !!adminEmails,
-      envVarLength: adminEmails?.length || 0,
-      message: 'Admin test endpoint working'
+      rawEnvVar: process.env.NEXT_PUBLIC_ADMIN_EMAILS,
+      envVarExists: !!process.env.NEXT_PUBLIC_ADMIN_EMAILS,
+      domainCheck: userEmail.endsWith('@collectif.nyc')
     });
   } catch (error) {
-    console.error('Admin test error:', error);
+    console.error('Admin test API error:', error);
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      message: 'Admin test endpoint failed'
+      error: 'Failed to check admin status',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }

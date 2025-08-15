@@ -46,9 +46,14 @@ export function checkAdminStatus(userEmail: string | null | undefined): boolean 
     return false;
   }
 
+  console.log('checkAdminStatus: Checking admin status for:', userEmail);
+
   // Method 1: Check against NEXT_PUBLIC_ADMIN_EMAILS environment variable
   try {
     const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
+    console.log('checkAdminStatus: Admin emails from env:', adminEmails);
+    console.log('checkAdminStatus: Raw NEXT_PUBLIC_ADMIN_EMAILS value:', process.env.NEXT_PUBLIC_ADMIN_EMAILS);
+    
     if (adminEmails.includes(userEmail)) {
       console.log('checkAdminStatus: User is admin via NEXT_PUBLIC_ADMIN_EMAILS');
       return true;
@@ -57,7 +62,7 @@ export function checkAdminStatus(userEmail: string | null | undefined): boolean 
     console.warn('checkAdminStatus: Error checking NEXT_PUBLIC_ADMIN_EMAILS:', error);
   }
 
-  // Method 2: Check domain-based admin access
+  // Method 2: Check domain-based admin access (always allow @collectif.nyc)
   if (userEmail.endsWith('@collectif.nyc')) {
     console.log('checkAdminStatus: User is admin via @collectif.nyc domain');
     return true;
@@ -89,6 +94,12 @@ export function checkAdminStatus(userEmail: string | null | undefined): boolean 
       console.log('checkAdminStatus: User is admin via pattern match:', pattern);
       return true;
     }
+  }
+
+  // Method 5: Temporary hardcoded admin for jonathan@collectif.nyc (fallback)
+  if (userEmail === 'jonathan@collectif.nyc') {
+    console.log('checkAdminStatus: User is admin via hardcoded fallback');
+    return true;
   }
 
   console.log('checkAdminStatus: User is not admin:', userEmail);
