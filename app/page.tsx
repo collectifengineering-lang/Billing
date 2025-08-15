@@ -49,6 +49,31 @@ interface DashboardStats {
 }
 
 interface ProjectData {
+  id?: string;
+  projectId?: string;
+  name?: string;
+  projectName?: string;
+  customer?: string;
+  customerName?: string;
+  status?: 'active' | 'completed' | 'on-hold';
+  startDate?: string;
+  endDate?: string;
+  budget?: number;
+  billed?: number;
+  hours?: number;
+  efficiency?: number;
+  revenue?: number;
+  profitMargin?: number;
+  multiplier?: number;
+  estimatedCost?: number;
+  // Clockify-specific fields
+  totalHours?: number;
+  billableHours?: number;
+  entryCount?: number;
+}
+
+// Type alias to ensure compatibility with ProjectModal
+type ProjectDetails = {
   id: string;
   name: string;
   customer: string;
@@ -63,10 +88,11 @@ interface ProjectData {
   profitMargin: number;
   multiplier?: number;
   estimatedCost?: number;
-}
-
-// Type alias to ensure compatibility with ProjectModal
-type ProjectDetails = ProjectData;
+  projectId?: string;
+  totalHours?: number;
+  billableHours?: number;
+  entryCount?: number;
+};
 
 export default function HomePage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -245,6 +271,8 @@ export default function HomePage() {
         revenue: project.revenue || 0,
         profitMargin: project.profitMargin || 0,
         multiplier: project.multiplier || 0,
+        estimatedCost: project.estimatedCost || 0,
+        projectId: project.projectId || project.id,
         totalHours: project.totalHours || 0,
         billableHours: project.billableHours || 0,
         entryCount: project.entryCount || 0
@@ -1008,12 +1036,12 @@ export default function HomePage() {
                       <div className="space-y-4">
                         {topProjects.map((project, index) => (
                           <motion.div
-                            key={project.id}
+                            key={project.id || project.projectId || `project-${index}`}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.3 + index * 0.1 }}
                             className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors duration-200 cursor-pointer group"
-                            onClick={() => handleProjectClick(project.id)}
+                            onClick={() => handleProjectClick(project.id || project.projectId || `project-${index}`)}
                           >
                             <div className="flex items-center space-x-4">
                               <div className="flex-shrink-0">
@@ -1026,7 +1054,7 @@ export default function HomePage() {
                                   {project.name}
                                 </p>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  {project.hours}h • {formatPercentage(project.efficiency)} efficient
+                                  {(project.hours || project.totalHours || 0)}h • {formatPercentage(project.efficiency || 0)} efficient
                                 </p>
                               </div>
                             </div>
@@ -1039,7 +1067,7 @@ export default function HomePage() {
                               </div>
                               <div className="text-right">
                                 <p className="font-semibold text-gray-900 dark:text-white">
-                                  {formatCurrency(project.revenue)}
+                                  {formatCurrency(project.revenue || 0)}
                                 </p>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">Revenue</p>
                               </div>
@@ -1142,12 +1170,12 @@ export default function HomePage() {
                         {Array.isArray(topProjects) && topProjects.length > 0 ? (
                           topProjects.slice(-5).reverse().map((project, index) => (
                             <motion.div
-                              key={project.id || `project-${index}`}
+                              key={project.id || project.projectId || `project-${index}`}
                               initial={{ opacity: 0, x: -20 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: 0.3 + index * 0.1 }}
                               className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors duration-200 cursor-pointer group border border-red-200 dark:border-red-800"
-                              onClick={() => handleProjectClick(project.id)}
+                              onClick={() => handleProjectClick(project.id || project.projectId || `project-${index}`)}
                             >
                               <div className="flex items-center space-x-4">
                                 <div className="flex-shrink-0">
