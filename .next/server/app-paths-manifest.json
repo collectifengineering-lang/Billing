@@ -1,4 +1,8 @@
 {
+  "/page": "app/page.js",
+  "/api/bottom-projects/route": "app/api/bottom-projects/route.js",
+  "/api/homepage-dashboard/route": "app/api/homepage-dashboard/route.js",
+  "/api/setup-database/route": "app/api/setup-database/route.js",
   "/api/top-projects/route": "app/api/top-projects/route.js",
-  "/api/homepage-dashboard/route": "app/api/homepage-dashboard/route.js"
+  "/api/projects/route": "app/api/projects/route.js"
 }
