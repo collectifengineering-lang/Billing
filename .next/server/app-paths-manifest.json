@@ -1,5 +1,4 @@
 {
-  "/api/closed-projects/route": "app/api/closed-projects/route.js",
-  "/api/homepage-dashboard/route": "app/api/homepage-dashboard/route.js",
-  "/api/top-projects/route": "app/api/top-projects/route.js"
+  "/api/auth/admin-test/route": "app/api/auth/admin-test/route.js",
+  "/api/homepage-dashboard/route": "app/api/homepage-dashboard/route.js"
 }
