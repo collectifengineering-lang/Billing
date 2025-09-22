@@ -1,4 +1,4 @@
-// File: C:\Users\John\BillingPlatform\Billing\app\api\closed-projects\route.ts
+// File: C:\Users\Jonathan\Desktop\Billing\app\api\closed-projects\route.ts
 import * as entry from '../../../../../app/api/closed-projects/route.js'
 import type { NextRequest } from 'next/server.js'
 

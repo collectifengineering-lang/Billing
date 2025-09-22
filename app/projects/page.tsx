@@ -40,8 +40,6 @@ export default function ProjectsPage() {
       
       if (newClosedProjects) {
         setClosedProjects(newClosedProjects);
-        // Save to localStorage to persist the change
-        localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
         
         // Update the project status in the projects array
         setProjects(prevProjects => 
@@ -100,47 +98,97 @@ export default function ProjectsPage() {
     }
   };
 
-  const loadClosedProjects = () => {
-    const savedClosedProjects = safeLocalStorageGet('closedProjects');
-    if (savedClosedProjects && Array.isArray(savedClosedProjects)) {
-      setClosedProjects(new Set(savedClosedProjects));
+  const loadClosedProjects = async () => {
+    try {
+      const response = await fetch('/api/closed-projects');
+      if (response.ok) {
+        const closedProjectsData = await response.json();
+        if (Array.isArray(closedProjectsData)) {
+          setClosedProjects(new Set(closedProjectsData));
+          console.log('ProjectsPage: Loaded closed projects from database:', closedProjectsData);
+        }
+      } else {
+        console.warn('Failed to fetch closed projects from database, using empty set');
+        setClosedProjects(new Set());
+      }
+    } catch (error) {
+      console.error('Error loading closed projects from database:', error);
+      setClosedProjects(new Set());
     }
   };
 
-  const handleReopenProject = (projectId: string) => {
-    const newClosedProjects = new Set(closedProjects);
-    newClosedProjects.delete(projectId);
-    setClosedProjects(newClosedProjects);
-    safeLocalStorageSet('closedProjects', Array.from(newClosedProjects));
-    
-    // Update the project status in the projects array
-    setProjects(prevProjects => 
-      prevProjects.map(project => 
-        project.projectId === projectId 
-          ? { ...project, status: 'active' }
-          : project
-      )
-    );
-    
-    toast.success('Project reopened successfully');
+  const handleReopenProject = async (projectId: string) => {
+    try {
+      const response = await fetch('/api/closed-projects', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      
+      if (response.ok) {
+        const newClosedProjects = new Set(closedProjects);
+        newClosedProjects.delete(projectId);
+        setClosedProjects(newClosedProjects);
+        
+        // Update the project status in the projects array
+        setProjects(prevProjects => 
+          prevProjects.map(project => 
+            project.projectId === projectId 
+              ? { ...project, status: 'active' }
+              : project
+          )
+        );
+        
+        // Emit custom event for other components to listen to
+        window.dispatchEvent(new CustomEvent('projectStatusChanged', {
+          detail: { projectId, status: 'reopened', closedProjects: newClosedProjects }
+        }));
+        
+        toast.success('Project reopened successfully');
+      } else {
+        throw new Error('Failed to reopen project');
+      }
+    } catch (error) {
+      console.error('Error reopening project:', error);
+      toast.error('Failed to reopen project');
+    }
   };
 
-  const handleCloseProject = (projectId: string) => {
-    const newClosedProjects = new Set(closedProjects);
-    newClosedProjects.add(projectId);
-    setClosedProjects(newClosedProjects);
-    safeLocalStorageSet('closedProjects', Array.from(newClosedProjects));
-    
-    // Update the project status in the projects array
-    setProjects(prevProjects => 
-      prevProjects.map(project => 
-        project.projectId === projectId 
-          ? { ...project, status: 'closed' }
-          : project
-      )
-    );
-    
-    toast.success('Project closed successfully');
+  const handleCloseProject = async (projectId: string) => {
+    try {
+      const response = await fetch('/api/closed-projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      
+      if (response.ok) {
+        const newClosedProjects = new Set(closedProjects);
+        newClosedProjects.add(projectId);
+        setClosedProjects(newClosedProjects);
+        
+        // Update the project status in the projects array
+        setProjects(prevProjects => 
+          prevProjects.map(project => 
+            project.projectId === projectId 
+              ? { ...project, status: 'closed' }
+              : project
+          )
+        );
+        
+        // Emit custom event for other components to listen to
+        window.dispatchEvent(new CustomEvent('projectStatusChanged', {
+          detail: { projectId, status: 'closed', closedProjects: newClosedProjects }
+        }));
+        
+        toast.success('Project closed successfully');
+      } else {
+        throw new Error('Failed to close project');
+      }
+    } catch (error) {
+      console.error('Error closing project:', error);
+      toast.error('Failed to close project');
+    }
   };
 
   // Show all projects (both active and closed) but filter based on status filter

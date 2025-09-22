@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { zohoService } from '@/lib/zoho';
 
+// Force dynamic rendering to avoid build-time API calls
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     console.log('🔍 Starting Zoho Books Financial Data Diagnostic...\n');
@@ -102,9 +105,9 @@ export async function GET(request: NextRequest) {
       results.financialReports.profitAndLoss = {
         status: '❌ Failed',
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error.response ? {
-          status: error.response.status,
-          data: error.response.data
+        details: (error as any).response ? {
+          status: (error as any).response.status,
+          data: (error as any).response.data
         } : undefined
       };
     }
@@ -128,9 +131,9 @@ export async function GET(request: NextRequest) {
       results.financialReports.cashFlow = {
         status: '❌ Failed',
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error.response ? {
-          status: error.response.status,
-          data: error.response.data
+        details: (error as any).response ? {
+          status: (error as any).response.status,
+          data: (error as any).response.data
         } : undefined
       };
     }
@@ -155,9 +158,9 @@ export async function GET(request: NextRequest) {
       results.financialReports.balanceSheet = {
         status: '❌ Failed',
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error.response ? {
-          status: error.response.status,
-          data: error.response.data
+        details: (error as any).response ? {
+          status: (error as any).response.status,
+          data: (error as any).response.data
         } : undefined
       };
     }
@@ -177,9 +180,9 @@ export async function GET(request: NextRequest) {
       results.financialReports.comprehensiveMetrics = {
         status: '❌ Failed',
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error.response ? {
-          status: error.response.status,
-          data: error.response.data
+        details: (error as any).response ? {
+          status: (error as any).response.status,
+          data: (error as any).response.data
         } : undefined
       };
     }
@@ -200,9 +203,9 @@ export async function GET(request: NextRequest) {
       results.financialReports.broaderDateRange = {
         status: '❌ Failed',
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error.response ? {
-          status: error.response.status,
-          data: error.response.data
+        details: (error as any).response ? {
+          status: (error as any).response.status,
+          data: (error as any).response.data
         } : undefined
       };
     }
@@ -306,7 +309,7 @@ export async function GET(request: NextRequest) {
     // 9. Test organization access and check for transaction data
     console.log('🏢 Testing Organization Access and Transaction Data:');
     try {
-      const token = await zohoService.getAccessToken();
+      const token = await (zohoService as any).getAccessToken();
       if (token) {
         // Test organizations endpoint directly
         const axios = await import('axios');

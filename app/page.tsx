@@ -146,11 +146,12 @@ export default function HomePage() {
           console.log('Database setup error, continuing with existing schema:', setupError);
         }
         
-        const [dashboardResponse, topProjectsResponse, bottomProjectsResponse, projectsResponse] = await Promise.all([
+        const [dashboardResponse, topProjectsResponse, bottomProjectsResponse, projectsResponse, closedProjectsResponse] = await Promise.all([
           fetch('/api/homepage-dashboard'),
           fetch('/api/top-projects'),
           fetch('/api/bottom-projects'),
-          fetch('/api/projects')
+          fetch('/api/projects'),
+          fetch('/api/closed-projects')
         ]);
 
         if (!dashboardResponse.ok) {
@@ -173,6 +174,7 @@ export default function HomePage() {
         const topProjectsData = await topProjectsResponse.json();
         const bottomProjectsData = await bottomProjectsResponse.json();
         const projectsData = await projectsResponse.json();
+        const closedProjectsData = closedProjectsResponse.ok ? await closedProjectsResponse.json() : [];
 
         // Validate and set dashboard stats
         if (dashboardData && typeof dashboardData === 'object') {
@@ -200,6 +202,15 @@ export default function HomePage() {
         } else {
           console.warn('Invalid bottomProjects data received, setting empty array:', bottomProjectsData);
           setBottomProjects([]);
+        }
+
+        // Set closed projects from database
+        if (Array.isArray(closedProjectsData)) {
+          setClosedProjects(new Set(closedProjectsData));
+          console.log('Loaded closed projects from database:', closedProjectsData);
+        } else {
+          console.warn('Invalid closed projects data received, using empty set');
+          setClosedProjects(new Set());
         }
         
         // Transform Zoho projects to billing data format
@@ -234,17 +245,6 @@ export default function HomePage() {
 
     fetchDashboardData();
     
-    // Load closed projects from localStorage
-    const savedClosedProjects = localStorage.getItem('closedProjects');
-    if (savedClosedProjects) {
-      try {
-        const closedProjectsArray = JSON.parse(savedClosedProjects);
-        setClosedProjects(new Set(closedProjectsArray));
-      } catch (error) {
-        console.error('Error parsing closed projects from localStorage:', error);
-      }
-    }
-    
     // Listen for project status changes from other components
     const handleProjectStatusChange = (event: CustomEvent) => {
       const { projectId, status, closedProjects: newClosedProjects } = event.detail;
@@ -252,8 +252,6 @@ export default function HomePage() {
       
       if (newClosedProjects) {
         setClosedProjects(newClosedProjects);
-        // Save to localStorage to persist the change
-        localStorage.setItem('closedProjects', JSON.stringify(Array.from(newClosedProjects)));
       }
     };
 

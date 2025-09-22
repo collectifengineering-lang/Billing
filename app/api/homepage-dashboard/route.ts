@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { zohoService } from '@/lib/zoho';
 import clockifyService from '@/lib/clockify';
 
-// Force dynamic rendering to prevent static generation errors
+// Force dynamic rendering to avoid build-time API calls
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {

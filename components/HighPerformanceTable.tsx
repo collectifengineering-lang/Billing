@@ -266,7 +266,24 @@ export default function HighPerformanceTable({
     };
   }, [openDropdown, dropdownAnchor, openMenuCell, menuAnchor, editingCommentCell]);
 
-  // Cross-tab synchronization removed - now using SWR for real-time sync
+  // Listen for project status changes from other components
+  useEffect(() => {
+    const handleProjectStatusChange = (event: CustomEvent) => {
+      const { projectId, status, closedProjects: newClosedProjects } = event.detail;
+      console.log('HighPerformanceTable: Received project status change:', { projectId, status, newClosedProjects });
+      
+      if (newClosedProjects) {
+        setClosedProjects(newClosedProjects);
+        onClosedProjectsChange?.(newClosedProjects);
+      }
+    };
+
+    window.addEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+    };
+  }, [onClosedProjectsChange]);
 
   // Vertical scroll synchronization
   useEffect(() => {
@@ -648,25 +665,29 @@ export default function HighPerformanceTable({
 
   const handleProjectClose = useCallback(async (projectId: string) => {
     try {
-      await fetch('/api/closed-projects', {
+      const response = await fetch('/api/closed-projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId }),
       });
       
-      const updatedClosedProjects = new Set(closedProjects);
-      updatedClosedProjects.add(projectId);
-      setClosedProjects(updatedClosedProjects);
-      onClosedProjectsChange?.(updatedClosedProjects);
-      mutateClosedProjects();
-      setOpenDropdown(null);
-      
-      // Emit custom event for other components to listen to
-      window.dispatchEvent(new CustomEvent('projectStatusChanged', {
-        detail: { projectId, status: 'closed', closedProjects: updatedClosedProjects }
-      }));
-      
-      toast.success('Project closed');
+      if (response.ok) {
+        const updatedClosedProjects = new Set(closedProjects);
+        updatedClosedProjects.add(projectId);
+        setClosedProjects(updatedClosedProjects);
+        onClosedProjectsChange?.(updatedClosedProjects);
+        mutateClosedProjects();
+        setOpenDropdown(null);
+        
+        // Emit custom event for other components to listen to
+        window.dispatchEvent(new CustomEvent('projectStatusChanged', {
+          detail: { projectId, status: 'closed', closedProjects: updatedClosedProjects }
+        }));
+        
+        toast.success('Project closed');
+      } else {
+        throw new Error('Failed to close project');
+      }
     } catch (error) {
       console.error('Error closing project:', error);
       toast.error('Failed to close project');
@@ -675,24 +696,28 @@ export default function HighPerformanceTable({
 
   const handleProjectReopen = useCallback(async (projectId: string) => {
     try {
-      await fetch('/api/closed-projects', {
+      const response = await fetch('/api/closed-projects', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId }),
       });
       
-      const updatedClosedProjects = new Set(closedProjects);
-      updatedClosedProjects.delete(projectId);
-      setClosedProjects(updatedClosedProjects);
-      onClosedProjectsChange?.(updatedClosedProjects);
-      mutateClosedProjects();
-      
-      // Emit custom event for other components to listen to
-      window.dispatchEvent(new CustomEvent('projectStatusChanged', {
-        detail: { projectId, status: 'reopened', closedProjects: updatedClosedProjects }
-      }));
-      
-      toast.success('Project reopened');
+      if (response.ok) {
+        const updatedClosedProjects = new Set(closedProjects);
+        updatedClosedProjects.delete(projectId);
+        setClosedProjects(updatedClosedProjects);
+        onClosedProjectsChange?.(updatedClosedProjects);
+        mutateClosedProjects();
+        
+        // Emit custom event for other components to listen to
+        window.dispatchEvent(new CustomEvent('projectStatusChanged', {
+          detail: { projectId, status: 'reopened', closedProjects: updatedClosedProjects }
+        }));
+        
+        toast.success('Project reopened');
+      } else {
+        throw new Error('Failed to reopen project');
+      }
     } catch (error) {
       console.error('Error reopening project:', error);
       toast.error('Failed to reopen project');
