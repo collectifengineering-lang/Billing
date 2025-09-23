@@ -104,7 +104,7 @@ export default function HighPerformanceTable({
   const { data: monthlyProjectionsData, mutate: mutateMonthlyProjections } = useSWR('/api/projections', fetcher, swrConfig);
   const { data: monthlyStatusesData, mutate: mutateMonthlyStatuses } = useSWR('/api/statuses', fetcher, swrConfig);
   const { data: monthlyCommentsData, mutate: mutateMonthlyComments } = useSWR('/api/comments', fetcher, swrConfig);
-  const { data: closedProjectsData, mutate: mutateClosedProjects } = useSWR('/api/closed-projects', fetcher, swrConfig);
+  // Removed closed projects SWR dependency - now using localStorage
   const { data: projectAssignmentsData, mutate: mutateProjectAssignments } = useSWR('/api/project-assignments', fetcher, swrConfig);
   const { data: projectManagersData, mutate: mutateProjectManagers } = useSWR('/api/project-managers', fetcher, swrConfig);
 
@@ -172,13 +172,26 @@ export default function HighPerformanceTable({
     }
   }, [monthlyCommentsData]);
 
+  // Load closed projects from database on component mount
   useEffect(() => {
-    if (closedProjectsData && Array.isArray(closedProjectsData)) {
-      const newClosedProjects = new Set(closedProjectsData);
-      setClosedProjects(newClosedProjects);
-      onClosedProjectsChange?.(newClosedProjects);
-    }
-  }, [closedProjectsData, onClosedProjectsChange]);
+    const loadClosedProjects = async () => {
+      try {
+        const response = await fetch('/api/closed-projects');
+        if (response.ok) {
+          const closedProjectsData = await response.json();
+          if (Array.isArray(closedProjectsData)) {
+            const newClosedProjects = new Set(closedProjectsData);
+            setClosedProjects(newClosedProjects);
+            onClosedProjectsChange?.(newClosedProjects);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to load closed projects from database:', error);
+      }
+    };
+    
+    loadClosedProjects();
+  }, [onClosedProjectsChange]);
 
   useEffect(() => {
     if (projectAssignmentsData && typeof projectAssignmentsData === 'object') {
@@ -676,7 +689,7 @@ export default function HighPerformanceTable({
         updatedClosedProjects.add(projectId);
         setClosedProjects(updatedClosedProjects);
         onClosedProjectsChange?.(updatedClosedProjects);
-        mutateClosedProjects();
+        
         setOpenDropdown(null);
         
         // Emit custom event for other components to listen to
@@ -692,7 +705,7 @@ export default function HighPerformanceTable({
       console.error('Error closing project:', error);
       toast.error('Failed to close project');
     }
-  }, [closedProjects, onClosedProjectsChange, mutateClosedProjects]);
+  }, [closedProjects, onClosedProjectsChange]);
 
   const handleProjectReopen = useCallback(async (projectId: string) => {
     try {
@@ -707,7 +720,6 @@ export default function HighPerformanceTable({
         updatedClosedProjects.delete(projectId);
         setClosedProjects(updatedClosedProjects);
         onClosedProjectsChange?.(updatedClosedProjects);
-        mutateClosedProjects();
         
         // Emit custom event for other components to listen to
         window.dispatchEvent(new CustomEvent('projectStatusChanged', {
@@ -722,7 +734,7 @@ export default function HighPerformanceTable({
       console.error('Error reopening project:', error);
       toast.error('Failed to reopen project');
     }
-  }, [closedProjects, onClosedProjectsChange, mutateClosedProjects]);
+  }, [closedProjects, onClosedProjectsChange]);
 
   const handleStatusSelect = async (status: string) => {
     if (!openMenuCell) return;
@@ -851,15 +863,8 @@ export default function HighPerformanceTable({
     return sortState.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
 
-  // Use SWR data for closed projects (database only)
-  const closedProjectsSet = useMemo(() => {
-    if (closedProjectsData && Array.isArray(closedProjectsData)) {
-      return new Set(closedProjectsData);
-    }
-    return new Set<string>();
-  }, [closedProjectsData]);
-
-  const activeProjects = sortProjects(safeBillingData.filter(project => !closedProjectsSet.has(project.projectId)));
+  // Use local closed projects state for filtering
+  const activeProjects = sortProjects(safeBillingData.filter(project => !closedProjects.has(project.projectId)));
 
   // Filter projects by project name
   const filteredProjects = useMemo(() => {

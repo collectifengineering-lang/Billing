@@ -146,12 +146,11 @@ export default function HomePage() {
           console.log('Database setup error, continuing with existing schema:', setupError);
         }
         
-        const [dashboardResponse, topProjectsResponse, bottomProjectsResponse, projectsResponse, closedProjectsResponse] = await Promise.all([
+        const [dashboardResponse, topProjectsResponse, bottomProjectsResponse, projectsResponse] = await Promise.all([
           fetch('/api/homepage-dashboard'),
           fetch('/api/top-projects'),
           fetch('/api/bottom-projects'),
-          fetch('/api/projects'),
-          fetch('/api/closed-projects')
+          fetch('/api/projects')
         ]);
 
         if (!dashboardResponse.ok) {
@@ -174,7 +173,20 @@ export default function HomePage() {
         const topProjectsData = await topProjectsResponse.json();
         const bottomProjectsData = await bottomProjectsResponse.json();
         const projectsData = await projectsResponse.json();
-        const closedProjectsData = closedProjectsResponse.ok ? await closedProjectsResponse.json() : [];
+        // Load closed projects from database
+        let closedProjectsData = [];
+        try {
+          const closedProjectsResponse = await fetch('/api/closed-projects');
+          if (closedProjectsResponse.ok) {
+            closedProjectsData = await closedProjectsResponse.json();
+          } else {
+            console.warn('Failed to fetch closed projects from database, using empty array');
+            closedProjectsData = [];
+          }
+        } catch (error) {
+          console.warn('Error fetching closed projects from database:', error);
+          closedProjectsData = [];
+        }
 
         // Validate and set dashboard stats
         if (dashboardData && typeof dashboardData === 'object') {

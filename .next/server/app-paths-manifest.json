@@ -1,4 +1,4 @@
 {
-  "/api/auth/admin-test/route": "app/api/auth/admin-test/route.js",
+  "/api/closed-projects/route": "app/api/closed-projects/route.js",
   "/api/homepage-dashboard/route": "app/api/homepage-dashboard/route.js"
 }
