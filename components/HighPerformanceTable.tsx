@@ -205,7 +205,7 @@ export default function HighPerformanceTable({
     }
   }, [projectManagersData]);
 
-  // Debug component lifecycle
+  // Debug component lifecycle and cleanup
   useEffect(() => {
     return () => {
       // Cleanup dropdowns on unmount
@@ -215,6 +215,11 @@ export default function HighPerformanceTable({
       setMenuAnchor(null);
       setEditingCommentCell(null);
       setCommentAnchor(null);
+      
+      // Remove all event listeners
+      window.removeEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 

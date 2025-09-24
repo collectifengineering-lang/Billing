@@ -295,26 +295,26 @@ export default function HomePage() {
     if (!Array.isArray(topProjects) || !projectId) return;
     const project = topProjects.find(p => p.id === projectId || p.projectId === projectId);
     if (project) {
-      // Transform the project data to match what the modal expects
-      const transformedProject = {
+      // Transform the project data to match what the modal expects with safe fallbacks
+      const transformedProject: ProjectDetails = {
         id: project.id || project.projectId || projectId,
         name: project.name || project.projectName || 'Unknown Project',
-        customer: project.customer || 'Unknown Customer',
-        status: project.status || 'active',
+        customer: project.customer || project.customerName || 'Unknown Customer',
+        status: (project.status as 'active' | 'completed' | 'on-hold') || 'active',
         startDate: project.startDate || new Date().toISOString(),
-        endDate: project.endDate,
-        budget: project.budget || 0,
-        billed: project.billed || 0,
-        hours: project.hours || project.totalHours || 0,
-        efficiency: project.efficiency || 0,
-        revenue: project.revenue || 0,
-        profitMargin: project.profitMargin || 0,
-        multiplier: project.multiplier || 0,
-        estimatedCost: project.estimatedCost || 0,
+        endDate: project.endDate || undefined,
+        budget: Number(project.budget) || 0,
+        billed: Number(project.billed) || 0,
+        hours: Number(project.hours || project.totalHours) || 0,
+        efficiency: Number(project.efficiency) || 0,
+        revenue: Number(project.revenue) || 0,
+        profitMargin: Number(project.profitMargin) || 0,
+        multiplier: Number(project.multiplier) || 0,
+        estimatedCost: Number(project.estimatedCost) || 0,
         projectId: project.projectId || project.id,
-        totalHours: project.totalHours || 0,
-        billableHours: project.billableHours || 0,
-        entryCount: project.entryCount || 0
+        totalHours: Number(project.totalHours) || 0,
+        billableHours: Number(project.billableHours) || 0,
+        entryCount: Number(project.entryCount) || 0
       };
       setSelectedProject(transformedProject);
       setIsModalOpen(true);

@@ -14,7 +14,7 @@ export async function GET() {
     if (!schemaExists) {
       // Tables don't exist yet, return empty data
       console.log('Tables do not exist yet, returning empty closed projects');
-      return NextResponse.json({});
+      return NextResponse.json([]);
     }
     
     const closedProjects = await prisma.closedProject.findMany();
@@ -27,10 +27,19 @@ export async function GET() {
     // If it's a table doesn't exist error, return empty data
     if (error instanceof Error && (error.message?.includes('does not exist') || 'code' in error && (error as any).code === 'P2021')) {
       console.log('Tables do not exist, returning empty closed projects');
-      return NextResponse.json({});
+      return NextResponse.json([]);
     }
     
-    return NextResponse.json({ error: 'Failed to fetch closed projects' }, { status: 500 });
+    // If it's a connection error, return empty data
+    if (error instanceof Error && (error.message?.includes('ENOTFOUND') || error.message?.includes('ECONNREFUSED'))) {
+      console.error('Database connection failed, returning empty closed projects');
+      return NextResponse.json([]);
+    }
+    
+    return NextResponse.json({ 
+      error: 'Failed to fetch closed projects',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 

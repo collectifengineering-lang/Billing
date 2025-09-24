@@ -794,12 +794,22 @@ class ClockifyService {
 
   // Helper method to parse ISO 8601 duration to hours
   private parseDuration(duration: string): number {
-    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-    if (!match) return 0;
+    if (!duration || duration === 'PT0H0M' || duration === 'PT0H') return 0;
+    
+    // Enhanced regex to handle more duration formats
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+    if (!match) {
+      // Fallback: try to parse as simple number (seconds)
+      const numDuration = parseFloat(duration);
+      if (!isNaN(numDuration)) {
+        return numDuration / 3600; // Convert seconds to hours
+      }
+      return 0;
+    }
     
     const hours = parseInt(match[1] || '0');
     const minutes = parseInt(match[2] || '0');
-    const seconds = parseInt(match[3] || '0');
+    const seconds = parseFloat(match[3] || '0');
     
     return hours + (minutes / 60) + (seconds / 3600);
   }

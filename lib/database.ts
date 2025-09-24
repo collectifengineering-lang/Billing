@@ -2,19 +2,28 @@ import prisma from './db';
 
 export async function ensureDatabaseSchema() {
   try {
+    // First, test the database connection
+    await prisma.$connect();
+    console.log('Database connection successful');
+    
     // Check if tables already exist by trying to query them
     await prisma.projection.findFirst();
     console.log('Database schema already exists');
     return true; // Tables exist
   } catch (error: any) {
-    console.log('Tables do not exist, attempting to create schema...');
+    console.error('Database connection or schema check failed:', error);
+    
+    // Check for specific database connection errors
+    if (error.message?.includes('ENOTFOUND') || error.message?.includes('ECONNREFUSED')) {
+      console.error('❌ Database connection failed - check your DATABASE_URL');
+      console.error('   Current DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
+      return false;
+    }
     
     // If it's a table doesn't exist error, we need to create the schema
     if (error.code === 'P2021' || error.message?.includes('does not exist')) {
       try {
-        // Try to create the schema by running a simple operation
-        // This will trigger Prisma to create the tables if using Prisma Accelerate
-        console.log('Attempting to create database schema...');
+        console.log('Tables do not exist, attempting to create schema...');
         
         // Try to create a test record to trigger table creation
         await prisma.projection.create({
@@ -44,6 +53,8 @@ export async function ensureDatabaseSchema() {
     console.log('Tables do not exist, but Prisma Accelerate will create them automatically');
     console.log('Note: With Prisma Accelerate, tables are created automatically when you first insert data');
     return false; // Tables don't exist yet
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
