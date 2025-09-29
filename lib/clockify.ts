@@ -584,45 +584,69 @@ class ClockifyService {
     return [];
   }
 
-  // Fallback method to get time entries via user endpoint (GET method)
+  // Fallback method to get time entries via user endpoint (GET method) - for ALL users
   private async getTimeEntriesViaUserEndpoint(startDate: string, endDate: string): Promise<any[]> {
     try {
-      // Get the current user first
-      const user = await this.getUser();
-      if (!user?.id) {
-        throw new Error('Could not get current user for time entries');
+      // Get all users in the workspace first
+      if (!this.workspaceId) {
+        throw new Error('Workspace ID not configured');
       }
-
-      // Use GET method with query parameters - this is the correct way to fetch time entries
-      const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/user/${user.id}/time-entries`);
-      url.searchParams.set('start', startDate);
-      url.searchParams.set('end', endDate);
       
-      console.info(`🔍 Clockify User Time Entries API Request (Fallback): ${url.toString()}`);
-      console.info(`   Method: GET (User Time Entries - Fallback from Reports API)`);
-      console.info(`   Headers: ${JSON.stringify(this.getHeaders())}`);
-      console.info(`   Note: Using fallback method because Reports API failed or requires Pro plan`);
-
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: this.getHeaders(),
-      });
-
-      console.info(`📡 Clockify User Time Entries API Response: ${response.status} ${response.statusText}`);
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`Clockify User Time Entries API error response body: ${errorText}`);
-        throw new Error(`Clockify User Time Entries API error: ${response.status} ${response.statusText} - ${errorText}`);
+      const users = await this.getUsers(this.workspaceId);
+      if (!users || users.length === 0) {
+        throw new Error('Could not get users for time entries');
       }
 
-      const data = await response.json();
-      console.info(`✅ Clockify User Time Entries API Success (Fallback): /workspaces/${this.workspaceId}/user/${user.id}/time-entries`);
-      console.info(`   Retrieved ${data?.length || 0} time entries via fallback method`);
+      console.info(`🔍 Fetching time entries for ${users.length} users in workspace ${this.workspaceId}`);
+      
+      // Fetch time entries for all users
+      const allTimeEntries: any[] = [];
+      
+      for (const user of users) {
+        try {
+          const url = new URL(`${this.baseUrl}/workspaces/${this.workspaceId}/user/${user.id}/time-entries`);
+          url.searchParams.set('start', startDate);
+          url.searchParams.set('end', endDate);
+          
+          console.info(`🔍 Clockify User Time Entries API Request for user ${user.name}: ${url.toString()}`);
+
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: this.getHeaders(),
+          });
+
+          if (response.ok) {
+            const userTimeEntries = await response.json();
+            console.info(`✅ Retrieved ${userTimeEntries?.length || 0} time entries for user ${user.name}`);
+            
+            // Add user information to each time entry
+            const enrichedEntries = userTimeEntries.map((entry: any) => ({
+              ...entry,
+              userId: user.id,
+              userName: user.name,
+              userEmail: user.email
+            }));
+            
+            allTimeEntries.push(...enrichedEntries);
+          } else {
+            console.warn(`⚠️ Failed to get time entries for user ${user.name}: ${response.status} ${response.statusText}`);
+          }
+        } catch (userError) {
+          console.warn(`⚠️ Error fetching time entries for user ${user.name}:`, userError);
+        }
+      }
+
+      console.info(`✅ Clockify User Time Entries API Success (Fallback): Retrieved ${allTimeEntries.length} total time entries from ${users.length} users`);
+      
+      // Return empty array if no time entries found
+      if (allTimeEntries.length === 0) {
+        console.warn('⚠️ No time entries found for any users in the workspace');
+        return [];
+      }
       
       // Transform the data to match our expected format
-      if (Array.isArray(data)) {
-        return data.map((entry: any, index: number) => {
+      if (Array.isArray(allTimeEntries)) {
+        return allTimeEntries.map((entry: any, index: number) => {
           try {
             // Handle duration conversion - User API might also return duration as number
             let duration = 'PT0H0M';

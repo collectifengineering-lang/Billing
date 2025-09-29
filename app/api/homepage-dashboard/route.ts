@@ -189,6 +189,13 @@ export async function GET(request: NextRequest) {
           timeEntriesCount: timeEntries?.length || 0
         });
 
+        // Log unique users in time entries to verify we're getting data from multiple users
+        const uniqueUsers = new Set(timeEntries.map(entry => entry.userId || entry.userName).filter(Boolean));
+        console.log('👥 Unique users in time entries:', {
+          count: uniqueUsers.size,
+          users: Array.from(uniqueUsers)
+        });
+
         // Calculate time tracking metrics
         const totalHours = timeEntries.reduce((sum, entry) => {
           const duration = entry.timeInterval?.duration || 'PT0H';
