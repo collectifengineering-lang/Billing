@@ -716,16 +716,37 @@ class ZohoService {
       console.log('📄 Fetching invoices from Zoho...');
       const data = await this.makeRequest('invoices');
       
-      const invoices = data.invoices?.map((invoice: any) => ({
-        invoice_id: invoice.invoice_id,
-        project_id: invoice.project_id,
-        invoice_number: invoice.invoice_number,
-        date: invoice.date,
-        amount: invoice.total,
-        status: invoice.status,
-        billed_amount: invoice.billed_amount || 0,
-        unbilled_amount: invoice.unbilled_amount || 0,
-      })) || [];
+      const invoices = data.invoices?.map((invoice: any) => {
+        const total = invoice.total || 0;
+        const status = invoice.status || 'unknown';
+        
+        // Calculate billed/unbilled amounts based on status
+        let billed_amount = 0;
+        let unbilled_amount = 0;
+        
+        if (status === 'paid') {
+          billed_amount = total;
+          unbilled_amount = 0;
+        } else if (status === 'sent' || status === 'viewed' || status === 'draft') {
+          billed_amount = 0;
+          unbilled_amount = total;
+        } else {
+          // For other statuses, assume it's unbilled
+          billed_amount = 0;
+          unbilled_amount = total;
+        }
+        
+        return {
+          invoice_id: invoice.invoice_id,
+          project_id: invoice.project_id,
+          invoice_number: invoice.invoice_number,
+          date: invoice.date,
+          amount: total,
+          status: status,
+          billed_amount: billed_amount,
+          unbilled_amount: unbilled_amount,
+        };
+      }) || [];
       
       // Log invoice counts and details
       console.log(`📊 Zoho invoices fetched: ${invoices.length} total invoices`);
@@ -738,6 +759,16 @@ class ZohoService {
         
         console.log('📋 Invoice status breakdown:', statusCounts);
         
+        // Calculate total billed and unbilled amounts
+        const totalBilled = invoices.reduce((sum: number, inv: ZohoInvoice) => sum + inv.billed_amount, 0);
+        const totalUnbilled = invoices.reduce((sum: number, inv: ZohoInvoice) => sum + inv.unbilled_amount, 0);
+        
+        console.log('💰 Invoice amount breakdown:', {
+          totalBilled: totalBilled,
+          totalUnbilled: totalUnbilled,
+          totalAmount: totalBilled + totalUnbilled
+        });
+        
         // Log sample invoice data for debugging
         const sampleInvoice = invoices[0];
         console.log('📄 Sample invoice data:', {
@@ -745,7 +776,9 @@ class ZohoService {
           number: sampleInvoice.invoice_number,
           project: sampleInvoice.project_id,
           amount: sampleInvoice.amount,
-          status: sampleInvoice.status
+          status: sampleInvoice.status,
+          billed_amount: sampleInvoice.billed_amount,
+          unbilled_amount: sampleInvoice.unbilled_amount
         });
       }
       
@@ -956,12 +989,46 @@ class ZohoService {
       }
 
       // Extract financial metrics from the responses with fallbacks
-      const revenue = plData.status === 'fulfilled' ? (plData.value?.revenue?.total || 0) : 0;
-      const expenses = plData.status === 'fulfilled' ? (plData.value?.expenses?.total || 0) : 0;
-      const grossProfit = revenue - expenses;
+      // Zoho P&L structure may vary, so we'll try multiple possible paths
+      let revenue = 0;
+      let expenses = 0;
+      let operatingExpenses = 0;
       
-      // Calculate net profit (may need adjustment based on actual Zoho response structure)
-      const operatingExpenses = plData.status === 'fulfilled' ? (plData.value?.operating_expenses?.total || 0) : 0;
+      if (plData.status === 'fulfilled' && plData.value) {
+        const plDataValue = plData.value;
+        
+        // Try different possible structures for revenue
+        revenue = plDataValue.revenue?.total || 
+                 plDataValue.revenue || 
+                 plDataValue.income?.total || 
+                 plDataValue.income || 
+                 plDataValue.sales?.total || 
+                 plDataValue.sales || 0;
+        
+        // Try different possible structures for expenses
+        expenses = plDataValue.expenses?.total || 
+                  plDataValue.expenses || 
+                  plDataValue.cost_of_goods_sold?.total || 
+                  plDataValue.cost_of_goods_sold || 0;
+        
+        // Try different possible structures for operating expenses
+        operatingExpenses = plDataValue.operating_expenses?.total || 
+                           plDataValue.operating_expenses || 
+                           plDataValue.admin_expenses?.total || 
+                           plDataValue.admin_expenses || 0;
+        
+        console.log('📊 P&L data structure analysis:', {
+          hasRevenue: !!plDataValue.revenue,
+          hasExpenses: !!plDataValue.expenses,
+          hasOperatingExpenses: !!plDataValue.operating_expenses,
+          revenueValue: revenue,
+          expensesValue: expenses,
+          operatingExpensesValue: operatingExpenses,
+          allKeys: Object.keys(plDataValue)
+        });
+      }
+      
+      const grossProfit = revenue - expenses;
       const netProfit = grossProfit - operatingExpenses;
       const operatingIncome = grossProfit - operatingExpenses;
       
