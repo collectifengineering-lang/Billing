@@ -1,4 +1,4 @@
-const { zohoService } = require('../lib/zoho');
+const { zohoService } = require('../lib/zoho.ts');
 
 async function testZohoFinancialMetrics() {
   console.log('🔍 Testing Zoho Financial Metrics API...');
