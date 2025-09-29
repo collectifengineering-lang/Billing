@@ -31,7 +31,7 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     fetchProjectsData();
-    loadClosedProjects();
+    loadProjectStatuses();
     
     // Listen for project status changes from other components
     const handleProjectStatusChange = (event: CustomEvent) => {
@@ -98,31 +98,35 @@ export default function ProjectsPage() {
     }
   };
 
-  const loadClosedProjects = async () => {
+  const loadProjectStatuses = async () => {
     try {
-      const response = await fetch('/api/closed-projects');
+      const response = await fetch('/api/project-statuses');
       if (response.ok) {
-        const closedProjectsData = await response.json();
-        if (Array.isArray(closedProjectsData)) {
-          setClosedProjects(new Set(closedProjectsData));
-          console.log('ProjectsPage: Loaded closed projects from database:', closedProjectsData);
+        const projectStatuses = await response.json();
+        if (typeof projectStatuses === 'object' && projectStatuses !== null) {
+          const closedProjectIds = Object.entries(projectStatuses)
+            .filter(([_, status]) => status === 'closed')
+            .map(([projectId, _]) => projectId);
+          
+          setClosedProjects(new Set(closedProjectIds));
+          console.log('ProjectsPage: Loaded project statuses from database:', projectStatuses);
         }
       } else {
-        console.warn('Failed to fetch closed projects from database, using empty set');
+        console.warn('Failed to fetch project statuses from database, using empty set');
         setClosedProjects(new Set());
       }
     } catch (error) {
-      console.error('Error loading closed projects from database:', error);
+      console.error('Error loading project statuses from database:', error);
       setClosedProjects(new Set());
     }
   };
 
   const handleReopenProject = async (projectId: string) => {
     try {
-      const response = await fetch('/api/closed-projects', {
-        method: 'DELETE',
+      const response = await fetch('/api/project-status', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, status: 'active' }),
       });
       
       if (response.ok) {
@@ -156,10 +160,10 @@ export default function ProjectsPage() {
 
   const handleCloseProject = async (projectId: string) => {
     try {
-      const response = await fetch('/api/closed-projects', {
+      const response = await fetch('/api/project-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, status: 'closed' }),
       });
       
       if (response.ok) {

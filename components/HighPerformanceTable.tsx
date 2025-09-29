@@ -107,6 +107,7 @@ export default function HighPerformanceTable({
   // Removed closed projects SWR dependency - now using localStorage
   const { data: projectAssignmentsData, mutate: mutateProjectAssignments } = useSWR('/api/project-assignments', fetcher, swrConfig);
   const { data: projectManagersData, mutate: mutateProjectManagers } = useSWR('/api/project-managers', fetcher, swrConfig);
+  const { data: projectStatusesData, mutate: mutateProjectStatuses } = useSWR('/api/project-statuses', fetcher, swrConfig);
 
   // User-entered data persistence (only for immediate UI updates, always sync with SWR)
   const [signedFees, setSignedFees] = useState<Record<string, number>>({});
@@ -172,26 +173,18 @@ export default function HighPerformanceTable({
     }
   }, [monthlyCommentsData]);
 
-  // Load closed projects from database on component mount
+  // Load project statuses from database and update closed projects
   useEffect(() => {
-    const loadClosedProjects = async () => {
-      try {
-        const response = await fetch('/api/closed-projects');
-        if (response.ok) {
-          const closedProjectsData = await response.json();
-          if (Array.isArray(closedProjectsData)) {
-            const newClosedProjects = new Set(closedProjectsData);
-            setClosedProjects(newClosedProjects);
-            onClosedProjectsChange?.(newClosedProjects);
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to load closed projects from database:', error);
-      }
-    };
-    
-    loadClosedProjects();
-  }, [onClosedProjectsChange]);
+    if (projectStatusesData && typeof projectStatusesData === 'object') {
+      const closedProjectIds = Object.entries(projectStatusesData)
+        .filter(([_, status]) => status === 'closed')
+        .map(([projectId, _]) => projectId);
+      
+      const newClosedProjects = new Set(closedProjectIds);
+      setClosedProjects(newClosedProjects);
+      onClosedProjectsChange?.(newClosedProjects);
+    }
+  }, [projectStatusesData, onClosedProjectsChange]);
 
   useEffect(() => {
     if (projectAssignmentsData && typeof projectAssignmentsData === 'object') {
@@ -683,10 +676,10 @@ export default function HighPerformanceTable({
 
   const handleProjectClose = useCallback(async (projectId: string) => {
     try {
-      const response = await fetch('/api/closed-projects', {
+      const response = await fetch('/api/project-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, status: 'closed' }),
       });
       
       if (response.ok) {
@@ -694,6 +687,9 @@ export default function HighPerformanceTable({
         updatedClosedProjects.add(projectId);
         setClosedProjects(updatedClosedProjects);
         onClosedProjectsChange?.(updatedClosedProjects);
+        
+        // Refresh project statuses
+        mutateProjectStatuses();
         
         setOpenDropdown(null);
         
@@ -710,14 +706,14 @@ export default function HighPerformanceTable({
       console.error('Error closing project:', error);
       toast.error('Failed to close project');
     }
-  }, [closedProjects, onClosedProjectsChange]);
+  }, [closedProjects, onClosedProjectsChange, mutateProjectStatuses]);
 
   const handleProjectReopen = useCallback(async (projectId: string) => {
     try {
-      const response = await fetch('/api/closed-projects', {
-        method: 'DELETE',
+      const response = await fetch('/api/project-status', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, status: 'active' }),
       });
       
       if (response.ok) {
@@ -725,6 +721,9 @@ export default function HighPerformanceTable({
         updatedClosedProjects.delete(projectId);
         setClosedProjects(updatedClosedProjects);
         onClosedProjectsChange?.(updatedClosedProjects);
+        
+        // Refresh project statuses
+        mutateProjectStatuses();
         
         // Emit custom event for other components to listen to
         window.dispatchEvent(new CustomEvent('projectStatusChanged', {
@@ -739,7 +738,7 @@ export default function HighPerformanceTable({
       console.error('Error reopening project:', error);
       toast.error('Failed to reopen project');
     }
-  }, [closedProjects, onClosedProjectsChange]);
+  }, [closedProjects, onClosedProjectsChange, mutateProjectStatuses]);
 
   const handleStatusSelect = async (status: string) => {
     if (!openMenuCell) return;
@@ -868,8 +867,11 @@ export default function HighPerformanceTable({
     return sortState.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
 
-  // Use local closed projects state for filtering
+  // Use local closed projects state for filtering - hide closed projects from table display
   const activeProjects = sortProjects(safeBillingData.filter(project => !closedProjects.has(project.projectId)));
+  
+  // Keep all projects (including closed) for financial calculations
+  const allProjects = sortProjects(safeBillingData);
 
   // Filter projects by project name
   const filteredProjects = useMemo(() => {
@@ -1230,7 +1232,7 @@ export default function HighPerformanceTable({
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
-                {formatCurrency(safeBillingData.reduce((sum, project) => {
+                {formatCurrency(allProjects.reduce((sum, project) => {
                   const userSignedFee = signedFees[project.projectId];
                   const apiSignedFee = signedFeesData?.[project.projectId];
                   const finalSignedFee = userSignedFee !== undefined ? userSignedFee : 
@@ -1241,17 +1243,17 @@ export default function HighPerformanceTable({
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
-                {formatCurrency(safeBillingData.reduce((sum, project) => sum + getAsrFee(project.projectId), 0))}
+                {formatCurrency(allProjects.reduce((sum, project) => sum + getAsrFee(project.projectId), 0))}
               </div>
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
-                {formatCurrency(safeBillingData.reduce((sum, project) => sum + getTotalFee(project), 0))}
+                {formatCurrency(allProjects.reduce((sum, project) => sum + getTotalFee(project), 0))}
               </div>
             </div>
             <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
               <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
-                {formatCurrency(safeBillingData.reduce((sum, project) => sum + getTotalProjected(project.projectId), 0))}
+                {formatCurrency(allProjects.reduce((sum, project) => sum + getTotalProjected(project.projectId), 0))}
               </div>
             </div>
           </div>
@@ -1397,7 +1399,7 @@ export default function HighPerformanceTable({
               <div className="flex bg-gray-50/90 dark:bg-slate-700/90 backdrop-blur-sm border-t border-gray-200 dark:border-slate-600 footer-flex">
                 {monthRange.map((month, index) => {
                   const totals = monthRange.map(month => 
-                    safeBillingData.reduce((sum, project) => sum + getCellValue(project.projectId, month), 0)
+                    allProjects.reduce((sum, project) => sum + getCellValue(project.projectId, month), 0)
                   );
                   return (
                     <div

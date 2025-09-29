@@ -1,4 +1,4 @@
 {
-  "/api/closed-projects/route": "app/api/closed-projects/route.js",
-  "/api/homepage-dashboard/route": "app/api/homepage-dashboard/route.js"
+  "/api/project-statuses/route": "app/api/project-statuses/route.js",
+  "/api/project-status/route": "app/api/project-status/route.js"
 }

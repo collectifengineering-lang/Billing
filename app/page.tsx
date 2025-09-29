@@ -110,6 +110,7 @@ export default function HomePage() {
   const [billingData, setBillingData] = useState<any[]>([]);
   const [projections, setProjections] = useState<any>({});
   const [closedProjects, setClosedProjects] = useState<Set<string>>(new Set());
+  const [projectStatuses, setProjectStatuses] = useState<Record<string, string>>({});
 
   // Monitor topProjects state to ensure it's always an array
   useEffect(() => {
@@ -126,6 +127,27 @@ export default function HomePage() {
       setBottomProjects([]);
     }
   }, [bottomProjects]);
+
+  const loadProjectStatuses = async () => {
+    try {
+      const response = await fetch('/api/project-statuses');
+      if (response.ok) {
+        const statuses = await response.json();
+        if (typeof statuses === 'object' && statuses !== null) {
+          setProjectStatuses(statuses);
+          
+          // Update closed projects based on statuses
+          const closedProjectIds = Object.entries(statuses)
+            .filter(([_, status]) => status === 'closed')
+            .map(([projectId, _]) => projectId);
+          
+          setClosedProjects(new Set(closedProjectIds));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading project statuses:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -173,19 +195,18 @@ export default function HomePage() {
         const topProjectsData = await topProjectsResponse.json();
         const bottomProjectsData = await bottomProjectsResponse.json();
         const projectsData = await projectsResponse.json();
-        // Load closed projects from database
-        let closedProjectsData = [];
+        // Load project statuses and closed projects from database
+        await loadProjectStatuses();
+        
+        // Load projections data
         try {
-          const closedProjectsResponse = await fetch('/api/closed-projects');
-          if (closedProjectsResponse.ok) {
-            closedProjectsData = await closedProjectsResponse.json();
-          } else {
-            console.warn('Failed to fetch closed projects from database, using empty array');
-            closedProjectsData = [];
+          const projectionsResponse = await fetch('/api/projections');
+          if (projectionsResponse.ok) {
+            const projectionsData = await projectionsResponse.json();
+            setProjections(projectionsData);
           }
-        } catch (error) {
-          console.warn('Error fetching closed projects from database:', error);
-          closedProjectsData = [];
+        } catch (projectionsError) {
+          console.error('Error loading projections:', projectionsError);
         }
 
         // Validate and set dashboard stats
@@ -216,14 +237,7 @@ export default function HomePage() {
           setBottomProjects([]);
         }
 
-        // Set closed projects from database
-        if (Array.isArray(closedProjectsData)) {
-          setClosedProjects(new Set(closedProjectsData));
-          console.log('Loaded closed projects from database:', closedProjectsData);
-        } else {
-          console.warn('Invalid closed projects data received, using empty set');
-          setClosedProjects(new Set());
-        }
+        // Closed projects are now set in loadProjectStatuses()
         
         // Transform Zoho projects to billing data format
         if (projectsData.success && projectsData.data) {

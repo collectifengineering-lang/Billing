@@ -53,6 +53,17 @@ model ClosedProject {
   projectId String @unique
 }
 
+model Project {
+  id          String   @id
+  name        String
+  customerName String?
+  status      String   @default("active") // "active", "closed", "completed", "on-hold"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("projects")
+}
+
 model ProjectAssignment {
   id        Int     @id @default(autoincrement())
   projectId String @unique

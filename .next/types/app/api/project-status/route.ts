@@ -1,8 +1,8 @@
-// File: C:\Users\Jonathan\Desktop\Billing\app\api\closed-projects\route.ts
-import * as entry from '../../../../../app/api/closed-projects/route.js'
+// File: C:\Users\Jonathan\Desktop\Billing\app\api\project-status\route.ts
+import * as entry from '../../../../../app/api/project-status/route.js'
 import type { NextRequest } from 'next/server.js'
 
-type TEntry = typeof import('../../../../../app/api/closed-projects/route.js')
+type TEntry = typeof import('../../../../../app/api/project-status/route.js')
 
 // Check that the entry is a valid entry
 checkFields<Diff<{
