@@ -209,10 +209,7 @@ export default function HighPerformanceTable({
       setEditingCommentCell(null);
       setCommentAnchor(null);
       
-      // Remove all event listeners
-      window.removeEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('resize', handleResize);
+      // Event listeners are cleaned up in their respective useEffect hooks
     };
   }, []);
 
