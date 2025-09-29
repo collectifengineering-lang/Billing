@@ -864,8 +864,17 @@ export default function HighPerformanceTable({
     return sortState.direction === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
   };
 
-  // Use local closed projects state for filtering - hide closed projects from table display
-  const activeProjects = sortProjects(safeBillingData.filter(project => !closedProjects.has(project.projectId)));
+  // State for showing/hiding closed projects
+  const [showClosedProjects, setShowClosedProjects] = useState(false);
+  
+  // Filter projects based on showClosedProjects setting
+  const displayedProjects = useMemo(() => {
+    if (showClosedProjects) {
+      return sortProjects(safeBillingData); // Show all projects
+    } else {
+      return sortProjects(safeBillingData.filter(project => !closedProjects.has(project.projectId))); // Hide closed projects
+    }
+  }, [safeBillingData, closedProjects, showClosedProjects, sortProjects]);
   
   // Keep all projects (including closed) for financial calculations
   const allProjects = sortProjects(safeBillingData);
@@ -873,18 +882,19 @@ export default function HighPerformanceTable({
   // Filter projects by project name
   const filteredProjects = useMemo(() => {
     if (!filterText.trim()) {
-      return activeProjects;
+      return displayedProjects;
     }
-    return activeProjects.filter(project => 
+    return displayedProjects.filter(project => 
       project.projectName.toLowerCase().includes(filterText.toLowerCase())
     );
-  }, [activeProjects, filterText]);
+  }, [displayedProjects, filterText]);
 
   // Debug logging
   console.log('HighPerformanceTable: safeBillingData length:', safeBillingData.length);
-  console.log('HighPerformanceTable: activeProjects length:', activeProjects.length);
+  console.log('HighPerformanceTable: displayedProjects length:', displayedProjects.length);
   console.log('HighPerformanceTable: filteredProjects length:', filteredProjects.length);
   console.log('HighPerformanceTable: closedProjects size:', closedProjects.size);
+  console.log('HighPerformanceTable: showClosedProjects:', showClosedProjects);
   if (safeBillingData.length > 0) {
     console.log('HighPerformanceTable: First billing data item:', safeBillingData[0]);
   }
@@ -916,7 +926,7 @@ export default function HighPerformanceTable({
       observer.disconnect();
       clearInterval(interval);
     };
-  }, [activeProjects.length, scrollbarWidth]);
+  }, [displayedProjects.length, scrollbarWidth]);
 
   const handleImportData = async (importedData: Record<string, Record<string, number>>) => {
     try {
@@ -963,7 +973,7 @@ export default function HighPerformanceTable({
               Projections Table
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Virtualized table with {filteredProjects.length} active projects - click any cell to edit
+              Virtualized table with {filteredProjects.length} {showClosedProjects ? 'total' : 'active'} projects - click any cell to edit
             </p>
           </div>
         </div>
@@ -990,11 +1000,29 @@ export default function HighPerformanceTable({
               </button>
             )}
           </div>
-          {filterText && (
-            <div className="mt-3 text-sm text-gray-600 dark:text-gray-300">
-              Showing {filteredProjects.length} of {activeProjects.length} projects
+          <div className="mt-3 flex items-center justify-between">
+            {filterText && (
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                Showing {filteredProjects.length} of {displayedProjects.length} projects
+              </div>
+            )}
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={showClosedProjects}
+                  onChange={(e) => setShowClosedProjects(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>Show closed projects</span>
+              </label>
+              {closedProjects.size > 0 && (
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {closedProjects.size} closed project{closedProjects.size !== 1 ? 's' : ''}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
         
         {/* CSV Import/Export Component */}
@@ -1102,9 +1130,11 @@ export default function HighPerformanceTable({
                 const managerId = projectAssignmentsData?.[project.projectId] || projectAssignments[project.projectId];
                 const assignedManager = projectManagersData?.[managerId] || projectManagers.find(m => m.id === managerId);
 
+                const isClosed = closedProjects.has(project.projectId);
+                
                 return (
-                  <div style={style} className="flex border-b border-gray-200 dark:border-slate-600 sticky-column">
-                    <div className="flex-shrink-0 w-[264px] bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+                  <div style={style} className={`flex border-b border-gray-200 dark:border-slate-600 sticky-column ${isClosed ? 'bg-gray-100/50 dark:bg-slate-700/50' : ''}`}>
+                    <div className={`flex-shrink-0 w-[264px] backdrop-blur-sm border-r border-gray-200 dark:border-slate-600 ${isClosed ? 'bg-gray-100/90 dark:bg-slate-700/90' : 'bg-gray-50/90 dark:bg-slate-800/90'}`}>
                       <div className="flex items-center h-18 px-4">
                         <div className="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
                           <div className="flex items-center">
@@ -1117,6 +1147,11 @@ export default function HighPerformanceTable({
                             <span className="text-xs font-medium text-gray-900 dark:text-white truncate" title={project.projectName}>
                               {project.projectName}
                             </span>
+                            {closedProjects.has(project.projectId) && (
+                              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full">
+                                Closed
+                              </span>
+                            )}
                           </div>
                           {assignedManager && (
                             <span className="text-xs text-gray-500 dark:text-gray-400 italic truncate">
@@ -1139,7 +1174,7 @@ export default function HighPerformanceTable({
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+                    <div className={`flex-shrink-0 w-32 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600 ${isClosed ? 'bg-gray-100/90 dark:bg-slate-700/90' : 'bg-gray-50/90 dark:bg-slate-800/90'}`}>
                       <div className="h-18 px-4 py-2 text-center">
                         {editingSignedFee === project.projectId ? (
                           <input
@@ -1177,7 +1212,7 @@ export default function HighPerformanceTable({
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+                    <div className={`flex-shrink-0 w-32 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600 ${isClosed ? 'bg-gray-100/90 dark:bg-slate-700/90' : 'bg-gray-50/90 dark:bg-slate-800/90'}`}>
                       <div className="h-18 px-4 py-2 text-center">
                         {isEditingAsrFee ? (
                           <input
@@ -1203,13 +1238,13 @@ export default function HighPerformanceTable({
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+                    <div className={`flex-shrink-0 w-32 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600 ${isClosed ? 'bg-gray-100/90 dark:bg-slate-700/90' : 'bg-gray-50/90 dark:bg-slate-800/90'}`}>
                       <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
                         {formatCurrency(totalFee)}
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0 w-32 bg-gray-50/90 dark:bg-slate-800/90 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600">
+                    <div className={`flex-shrink-0 w-32 backdrop-blur-sm border-r border-gray-200 dark:border-slate-600 ${isClosed ? 'bg-gray-100/90 dark:bg-slate-700/90' : 'bg-gray-50/90 dark:bg-slate-800/90'}`}>
                       <div className="h-18 px-4 py-2 text-center text-sm font-medium text-gray-900 dark:text-white">
                         {formatCurrency(totalProjected)}
                       </div>
@@ -1299,8 +1334,10 @@ export default function HighPerformanceTable({
                   const project = filteredProjects[index];
                   if (!project) return null;
 
+                  const isClosed = closedProjects.has(project.projectId);
+
                   return (
-                    <div style={style} className="flex border-b border-gray-200">
+                    <div style={style} className={`flex border-b border-gray-200 ${isClosed ? 'bg-gray-100/50 dark:bg-slate-700/50' : ''}`}>
                       {monthRange.map((month) => {
                         const currentValue = getCellValue(project.projectId, month);
                         const isEditing = editingCell?.projectId === project.projectId && editingCell?.month === month;
@@ -1308,7 +1345,7 @@ export default function HighPerformanceTable({
                         return (
                           <div
                             key={month}
-                            className={`flex-shrink-0 w-32 h-18 px-4 py-2 text-center text-sm border-r border-gray-200 dark:border-slate-600 cursor-pointer relative ${getCellClass(getCellStatus(project.projectId, month)) || 'bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm'}`}
+                            className={`flex-shrink-0 w-32 h-18 px-4 py-2 text-center text-sm border-r border-gray-200 dark:border-slate-600 cursor-pointer relative ${getCellClass(getCellStatus(project.projectId, month)) || (isClosed ? 'bg-gray-100/90 dark:bg-slate-700/90 backdrop-blur-sm' : 'bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm')}`}
                             onClick={() => handleCellClick(project.projectId, month, currentValue)}
                             title={getCellComment(project.projectId, month)}
                           >
@@ -1511,13 +1548,23 @@ export default function HighPerformanceTable({
           )}
 
           <div className="my-1 border-t border-gray-200"></div>
-          <button
-            onClick={() => handleProjectClose(openDropdown)}
-            className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
-          >
-            <X className="h-4 w-4 mr-2" />
-            Close Project
-          </button>
+          {closedProjects.has(openDropdown) ? (
+            <button
+              onClick={() => handleProjectReopen(openDropdown)}
+              className="w-full px-3 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Reopen Project
+            </button>
+          ) : (
+            <button
+              onClick={() => handleProjectClose(openDropdown)}
+              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Close Project
+            </button>
+          )}
         </div>,
         document.body
       )}
