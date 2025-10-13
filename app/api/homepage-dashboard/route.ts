@@ -274,9 +274,7 @@ export async function GET(request: NextRequest) {
     const totalProjects = projects.length || 0;
     
     // Calculate billing metrics from YTD invoices
-    // Filter for current year invoices
-    const currentYear = now.getFullYear();
-    const currentYearStart = new Date(currentYear, 0, 1);
+    // Filter for current year invoices (reuse variables defined at top of function)
     const ytdInvoices = invoices.filter(inv => {
       const invoiceDate = new Date(inv.date);
       return invoiceDate >= currentYearStart && invoiceDate <= now;
