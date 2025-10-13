@@ -153,9 +153,13 @@ function SettingsPageContent() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save project manager');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || 'Failed to save project manager');
       }
 
+      const result = await response.json();
+      console.log('Manager save response:', result);
+      
       toast.success(newManagerId ? 'Manager updated successfully' : 'Manager added successfully');
       
       // Reset form
@@ -167,7 +171,8 @@ function SettingsPageContent() {
       mutateProjectManagers();
     } catch (error) {
       console.error('Error saving manager:', error);
-      toast.error('Failed to save manager');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save manager';
+      toast.error(errorMessage);
     } finally {
       setSavingManager(false);
     }

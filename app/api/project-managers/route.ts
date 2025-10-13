@@ -40,17 +40,23 @@ export async function GET() {
 // POST: Update or create project manager
 export async function POST(request: Request) {
   const requestData = await request.json();
-  const { id, name, color } = requestData;
+  let { id, name, color } = requestData;
   
   console.log('POST /api/project-managers called with:', { id, name, color });
   
   // Validate input
-  if (!id || !name || !color) {
+  if (!name || !color) {
     return NextResponse.json({ 
       error: 'Missing required fields',
-      details: 'id, name, and color are required',
+      details: 'name and color are required',
       received: { id: !!id, name: !!name, color: !!color }
     }, { status: 400 });
+  }
+  
+  // Generate ID for new managers
+  if (!id || id === undefined) {
+    id = `manager-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log('Generated new manager ID:', id);
   }
   
   try {
@@ -129,6 +135,42 @@ export async function POST(request: Request) {
     
     return NextResponse.json({ 
       error: 'Failed to update project manager',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
+  }
+}
+
+// DELETE: Delete a project manager
+export async function DELETE(request: Request) {
+  const requestData = await request.json();
+  const { id } = requestData;
+  
+  console.log('DELETE /api/project-managers called with:', { id });
+  
+  if (!id) {
+    return NextResponse.json({ 
+      error: 'Missing required field',
+      details: 'id is required'
+    }, { status: 400 });
+  }
+  
+  try {
+    await prisma.projectManager.delete({
+      where: { id },
+    });
+    
+    console.log('Project manager deleted successfully:', id);
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    console.error('Error deleting project manager:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      code: 'code' in (error as any) ? (error as any).code : 'unknown',
+      id
+    });
+    
+    return NextResponse.json({ 
+      error: 'Failed to delete project manager',
       details: error instanceof Error ? error.message : String(error)
     }, { status: 500 });
   }
