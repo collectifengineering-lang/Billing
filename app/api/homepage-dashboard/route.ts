@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { zohoService } from '@/lib/zoho';
 import clockifyService from '@/lib/clockify';
+import { serverCache } from '@/lib/serverCache';
 
 // Force dynamic rendering to avoid build-time API calls
 export const dynamic = 'force-dynamic';
 
+// Configure max duration for Vercel
+export const maxDuration = 30;
+
 export async function GET(request: NextRequest) {
   try {
     console.log('🚀 Homepage Dashboard API called - starting data collection...');
+    
+    // Check if we have cached data
+    const CACHE_KEY = 'homepage-dashboard-data';
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    
+    const cachedData = serverCache.get(CACHE_KEY);
+    if (cachedData) {
+      console.log('✅ Returning cached dashboard data');
+      return NextResponse.json(cachedData);
+    }
+    
+    console.log('❌ No cache found, fetching fresh data...');
     
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -32,15 +48,27 @@ export async function GET(request: NextRequest) {
     let zohoAuthFailed = false;
     let zohoApiCallCount = 0;
 
-    // Fetch Zoho data
+    // Fetch Zoho data with timeout (15 seconds for all Zoho calls)
     try {
       console.log('🔄 Starting Zoho data fetch...');
       
-      // Track API calls
-      zohoApiCallCount++;
-      projects = await zohoService.getProjects();
-      zohoApiCallCount++;
-      invoices = await zohoService.getInvoices();
+      // Fetch projects and invoices in parallel with timeout
+      const ZOHO_TIMEOUT = 15000; // 15 seconds
+      const zohoDataPromise = Promise.all([
+        withTimeout(
+          zohoService.getProjects(),
+          ZOHO_TIMEOUT,
+          'Zoho getProjects() timed out after 15 seconds'
+        ),
+        withTimeout(
+          zohoService.getInvoices(),
+          ZOHO_TIMEOUT,
+          'Zoho getInvoices() timed out after 15 seconds'
+        )
+      ]);
+      
+      [projects, invoices] = await zohoDataPromise;
+      zohoApiCallCount += 2;
       
       console.log('✅ Zoho data fetched:', { projectsCount: projects.length, invoicesCount: invoices.length });
       
@@ -83,7 +111,7 @@ export async function GET(request: NextRequest) {
         console.log('⚠️ No invoices found in Zoho data');
       }
 
-      // Get financial metrics for current year
+      // Get financial metrics for current year with timeout
       try {
         console.log('💰 Fetching financial metrics...');
         console.log('📅 Date range:', {
@@ -92,9 +120,13 @@ export async function GET(request: NextRequest) {
         });
         
         zohoApiCallCount++;
-        financialMetrics = await zohoService.getFinancialMetrics(
-          currentYearStart.toISOString().split('T')[0],
-          now.toISOString().split('T')[0]
+        financialMetrics = await withTimeout(
+          zohoService.getFinancialMetrics(
+            currentYearStart.toISOString().split('T')[0],
+            now.toISOString().split('T')[0]
+          ),
+          10000, // 10 seconds timeout
+          'Zoho getFinancialMetrics() timed out after 10 seconds'
         );
         console.log('✅ Financial metrics loaded:', financialMetrics);
         
@@ -174,12 +206,26 @@ export async function GET(request: NextRequest) {
       if (clockifyConfig.configured) {
         console.log('⏰ Clockify configured, fetching real data...');
         
+        // Fetch Clockify data with timeout (10 seconds for all calls)
+        const CLOCKIFY_TIMEOUT = 10000; // 10 seconds
         const [clockifyUser, clockifyProjects, timeEntries] = await Promise.all([
-          clockifyService.getUser(),
-          clockifyService.getProjects(),
-          clockifyService.getAllTimeEntries(
-            extendedStartDate.toISOString(),
-            now.toISOString()
+          withTimeout(
+            clockifyService.getUser(),
+            CLOCKIFY_TIMEOUT,
+            'Clockify getUser() timed out after 10 seconds'
+          ),
+          withTimeout(
+            clockifyService.getProjects(),
+            CLOCKIFY_TIMEOUT,
+            'Clockify getProjects() timed out after 10 seconds'
+          ),
+          withTimeout(
+            clockifyService.getAllTimeEntries(
+              extendedStartDate.toISOString(),
+              now.toISOString()
+            ),
+            CLOCKIFY_TIMEOUT,
+            'Clockify getAllTimeEntries() timed out after 10 seconds'
           )
         ]);
 
@@ -524,6 +570,9 @@ export async function GET(request: NextRequest) {
     console.log('🚀 Returning dashboard data to client...');
     console.log('🔍 CRITICAL - ytdOperatingIncome being returned:', safeDashboardData.ytdOperatingIncome, '(type:', typeof safeDashboardData.ytdOperatingIncome, ')');
 
+    // Cache the response for 5 minutes
+    serverCache.set(CACHE_KEY, safeDashboardData, CACHE_TTL);
+
     return NextResponse.json(safeDashboardData);
   } catch (error) {
     console.error('❌ Homepage Dashboard API error:', error);
@@ -532,6 +581,20 @@ export async function GET(request: NextRequest) {
       stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString()
     });
+    
+    // Try to return stale cached data if available
+    const CACHE_KEY = 'homepage-dashboard-data';
+    const staleCachedData = serverCache.get(CACHE_KEY);
+    if (staleCachedData) {
+      console.warn('⚠️ Returning stale cached data due to error');
+      return NextResponse.json({
+        ...staleCachedData,
+        warnings: [
+          ...(staleCachedData.warnings || []),
+          'Using cached data due to API error'
+        ]
+      });
+    }
     
     return NextResponse.json(
       { 
@@ -558,4 +621,14 @@ function parseDuration(duration: string): number {
   const seconds = parseInt(match[3] || '0');
   
   return hours + (minutes / 60) + (seconds / 3600);
+}
+
+// Helper function to add timeout to promises
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    ),
+  ]);
 }
