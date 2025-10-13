@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { zohoService } from '@/lib/zoho';
+import { optimizedZohoService } from '@/lib/zohoOptimized';
 
 // Force dynamic rendering to avoid build-time API calls
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    console.info('🔄 Fetching projects from Zoho...');
+    console.info('🔄 Fetching projects from Zoho (optimized with caching)...');
     
-    const projects = await zohoService.getProjects();
+    const projects = await optimizedZohoService.getProjects();
     
     if (projects.length === 0) {
       console.warn('⚠️ No projects returned from Zoho - this may indicate an API issue or rate limiting');

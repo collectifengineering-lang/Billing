@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { zohoService } from '../../../lib/zoho';
+import { optimizedZohoService } from '../../../lib/zohoOptimized';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
 export async function GET(_request: NextRequest) {
   try {
-    console.log('API: Fetching invoices from Zoho');
+    console.log('API: Fetching invoices from Zoho (optimized with caching)');
     
     let invoices: any[] = [];
     let zohoAuthFailed = false;
-    let zohoApiCallCount = 0;
     
     try {
-      zohoApiCallCount++;
-      invoices = await zohoService.getInvoices();
-      console.log('API: Fetched', invoices.length, 'invoices');
+      invoices = await optimizedZohoService.getInvoices();
+      console.log('API: Fetched', invoices.length, 'invoices (from cache or fresh)');
     } catch (error) {
       console.error('API: Error fetching invoices:', error);
       
@@ -31,15 +29,11 @@ export async function GET(_request: NextRequest) {
       invoices = [];
     }
     
-    // Log Zoho API call count for monitoring
-    console.log(`📊 Zoho API calls made in this request: ${zohoApiCallCount}`);
-    
     return NextResponse.json({
       success: true,
       data: invoices,
       count: invoices.length,
-      warnings: zohoAuthFailed ? ['Zoho authentication failed due to rate limits. Showing partial data.'] : [],
-      zohoApiCallCount
+      warnings: zohoAuthFailed ? ['Zoho authentication failed due to rate limits. Showing partial data.'] : []
     });
   } catch (error) {
     console.error('API: Error fetching invoices:', error);

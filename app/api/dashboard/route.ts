@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { zohoService } from '@/lib/zoho';
+import { optimizedZohoService } from '@/lib/zohoOptimized';
 import clockifyService from '@/lib/clockify';
 
 // Force dynamic rendering to prevent static generation errors
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🚀 Dashboard API called - starting data collection...');
+    console.log('🚀 Dashboard API called - starting optimized data collection...');
     
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -30,65 +30,51 @@ export async function GET(request: NextRequest) {
       console.warn('Clockify service not configured - using mock data for time tracking metrics');
     }
 
-    // Get Zoho data for financial metrics
+    // Get Zoho data for financial metrics using optimized service with caching
     let projects: any[] = [];
     let invoices: any[] = [];
     let currentYearFinancials: any = null;
     let lastYearFinancials: any = null;
     let twoYearsAgoFinancials: any = null;
     
-    console.log('🔄 Starting Zoho data fetch...');
+    console.log('🔄 Starting optimized Zoho data fetch with caching...');
     
     try {
-      // Fetch projects and invoices
-      console.log('📊 Fetching projects and invoices...');
+      // Fetch projects and invoices in parallel with caching
+      console.log('📊 Fetching projects and invoices (cached if available)...');
       [projects, invoices] = await Promise.all([
-        zohoService.getProjects(),
-        zohoService.getInvoices()
+        optimizedZohoService.getProjects(),
+        optimizedZohoService.getInvoices()
       ]);
       console.log('✅ Projects and invoices fetched:', { projectsCount: projects.length, invoicesCount: invoices.length });
 
-      // Fetch real financial data from Zoho Books with individual error handling
-      console.log('💰 Fetching real financial data from Zoho Books...');
+      // Fetch all financial data in parallel using optimized batch fetch with caching
+      console.log('💰 Fetching real financial data from Zoho Books (cached if available)...');
       
-      // Try to fetch each financial metric individually to handle partial failures
-      try {
-        console.log('📈 Fetching current year financials...');
-        currentYearFinancials = await zohoService.getFinancialMetrics(
-          currentYearStart.toISOString().split('T')[0],
-          now.toISOString().split('T')[0]
-        );
-        console.log('✅ Current year financials loaded successfully:', currentYearFinancials);
-      } catch (error) {
-        console.warn('⚠️ Failed to fetch current year financials, using defaults:', error);
-        currentYearFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
-      }
-      
-      try {
-        console.log('📈 Fetching last year financials...');
-        lastYearFinancials = await zohoService.getFinancialMetrics(
-          lastYearStart.toISOString().split('T')[0],
-          new Date(currentYear - 1, 11, 31).toISOString().split('T')[0]
-        );
-        console.log('✅ Last year financials loaded successfully:', lastYearFinancials);
-      } catch (error) {
-        console.warn('⚠️ Failed to fetch last year financials, using defaults:', error);
-        lastYearFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
-      }
-      
-      try {
-        console.log('📈 Fetching two years ago financials...');
-        twoYearsAgoFinancials = await zohoService.getFinancialMetrics(
-          twoYearsAgoStart.toISOString().split('T')[0],
-          new Date(currentYear - 2, 11, 31).toISOString().split('T')[0]
-        );
-        console.log('✅ Two years ago financials loaded successfully:', twoYearsAgoFinancials);
-      } catch (error) {
-        console.warn('⚠️ Failed to fetch two years ago financials, using defaults:', error);
-        twoYearsAgoFinancials = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
-      }
+      const dateRanges = [
+        { 
+          startDate: currentYearStart.toISOString().split('T')[0],
+          endDate: now.toISOString().split('T')[0]
+        },
+        {
+          startDate: lastYearStart.toISOString().split('T')[0],
+          endDate: new Date(currentYear - 1, 11, 31).toISOString().split('T')[0]
+        },
+        {
+          startDate: twoYearsAgoStart.toISOString().split('T')[0],
+          endDate: new Date(currentYear - 2, 11, 31).toISOString().split('T')[0]
+        }
+      ];
 
-      console.log('📊 Financial data summary:');
+      // Fetch all financial metrics in parallel
+      const [currentYear_Financials, lastYear_Financials, twoYearsAgo_Financials] = 
+        await optimizedZohoService.getComprehensiveFinancialData(dateRanges);
+
+      currentYearFinancials = currentYear_Financials;
+      lastYearFinancials = lastYear_Financials;
+      twoYearsAgoFinancials = twoYearsAgo_Financials;
+
+      console.log('📊 Financial data summary (from cache or fresh):');
       console.log('- Current year:', currentYearFinancials);
       console.log('- Last year:', lastYearFinancials);
       console.log('- Two years ago:', twoYearsAgoFinancials);
