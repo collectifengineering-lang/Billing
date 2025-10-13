@@ -602,11 +602,11 @@ export default function HomePage() {
                       <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium opacity-90 mb-1">Zoho Books Operating Income</p>
+                            <p className="text-sm font-medium opacity-90 mb-1">Zoho Books Total Revenue</p>
                             <p className="text-3xl font-bold">
                               {formatCurrency(stats.ytdOperatingIncome)}
                             </p>
-                            <p className="text-sm opacity-80 mt-2">YTD Operating Income (Accrual Basis)</p>
+                            <p className="text-sm opacity-80 mt-2">YTD Income (Accrual Basis)</p>
                           </div>
                           <DollarSign className="h-12 w-12 opacity-80" />
                         </div>
