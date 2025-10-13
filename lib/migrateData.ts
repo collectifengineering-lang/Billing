@@ -30,8 +30,8 @@ export async function migrateLocalStorageToDatabase() {
       signedFeeCount = await prisma.signedFee.count();
       asrFeeCount = await prisma.asrFee.count();
       closedProjectCount = await prisma.closedProject.count();
-      projectAssignmentCount = await prisma.projectAssignment.count();
-      projectManagerCount = await prisma.projectManager.count();
+      projectAssignmentCount = await prisma.projectsAssignment.count();
+      projectManagerCount = await prisma.projectsManager.count();
     }
 
     if (projectionCount > 0 || statusCount > 0 || commentCount > 0 || 
@@ -114,7 +114,7 @@ export async function migrateLocalStorageToDatabase() {
 
       // Migrate project assignments
       for (const [projectId, managerId] of Object.entries(projectAssignments)) {
-        await prisma.projectAssignment.upsert({
+        await prisma.projectsAssignment.upsert({
           where: { projectId },
           update: { managerId: managerId as string },
           create: { projectId, managerId: managerId as string },
@@ -123,7 +123,7 @@ export async function migrateLocalStorageToDatabase() {
 
       // Migrate project managers
       for (const manager of projectManagers) {
-        await prisma.projectManager.upsert({
+        await prisma.projectsManager.upsert({
           where: { id: manager.id },
           update: { name: manager.name, color: manager.color },
           create: { id: manager.id, name: manager.name, color: manager.color },

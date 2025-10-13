@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     // Sync users
     for (const user of users) {
       try {
-        await prisma.clockifyUser.upsert({
+        await prisma.clockify_users.upsert({
           where: { id: user.id },
           update: {
             name: user.name,
@@ -62,7 +62,9 @@ export async function POST(request: NextRequest) {
             name: user.name,
             email: user.email,
             workspaceId: user.activeWorkspace || process.env.CLOCKIFY_WORKSPACE_ID!,
-            status: user.status || 'ACTIVE'
+            status: user.status || 'ACTIVE',
+            createdAt: new Date(),
+            updatedAt: new Date()
           }
         });
         syncResults.users.created++;
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
     // Sync projects
     for (const project of projects) {
       try {
-        await prisma.clockifyProject.upsert({
+        await prisma.clockify_projects.upsert({
           where: { id: project.id },
           update: {
             name: project.name,
@@ -101,7 +103,9 @@ export async function POST(request: NextRequest) {
             hourlyRate: typeof project.hourlyRate === 'object' ? project.hourlyRate.amount : project.hourlyRate,
             budget: project.budget,
             startDate: project.startDate ? new Date(project.startDate) : null,
-            endDate: project.endDate ? new Date(project.endDate) : null
+            endDate: project.endDate ? new Date(project.endDate) : null,
+            createdAt: new Date(),
+            updatedAt: new Date()
           }
         });
         syncResults.projects.created++;
@@ -117,7 +121,7 @@ export async function POST(request: NextRequest) {
         const startTime = new Date(entry.timeInterval?.start || entry.start || syncStartDate);
         const endTime = entry.timeInterval?.end || entry.end ? new Date(entry.timeInterval?.end || entry.end) : null;
         
-        await prisma.clockifyTimeEntry.upsert({
+        await prisma.clockify_time_entries.upsert({
           where: { id: entry.id },
           update: {
             description: entry.description,
@@ -147,7 +151,9 @@ export async function POST(request: NextRequest) {
             duration: entry.timeInterval?.duration || 'PT0H',
             hourlyRate: typeof entry.hourlyRate === 'object' ? entry.hourlyRate.amount : entry.hourlyRate,
             costRate: typeof entry.costRate === 'object' ? entry.costRate.amount : entry.costRate,
-            tags: entry.tags?.map((tag: any) => tag.name || tag) || []
+            tags: entry.tags?.map((tag: any) => tag.name || tag) || [],
+            createdAt: new Date(),
+            updatedAt: new Date()
           }
         });
         syncResults.timeEntries.created++;

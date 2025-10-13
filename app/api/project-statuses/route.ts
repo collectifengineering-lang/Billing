@@ -15,7 +15,7 @@ export async function GET() {
       return NextResponse.json({});
     }
     
-    const projects = await prisma.project.findMany({
+    const projects = await prisma.projects.findMany({
       select: { id: true, status: true }
     });
     

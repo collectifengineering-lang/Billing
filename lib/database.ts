@@ -117,21 +117,23 @@ export async function saveBambooHRConfig(config: {
   webhookSecret?: string;
 }) {
   try {
-    const result = await prisma.bambooHRConfig.upsert({
+    const result = await prisma.bamboohr_config.upsert({
       where: { subdomain: config.subdomain },
       update: {
-        apiKey: config.apiKey,
-        webhookSecret: config.webhookSecret,
-        isActive: true,
-        lastSync: new Date(),
-        updatedAt: new Date()
+        api_key: config.apiKey,
+        webhook_secret: config.webhookSecret,
+        is_active: true,
+        last_sync: new Date(),
+        updated_at: new Date()
       },
       create: {
         subdomain: config.subdomain,
-        apiKey: config.apiKey,
-        webhookSecret: config.webhookSecret,
-        isActive: true,
-        lastSync: new Date()
+        api_key: config.apiKey,
+        webhook_secret: config.webhookSecret,
+        is_active: true,
+        last_sync: new Date(),
+        created_at: new Date(),
+        updated_at: new Date()
       }
     });
     
@@ -145,7 +147,7 @@ export async function saveBambooHRConfig(config: {
 
 export async function getBambooHRConfig(subdomain: string) {
   try {
-    return await prisma.bambooHRConfig.findUnique({
+    return await prisma.bamboohr_config.findUnique({
       where: { subdomain }
     });
   } catch (error) {
@@ -167,7 +169,7 @@ export async function saveEmployee(employee: {
   try {
     console.log(`🔄 Attempting to upsert employee:`, JSON.stringify(employee, null, 2));
     
-    const result = await prisma.employee.upsert({
+    const result = await prisma.employees.upsert({
       where: { id: employee.id },
       update: {
         name: employee.name,
@@ -175,9 +177,9 @@ export async function saveEmployee(employee: {
         status: employee.status,
         department: employee.department,
         position: employee.position,
-        hireDate: employee.hireDate || null,
-        terminationDate: employee.terminationDate,
-        updatedAt: new Date()
+        hire_date: employee.hireDate || null,
+        termination_date: employee.terminationDate,
+        updated_at: new Date()
       },
       create: {
         id: employee.id,
@@ -186,8 +188,10 @@ export async function saveEmployee(employee: {
         status: employee.status,
         department: employee.department,
         position: employee.position,
-        hireDate: employee.hireDate || null,
-        terminationDate: employee.terminationDate
+        hire_date: employee.hireDate || null,
+        termination_date: employee.terminationDate,
+        created_at: new Date(),
+        updated_at: new Date()
       }
     });
     
@@ -200,7 +204,7 @@ export async function saveEmployee(employee: {
     if (error.code === 'P2025') {
       console.log(`🔄 Record not found, attempting to create employee: ${employee.name} (${employee.id})`);
       try {
-        const result = await prisma.employee.create({
+        const result = await prisma.employees.create({
           data: {
             id: employee.id,
             name: employee.name,
@@ -208,8 +212,10 @@ export async function saveEmployee(employee: {
             status: employee.status,
             department: employee.department,
             position: employee.position,
-            hireDate: employee.hireDate || null,
-            terminationDate: employee.terminationDate
+            hire_date: employee.hireDate || null,
+            termination_date: employee.terminationDate,
+            created_at: new Date(),
+            updated_at: new Date()
           }
         });
         console.log(`✅ Employee created: ${employee.name} (${employee.id})`);
@@ -237,7 +243,7 @@ export async function saveEmployeeSalary(salary: {
   try {
     console.log(`🔄 Attempting to upsert employee salary:`, JSON.stringify(salary, null, 2));
     
-    const result = await prisma.employeeSalary.upsert({
+    const result = await prisma.employee_salaries.upsert({
       where: {
         employeeId_effectiveDate: {
           employeeId: salary.employeeId,
@@ -274,7 +280,7 @@ export async function saveEmployeeSalary(salary: {
     if (error.code === 'P2025') {
       console.log(`🔄 Record not found, attempting to create employee salary for ${salary.employeeId} effective ${salary.effectiveDate}`);
       try {
-        const result = await prisma.employeeSalary.create({
+        const result = await prisma.employee_salaries.create({
           data: {
             employeeId: salary.employeeId,
             effectiveDate: salary.effectiveDate,
@@ -307,7 +313,7 @@ export async function saveProjectMultiplier(multiplier: {
   notes?: string;
 }) {
   try {
-    const result = await prisma.projectMultiplier.upsert({
+    const result = await prisma.project_multipliers.upsert({
       where: {
         projectId_effectiveDate: {
           projectId: multiplier.projectId,
@@ -357,7 +363,7 @@ export async function saveEmployeeTimeEntry(timeEntry: {
   tags: string[];
 }) {
   try {
-    const result = await prisma.employeeTimeEntry.upsert({
+    const result = await prisma.employee_time_entries.upsert({
       where: {
         employeeId_projectId_date: {
           employeeId: timeEntry.employeeId,
@@ -409,7 +415,7 @@ export async function saveEmployeeTimeEntry(timeEntry: {
 
 export async function getAllEmployees() {
   try {
-    return await prisma.employee.findMany({
+    return await prisma.employees.findMany({
       include: {
         salaries: true
       }
@@ -422,7 +428,7 @@ export async function getAllEmployees() {
 
 export async function getAllEmployeeSalaries() {
   try {
-    return await prisma.employeeSalary.findMany({
+    return await prisma.employee_salaries.findMany({
       include: {
         employee: true
       }
@@ -435,7 +441,7 @@ export async function getAllEmployeeSalaries() {
 
 export async function getAllProjectMultipliers() {
   try {
-    return await prisma.projectMultiplier.findMany();
+    return await prisma.project_multipliers.findMany();
   } catch (error) {
     console.error('Error getting all project multipliers:', error);
     throw error;
@@ -444,7 +450,7 @@ export async function getAllProjectMultipliers() {
 
 export async function getAllEmployeeTimeEntries() {
   try {
-    return await prisma.employeeTimeEntry.findMany({
+    return await prisma.employee_time_entries.findMany({
       include: {
         employee: true
       }

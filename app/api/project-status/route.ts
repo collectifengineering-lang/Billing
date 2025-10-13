@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ status: 'active' });
     }
     
-    const project = await prisma.project.findUnique({
+    const project = await prisma.projects.findUnique({
       where: { id: projectId },
       select: { status: true }
     });
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       console.log('Tables do not exist yet, but Prisma Accelerate will create them on first insert');
     }
     
-    const project = await prisma.project.upsert({
+    const project = await prisma.projects.upsert({
       where: { id: projectId },
       update: { 
         status,
@@ -76,7 +76,9 @@ export async function POST(request: Request) {
       create: { 
         id: projectId,
         name: `Project ${projectId}`, // Default name, will be updated when project data is synced
-        status
+        status,
+        createdAt: new Date(),
+        updatedAt: new Date()
       },
     });
     
@@ -94,23 +96,25 @@ export async function POST(request: Request) {
       
       try {
         // Try to create the table by inserting test data
-        await prisma.project.create({
+        await prisma.projects.create({
           data: {
             id: '__test__',
             name: 'Test Project',
-            status: 'active'
+            status: 'active',
+            createdAt: new Date(),
+            updatedAt: new Date()
           }
         });
         
         // Delete test data
-        await prisma.project.deleteMany({
+        await prisma.projects.deleteMany({
           where: {
             id: '__test__'
           }
         });
         
         // Now try the original operation again
-        const project = await prisma.project.upsert({
+        const project = await prisma.projects.upsert({
           where: { id: projectId },
           update: { 
             status,
@@ -119,7 +123,9 @@ export async function POST(request: Request) {
           create: { 
             id: projectId,
             name: `Project ${projectId}`,
-            status
+            status,
+            createdAt: new Date(),
+            updatedAt: new Date()
           },
         });
         
