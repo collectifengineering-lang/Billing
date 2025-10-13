@@ -3,3 +3,10 @@ node_modules
 env.local
 
 /lib/generated/prisma
+
+# Next.js build output
+.next/
+out/
+
+# Vercel
+.vercel
