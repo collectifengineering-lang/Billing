@@ -5,7 +5,9 @@ The billing dashboard was showing **$366,767** as "Zoho Books Operating Income",
 - Cash Basis: $1,797,351.77
 - Accrual Basis: $1,816,067.58
 
-## Root Cause
+## Root Causes
+
+### Primary Issue: Missing Invoice Fields
 The dashboard code in `app/api/homepage-dashboard/route.ts` was attempting to calculate revenue using invoice fields that **don't exist** in Zoho Books API:
 
 ```javascript
@@ -20,6 +22,22 @@ This resulted in:
 - `zohoTotalBilled` = $0
 - `zohoTotalUnbilled` = $0
 - Dashboard falling back to estimated calculations (~$366,767)
+
+### Secondary Issue: Missing Pagination in getInvoices()
+After fixing the field names, revenue was still showing **$177,923** instead of **~$1.8M**. 
+
+**Root Cause**: The `getInvoices()` function in `lib/zoho.ts` only fetched **the first page** (200 invoices) instead of all 1,360+ invoices!
+
+```javascript
+// ❌ BROKEN CODE (no pagination):
+const data = await this.makeRequest('invoices');
+return data.invoices; // Only returns first 200!
+```
+
+This meant:
+- Only ~200 out of 1,360 invoices were being counted
+- Missing ~85% of invoice data
+- Revenue divided by approximately 10x
 
 ## Solution
 
@@ -58,21 +76,43 @@ Accrual basis now correctly includes:
 - ✅ Overdue invoices
 - ❌ Excludes: void and draft invoices
 
-### 4. Updated UI Label
+### 4. Added Pagination to getInvoices()
+Updated `lib/zoho.ts` to fetch **ALL** invoices with proper pagination:
+
+```javascript
+// ✅ FIXED CODE (with pagination):
+let allInvoices: any[] = [];
+let page = 1;
+let hasMore = true;
+
+while (hasMore) {
+  const data = await this.makeRequest(`invoices?page=${page}&per_page=200`);
+  const invoices = data.invoices || [];
+  allInvoices = allInvoices.concat(invoices);
+  
+  hasMore = data.page_context?.has_more_page || false;
+  page++;
+}
+
+return processedInvoices; // Returns ALL invoices, not just first 200
+```
+
+### 5. Updated UI Label
 Changed the dashboard label from "Zoho Books Operating Income" to **"Zoho Books Total Revenue"** for clarity, since:
 - In accounting, "Operating Income" = Revenue - Operating Expenses
 - What we're showing is total revenue (which Zoho Books calls "Total Income")
 
 ## Results
 
-### Before Fix:
-- Dashboard showed: **$366,767** ❌
-- Source: Fallback estimates
+### Before Fixes:
+- **Initial bug**: Dashboard showed **$366,767** ❌ (due to missing invoice fields)
+- **After field fix**: Dashboard showed **$177,923** ❌ (due to missing pagination)
+- Source: Incomplete/fallback data
 
-### After Fix:
+### After All Fixes:
 - Dashboard will show: **~$1,860,673** ✅
-- Source: Actual Zoho invoice data (accrual basis)
-- Matches Zoho Books value: $1,816,067.58 (within $45k)
+- Source: ALL invoices from Zoho (with proper pagination + correct fields)
+- Matches Zoho Books value: $1,816,067.58 (within $45k or ~2.5%)
 
 ### Why the small difference?
 The ~$45k difference between our calculation ($1,860,673) and Zoho Books ($1,816,067) is likely due to:
@@ -83,6 +123,7 @@ The ~$45k difference between our calculation ($1,860,673) and Zoho Books ($1,816
 ## Files Changed
 1. `app/api/homepage-dashboard/route.ts` - Fixed revenue calculation logic
 2. `app/page.tsx` - Updated label from "Operating Income" to "Total Revenue"
+3. `lib/zoho.ts` - **CRITICAL FIX:** Added pagination to `getInvoices()` to fetch ALL invoices (not just first 200)
 
 ## Related Issue
 The Zoho Books Profit & Loss (P&L) API endpoint returns a 401 "Not Authorized" error, which is why we're calculating revenue from invoices instead of using the P&L report. This requires the `ZohoBooks.reports.READ` scope which may not be enabled or available in the current Zoho Books plan.

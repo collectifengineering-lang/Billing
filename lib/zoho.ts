@@ -714,9 +714,30 @@ class ZohoService {
   async getInvoices(): Promise<ZohoInvoice[]> {
     try {
       console.log('📄 Fetching invoices from Zoho...');
-      const data = await this.makeRequest('invoices');
       
-      const invoices = data.invoices?.map((invoice: any) => {
+      // Fetch ALL invoices with pagination
+      let allInvoices: any[] = [];
+      let page = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const data = await this.makeRequest(`invoices?page=${page}&per_page=200`);
+        const invoices = data.invoices || [];
+        allInvoices = allInvoices.concat(invoices);
+        
+        hasMore = data.page_context?.has_more_page || false;
+        page++;
+        
+        console.log(`📄 Fetched page ${page - 1}: ${invoices.length} invoices (total so far: ${allInvoices.length})`);
+        
+        if (!hasMore || invoices.length === 0) {
+          break;
+        }
+      }
+      
+      console.log(`✅ Total invoices fetched: ${allInvoices.length}`);
+      
+      const processedInvoices = allInvoices.map((invoice: any) => {
         const total = invoice.total || 0;
         const status = invoice.status || 'unknown';
         
@@ -749,10 +770,10 @@ class ZohoService {
       }) || [];
       
       // Log invoice counts and details
-      console.log(`📊 Zoho invoices fetched: ${invoices.length} total invoices`);
+      console.log(`📊 Zoho invoices processed: ${processedInvoices.length} total invoices`);
       
-      if (invoices.length > 0) {
-        const statusCounts = invoices.reduce((acc: Record<string, number>, inv: ZohoInvoice) => {
+      if (processedInvoices.length > 0) {
+        const statusCounts = processedInvoices.reduce((acc: Record<string, number>, inv: ZohoInvoice) => {
           acc[inv.status] = (acc[inv.status] || 0) + 1;
           return acc;
         }, {} as Record<string, number>);
@@ -760,8 +781,8 @@ class ZohoService {
         console.log('📋 Invoice status breakdown:', statusCounts);
         
         // Calculate total billed and unbilled amounts
-        const totalBilled = invoices.reduce((sum: number, inv: ZohoInvoice) => sum + inv.billed_amount, 0);
-        const totalUnbilled = invoices.reduce((sum: number, inv: ZohoInvoice) => sum + inv.unbilled_amount, 0);
+        const totalBilled = processedInvoices.reduce((sum: number, inv: ZohoInvoice) => sum + inv.billed_amount, 0);
+        const totalUnbilled = processedInvoices.reduce((sum: number, inv: ZohoInvoice) => sum + inv.unbilled_amount, 0);
         
         console.log('💰 Invoice amount breakdown:', {
           totalBilled: totalBilled,
@@ -770,7 +791,7 @@ class ZohoService {
         });
         
         // Log sample invoice data for debugging
-        const sampleInvoice = invoices[0];
+        const sampleInvoice = processedInvoices[0];
         console.log('📄 Sample invoice data:', {
           id: sampleInvoice.invoice_id,
           number: sampleInvoice.invoice_number,
@@ -782,7 +803,7 @@ class ZohoService {
         });
       }
       
-      return invoices;
+      return processedInvoices;
     } catch (error) {
       console.error('Error fetching invoices:', error);
       return [];
