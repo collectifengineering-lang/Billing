@@ -9,6 +9,30 @@ export const dynamic = 'force-dynamic';
 // Configure max duration for Vercel
 export const maxDuration = 30;
 
+// Type for the dashboard response
+interface DashboardResponse {
+  totalProjects: number;
+  totalBilled: number;
+  totalUnbilled: number;
+  activeProjects: number;
+  totalHours: number;
+  billableHours: number;
+  efficiency: number;
+  averageHourlyRate: number;
+  totalTimeValue: number;
+  averageHoursPerProject: number;
+  topPerformingProjects: string[];
+  ytdRevenue: number;
+  ytdExpenses: number;
+  ytdProfit: number;
+  ytdOperatingIncome: number;
+  ytdGrossProfit: number;
+  ytdNetProfit: number;
+  ytdCashFlow: number;
+  warnings?: string[];
+  zohoApiCallCount: number;
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log('🚀 Homepage Dashboard API called - starting data collection...');
@@ -17,7 +41,7 @@ export async function GET(request: NextRequest) {
     const CACHE_KEY = 'homepage-dashboard-data';
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
     
-    const cachedData = serverCache.get(CACHE_KEY);
+    const cachedData = serverCache.get<DashboardResponse>(CACHE_KEY);
     if (cachedData) {
       console.log('✅ Returning cached dashboard data');
       return NextResponse.json(cachedData);
@@ -529,7 +553,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Ensure we have valid arrays for all data
-    const safeDashboardData = {
+    const safeDashboardData: DashboardResponse = {
       totalProjects: totalProjects || 0,
       totalBilled: finalTotalBilled || 0,
       totalUnbilled: finalTotalUnbilled || 0,
@@ -584,7 +608,7 @@ export async function GET(request: NextRequest) {
     
     // Try to return stale cached data if available
     const CACHE_KEY = 'homepage-dashboard-data';
-    const staleCachedData = serverCache.get(CACHE_KEY);
+    const staleCachedData = serverCache.get<DashboardResponse>(CACHE_KEY);
     if (staleCachedData) {
       console.warn('⚠️ Returning stale cached data due to error');
       return NextResponse.json({
