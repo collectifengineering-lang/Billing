@@ -42,6 +42,17 @@ export async function POST(request: Request) {
   const requestData = await request.json();
   const { id, name, color } = requestData;
   
+  console.log('POST /api/project-managers called with:', { id, name, color });
+  
+  // Validate input
+  if (!id || !name || !color) {
+    return NextResponse.json({ 
+      error: 'Missing required fields',
+      details: 'id, name, and color are required',
+      received: { id: !!id, name: !!name, color: !!color }
+    }, { status: 400 });
+  }
+  
   try {
     // Check if tables exist first
     const schemaExists = await ensureDatabaseSchema();
@@ -53,12 +64,24 @@ export async function POST(request: Request) {
     
     await prisma.projectManager.upsert({
       where: { id },
-      update: { name, color },
-      create: { id, name, color },
+      update: { 
+        name, 
+        color 
+      },
+      create: { 
+        id, 
+        name, 
+        color 
+      },
     });
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error('Error updating project manager:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      code: 'code' in (error as any) ? (error as any).code : 'unknown',
+      data: requestData
+    });
     
     // If it's a table doesn't exist error, try to create the schema
     if (error instanceof Error && (error.message?.includes('does not exist') || 'code' in error && (error as any).code === 'P2021')) {
@@ -69,7 +92,7 @@ export async function POST(request: Request) {
         await prisma.projectManager.create({
           data: {
             id: '__test__',
-            name: 'test',
+            name: 'Test Manager',
             color: '#000000'
           }
         });
@@ -84,8 +107,15 @@ export async function POST(request: Request) {
         // Now try the original operation again
         await prisma.projectManager.upsert({
           where: { id },
-          update: { name, color },
-          create: { id, name, color },
+          update: { 
+            name, 
+            color 
+          },
+          create: { 
+            id, 
+            name, 
+            color 
+          },
         });
         
         return NextResponse.json({ success: true });
@@ -97,6 +127,9 @@ export async function POST(request: Request) {
       }
     }
     
-    return NextResponse.json({ error: 'Failed to update project manager' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to update project manager',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 } 
