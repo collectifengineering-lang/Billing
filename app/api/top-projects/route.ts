@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clockifyService } from '@/lib/clockify';
 import { zohoService } from '@/lib/zoho';
+import { projectMappingService, getProjectDetails } from '@/lib/projectMapping';
 
 // Force dynamic rendering to prevent static generation errors
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,10 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('end') || new Date().toISOString();
     
     console.info(`📅 Date range: ${startDate} to ${endDate}`);
+    
+    // Sync project mappings first (this will cache the data)
+    console.debug('🔄 Synchronizing project mappings...');
+    await projectMappingService.syncProjects();
     
     // Fetch data from both services
     const [clockifyTimeEntries, clockifyProjects, zohoProjects] = await Promise.allSettled([
@@ -32,7 +37,7 @@ export async function GET(request: NextRequest) {
       // Log sample entry for debugging
       if (timeEntries.length > 0) {
         const sampleEntry = timeEntries[0];
-        console.info('📝 Sample Clockify entry:', {
+        console.debug('📝 Sample Clockify entry:', {
           id: sampleEntry.id,
           projectId: sampleEntry.projectId,
           duration: sampleEntry.timeInterval?.duration,
@@ -53,7 +58,7 @@ export async function GET(request: NextRequest) {
       // Log sample project for debugging
       if (projects.length > 0) {
         const sampleProject = projects[0];
-        console.info('📋 Sample Clockify project:', {
+        console.debug('📋 Sample Clockify project:', {
           id: sampleProject.id,
           name: sampleProject.name,
           clientName: sampleProject.clientName
@@ -86,22 +91,53 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    // Calculate project statistics with proper project names
+    // Track missing projects for statistics
+    const missingProjectIds = new Set<string>();
+    const archivedProjectIds = new Set<string>();
+
+    // Calculate project statistics with proper project names and fallback mechanism
     const projectStats = new Map();
     
-    timeEntries.forEach(entry => {
+    for (const entry of timeEntries) {
       try {
         const projectId = entry.projectId;
         if (!projectId) {
-          console.warn('⚠️ Time entry missing projectId:', entry.id);
-          return;
+          console.debug('⚠️ Time entry missing projectId:', entry.id);
+          continue;
         }
         
         // Get project details from the map
-        const projectDetails = projectMap.get(projectId);
+        let projectDetails = projectMap.get(projectId);
+        
+        // If not found in primary source, try to fetch from mapping service with fallback
         if (!projectDetails) {
-          console.warn(`⚠️ No project details found for projectId: ${projectId}`);
-          return;
+          console.debug(`🔍 Project ${projectId} not found in Clockify, attempting fallback...`);
+          
+          const fetchedDetails = await getProjectDetails(projectId, 'clockify');
+          
+          if (fetchedDetails) {
+            console.debug(`✅ Retrieved project details via fallback: ${fetchedDetails.name}`);
+            projectDetails = {
+              id: fetchedDetails.id,
+              name: fetchedDetails.name,
+              clientName: fetchedDetails.clientName || 'Unknown Client',
+              billable: fetchedDetails.billable || false,
+              archived: fetchedDetails.archived || false
+            };
+            projectMap.set(projectId, projectDetails);
+          } else {
+            // Last resort: log as debug instead of warning for non-critical case
+            console.debug(`⚠️ Could not retrieve project details for ${projectId}, skipping entry`);
+            missingProjectIds.add(projectId);
+            continue;
+          }
+        }
+        
+        // Skip archived projects but log them separately
+        if (projectDetails.archived) {
+          archivedProjectIds.add(projectId);
+          console.debug(`📦 Skipping archived project: ${projectDetails.name} (${projectId})`);
+          continue;
         }
         
         // Parse duration safely
@@ -145,9 +181,9 @@ export async function GET(request: NextRequest) {
         
       } catch (entryError) {
         console.error('❌ Error processing time entry for stats:', entryError);
-        console.error('   Problematic entry:', entry);
+        console.debug('   Problematic entry:', entry);
       }
-    });
+    }
     
     // Convert to array and sort by total hours
     const topProjects = Array.from(projectStats.values())
@@ -163,6 +199,14 @@ export async function GET(request: NextRequest) {
     
     console.info(`📊 Calculated stats for ${topProjects.length} top projects`);
     
+    // Log summary of skipped items
+    if (missingProjectIds.size > 0) {
+      console.debug(`📝 Skipped ${missingProjectIds.size} entries due to missing project details`);
+    }
+    if (archivedProjectIds.size > 0) {
+      console.debug(`📦 Filtered out ${archivedProjectIds.size} archived projects from results`);
+    }
+    
     // Return successful response
     return NextResponse.json({
       success: true,
@@ -170,7 +214,12 @@ export async function GET(request: NextRequest) {
         topProjects,
         timeEntriesCount: timeEntries.length,
         projectsCount: projects.length,
-        dateRange: { start: startDate, end: endDate }
+        dateRange: { start: startDate, end: endDate },
+        metadata: {
+          missingProjects: missingProjectIds.size,
+          archivedProjects: archivedProjectIds.size,
+          processedProjects: projectStats.size
+        }
       },
       timestamp: new Date().toISOString()
     });

@@ -22,7 +22,9 @@
     "fix:database": "node fix-database-issues.js",
     "db:test": "npx prisma db pull",
     "db:reset": "npx prisma migrate reset --force",
-    "db:deploy": "npx prisma migrate deploy"
+    "db:deploy": "npx prisma migrate deploy",
+    "audit:projects": "npx ts-node scripts/audit-project-mappings.ts",
+    "audit:projects:js": "node scripts/audit-project-mappings.js"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.19.0",
