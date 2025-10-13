@@ -245,29 +245,31 @@ export async function saveEmployeeSalary(salary: {
     
     const result = await prisma.employee_salaries.upsert({
       where: {
-        employeeId_effectiveDate: {
-          employeeId: salary.employeeId,
-          effectiveDate: salary.effectiveDate
+        employee_id_effective_date: {
+          employee_id: salary.employeeId,
+          effective_date: salary.effectiveDate
         }
       },
       update: {
-        endDate: salary.endDate,
-        annualSalary: salary.annualSalary,
-        hourlyRate: salary.hourlyRate,
+        end_date: salary.endDate,
+        annual_salary: salary.annualSalary,
+        hourly_rate: salary.hourlyRate,
         currency: salary.currency,
         notes: salary.notes,
         source: salary.source,
-        updatedAt: new Date()
+        updated_at: new Date()
       },
       create: {
-        employeeId: salary.employeeId,
-        effectiveDate: salary.effectiveDate,
-        endDate: salary.endDate,
-        annualSalary: salary.annualSalary,
-        hourlyRate: salary.hourlyRate,
+        employee_id: salary.employeeId,
+        effective_date: salary.effectiveDate,
+        end_date: salary.endDate,
+        annual_salary: salary.annualSalary,
+        hourly_rate: salary.hourlyRate,
         currency: salary.currency || 'USD',
         notes: salary.notes,
-        source: salary.source || 'bamboohr'
+        source: salary.source || 'bamboohr',
+        created_at: new Date(),
+        updated_at: new Date()
       }
     });
     
@@ -282,14 +284,16 @@ export async function saveEmployeeSalary(salary: {
       try {
         const result = await prisma.employee_salaries.create({
           data: {
-            employeeId: salary.employeeId,
-            effectiveDate: salary.effectiveDate,
-            endDate: salary.endDate,
-            annualSalary: salary.annualSalary,
-            hourlyRate: salary.hourlyRate,
+            employee_id: salary.employeeId,
+            effective_date: salary.effectiveDate,
+            end_date: salary.endDate,
+            annual_salary: salary.annualSalary,
+            hourly_rate: salary.hourlyRate,
             currency: salary.currency || 'USD',
             notes: salary.notes,
-            source: salary.source || 'bamboohr'
+            source: salary.source || 'bamboohr',
+            created_at: new Date(),
+            updated_at: new Date()
           }
         });
         console.log(`✅ Employee salary created for ${salary.employeeId} effective ${salary.effectiveDate}`);
@@ -315,25 +319,27 @@ export async function saveProjectMultiplier(multiplier: {
   try {
     const result = await prisma.project_multipliers.upsert({
       where: {
-        projectId_effectiveDate: {
-          projectId: multiplier.projectId,
-          effectiveDate: multiplier.effectiveDate
+        project_id_effective_date: {
+          project_id: multiplier.projectId,
+          effective_date: multiplier.effectiveDate
         }
       },
       update: {
-        projectName: multiplier.projectName,
+        project_name: multiplier.projectName,
         multiplier: multiplier.multiplier,
-        endDate: multiplier.endDate,
+        end_date: multiplier.endDate,
         notes: multiplier.notes,
-        updatedAt: new Date()
+        updated_at: new Date()
       },
       create: {
-        projectId: multiplier.projectId,
-        projectName: multiplier.projectName,
+        project_id: multiplier.projectId,
+        project_name: multiplier.projectName,
         multiplier: multiplier.multiplier,
-        effectiveDate: multiplier.effectiveDate,
-        endDate: multiplier.endDate,
-        notes: multiplier.notes
+        effective_date: multiplier.effectiveDate,
+        end_date: multiplier.endDate,
+        notes: multiplier.notes,
+        created_at: new Date(),
+        updated_at: new Date()
       }
     });
     
@@ -365,43 +371,45 @@ export async function saveEmployeeTimeEntry(timeEntry: {
   try {
     const result = await prisma.employee_time_entries.upsert({
       where: {
-        employeeId_projectId_date: {
-          employeeId: timeEntry.employeeId,
-          projectId: timeEntry.projectId,
+        employee_id_project_id_date: {
+          employee_id: timeEntry.employeeId,
+          project_id: timeEntry.projectId,
           date: timeEntry.date
         }
       },
       update: {
-        employeeName: timeEntry.employeeName,
-        projectName: timeEntry.projectName,
+        employee_name: timeEntry.employeeName,
+        project_name: timeEntry.projectName,
         hours: timeEntry.hours,
-        billableHours: timeEntry.billableHours,
-        nonBillableHours: timeEntry.nonBillableHours,
-        hourlyRate: timeEntry.hourlyRate,
-        projectMultiplier: timeEntry.projectMultiplier,
-        totalCost: timeEntry.totalCost,
-        billableValue: timeEntry.billableValue,
+        billable_hours: timeEntry.billableHours,
+        non_billable_hours: timeEntry.nonBillableHours,
+        hourly_rate: timeEntry.hourlyRate,
+        project_multiplier: timeEntry.projectMultiplier,
+        total_cost: timeEntry.totalCost,
+        billable_value: timeEntry.billableValue,
         efficiency: timeEntry.efficiency,
         description: timeEntry.description,
         tags: timeEntry.tags,
-        updatedAt: new Date()
+        updated_at: new Date()
       },
       create: {
-        employeeId: timeEntry.employeeId,
-        employeeName: timeEntry.employeeName,
-        projectId: timeEntry.projectId,
-        projectName: timeEntry.projectName,
+        employee_id: timeEntry.employeeId,
+        employee_name: timeEntry.employeeName,
+        project_id: timeEntry.projectId,
+        project_name: timeEntry.projectName,
         date: timeEntry.date,
         hours: timeEntry.hours,
-        billableHours: timeEntry.billableHours,
-        nonBillableHours: timeEntry.nonBillableHours,
-        hourlyRate: timeEntry.hourlyRate,
-        projectMultiplier: timeEntry.projectMultiplier,
-        totalCost: timeEntry.totalCost,
-        billableValue: timeEntry.billableValue,
+        billable_hours: timeEntry.billableHours,
+        non_billable_hours: timeEntry.nonBillableHours,
+        hourly_rate: timeEntry.hourlyRate,
+        project_multiplier: timeEntry.projectMultiplier,
+        total_cost: timeEntry.totalCost,
+        billable_value: timeEntry.billableValue,
         efficiency: timeEntry.efficiency,
         description: timeEntry.description,
-        tags: timeEntry.tags
+        tags: timeEntry.tags,
+        created_at: new Date(),
+        updated_at: new Date()
       }
     });
     
@@ -415,11 +423,7 @@ export async function saveEmployeeTimeEntry(timeEntry: {
 
 export async function getAllEmployees() {
   try {
-    return await prisma.employees.findMany({
-      include: {
-        salaries: true
-      }
-    });
+    return await prisma.employees.findMany();
   } catch (error) {
     console.error('Error getting all employees:', error);
     throw error;
@@ -428,11 +432,7 @@ export async function getAllEmployees() {
 
 export async function getAllEmployeeSalaries() {
   try {
-    return await prisma.employee_salaries.findMany({
-      include: {
-        employee: true
-      }
-    });
+    return await prisma.employee_salaries.findMany();
   } catch (error) {
     console.error('Error getting all employee salaries:', error);
     throw error;
@@ -450,11 +450,7 @@ export async function getAllProjectMultipliers() {
 
 export async function getAllEmployeeTimeEntries() {
   try {
-    return await prisma.employee_time_entries.findMany({
-      include: {
-        employee: true
-      }
-    });
+    return await prisma.employee_time_entries.findMany();
   } catch (error) {
     console.error('Error getting all time entries:', error);
     throw error;

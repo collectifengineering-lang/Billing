@@ -47,7 +47,7 @@ export interface ClockifyImportResult {
   };
 }
 
-// Type conversion utility to handle Prisma null values
+// Type conversion utility to handle Prisma null values (with snake_case from DB)
 function convertPrismaEmployee(emp: { 
   id: string; 
   name: string; 
@@ -55,8 +55,10 @@ function convertPrismaEmployee(emp: {
   status: string; 
   department: string | null; 
   position: string | null; 
-  hireDate: string | null; 
-  terminationDate: string | null; 
+  hire_date: string | null; 
+  termination_date: string | null;
+  created_at: Date;
+  updated_at: Date;
 }): Employee {
   return {
     id: emp.id,
@@ -65,27 +67,29 @@ function convertPrismaEmployee(emp: {
     status: (emp.status === 'active' || emp.status === 'inactive') ? emp.status : 'active',
     department: emp.department ?? undefined, // Convert null to undefined
     position: emp.position ?? undefined, // Convert null to undefined
-    hireDate: emp.hireDate ?? undefined, // Convert null to undefined
-    terminationDate: emp.terminationDate ?? undefined // Convert null to undefined
+    hireDate: emp.hire_date ?? undefined, // Convert null to undefined, map snake_case to camelCase
+    terminationDate: emp.termination_date ?? undefined // Convert null to undefined, map snake_case to camelCase
   };
 }
 
-// Type conversion utility to handle Prisma null values for EmployeeSalary
+// Type conversion utility to handle Prisma null values for EmployeeSalary (with snake_case from DB)
 function convertPrismaEmployeeSalary(salary: { 
-  employeeId: string; 
-  effectiveDate: string; 
-  endDate: string | null; 
-  annualSalary: { toNumber(): number }; 
-  hourlyRate: { toNumber(): number }; 
+  employee_id: string; 
+  effective_date: string; 
+  end_date: string | null; 
+  annual_salary: { toNumber(): number }; 
+  hourly_rate: { toNumber(): number }; 
   currency: string; 
-  notes: string | null; 
+  notes: string | null;
+  created_at: Date;
+  updated_at: Date;
 }): EmployeeSalary {
   return {
-    employeeId: salary.employeeId,
-    effectiveDate: salary.effectiveDate,
-    endDate: salary.endDate ?? undefined, // Convert null to undefined
-    annualSalary: salary.annualSalary.toNumber(), // Convert Decimal to number
-    hourlyRate: salary.hourlyRate.toNumber(), // Convert Decimal to number
+    employeeId: salary.employee_id, // Map snake_case to camelCase
+    effectiveDate: salary.effective_date, // Map snake_case to camelCase
+    endDate: salary.end_date ?? undefined, // Convert null to undefined
+    annualSalary: salary.annual_salary.toNumber(), // Convert Decimal to number
+    hourlyRate: salary.hourly_rate.toNumber(), // Convert Decimal to number
     currency: salary.currency,
     notes: salary.notes ?? undefined // Convert null to undefined
   };
@@ -112,7 +116,7 @@ export class ClockifyImportService {
         getAllProjectMultipliers()
       ]);
 
-      // Build employee map with proper type casting
+      // Build employee map with proper type casting (using snake_case from Prisma)
       this.employeeMap.clear();
       for (const emp of employees as Array<{
         id: string; 
@@ -121,8 +125,10 @@ export class ClockifyImportService {
         status: string; 
         department: string | null; 
         position: string | null; 
-        hireDate: string | null; 
-        terminationDate: string | null; 
+        hire_date: string | null; 
+        termination_date: string | null;
+        created_at: Date;
+        updated_at: Date;
       }>) {
         // Log raw employee data for debugging
         console.log(`📋 Raw employee data for ${emp.id}:`, {
@@ -132,8 +138,8 @@ export class ClockifyImportService {
           status: emp.status,
           department: emp.department,
           position: emp.position,
-          hireDate: emp.hireDate,
-          terminationDate: emp.terminationDate
+          hireDate: emp.hire_date,
+          terminationDate: emp.termination_date
         });
 
         // Convert Prisma employee data to our interface
@@ -150,24 +156,26 @@ export class ClockifyImportService {
       }
       console.log(`👥 Loaded ${employees.length} employees`);
 
-      // Build salary map (use most recent salary per employee)
+      // Build salary map (use most recent salary per employee) - using snake_case from Prisma
       this.salaryMap.clear();
       for (const salary of salaries as Array<{
-        employeeId: string; 
-        effectiveDate: string; 
-        endDate: string | null; 
-        annualSalary: { toNumber(): number }; 
-        hourlyRate: { toNumber(): number }; 
+        employee_id: string; 
+        effective_date: string; 
+        end_date: string | null; 
+        annual_salary: { toNumber(): number }; 
+        hourly_rate: { toNumber(): number }; 
         currency: string; 
-        notes: string | null; 
+        notes: string | null;
+        created_at: Date;
+        updated_at: Date;
       }>) {
         // Log raw salary data for debugging
-        console.log(`📋 Raw salary data for ${salary.employeeId}:`, {
-          employeeId: salary.employeeId,
-          effectiveDate: salary.effectiveDate,
-          endDate: salary.endDate,
-          annualSalary: salary.annualSalary.toNumber(), // Convert Decimal to number for logging
-          hourlyRate: salary.hourlyRate.toNumber(), // Convert Decimal to number for logging
+        console.log(`📋 Raw salary data for ${salary.employee_id}:`, {
+          employeeId: salary.employee_id,
+          effectiveDate: salary.effective_date,
+          endDate: salary.end_date,
+          annualSalary: salary.annual_salary.toNumber(), // Convert Decimal to number for logging
+          hourlyRate: salary.hourly_rate.toNumber(), // Convert Decimal to number for logging
           currency: salary.currency,
           notes: salary.notes
         });
@@ -188,34 +196,36 @@ export class ClockifyImportService {
       }
       console.log(`💰 Loaded ${this.salaryMap.size} employee salaries`);
 
-      // Build project multiplier map
+      // Build project multiplier map - using snake_case from Prisma
       this.multiplierMap.clear();
       for (const mult of multipliers as Array<{
-        projectId: string; 
-        projectName: string; 
+        project_id: string; 
+        project_name: string; 
         multiplier: { toNumber(): number }; 
-        effectiveDate: string; 
-        endDate: string | null; 
-        notes: string | null; 
+        effective_date: string; 
+        end_date: string | null; 
+        notes: string | null;
+        created_at: Date;
+        updated_at: Date;
       }>) {
         // Log raw multiplier data for debugging
-        console.log(`📋 Raw multiplier data for project ${mult.projectId}:`, {
-          projectId: mult.projectId,
-          projectName: mult.projectName,
+        console.log(`📋 Raw multiplier data for project ${mult.project_id}:`, {
+          projectId: mult.project_id,
+          projectName: mult.project_name,
           multiplier: mult.multiplier.toNumber(), // Convert Decimal to number for logging
-          effectiveDate: mult.effectiveDate,
-          endDate: mult.endDate,
+          effectiveDate: mult.effective_date,
+          endDate: mult.end_date,
           notes: mult.notes
         });
 
-        const existing = this.multiplierMap.get(mult.projectId);
-        if (!existing || new Date(mult.effectiveDate) > new Date(existing.effectiveDate)) {
-          this.multiplierMap.set(mult.projectId, { 
+        const existing = this.multiplierMap.get(mult.project_id);
+        if (!existing || new Date(mult.effective_date) > new Date(existing.effectiveDate)) {
+          this.multiplierMap.set(mult.project_id, { 
             multiplier: mult.multiplier.toNumber(), // Convert Decimal to number
-            effectiveDate: mult.effectiveDate 
+            effectiveDate: mult.effective_date 
           });
           
-          console.log(`✅ Loaded multiplier for project ${mult.projectId}: ${mult.multiplier.toNumber()}x`);
+          console.log(`✅ Loaded multiplier for project ${mult.project_id}: ${mult.multiplier.toNumber()}x`);
         }
       }
       console.log(`📈 Loaded ${this.multiplierMap.size} project multipliers`);

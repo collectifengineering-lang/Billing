@@ -96,7 +96,7 @@ class OptimizedZohoService {
       const now = new Date();
       
       // Try to get cached token from Supabase
-      const cachedToken = await prisma.zohoTokenCache.findFirst({
+      const cachedToken = await prisma.zoho_token_cache.findFirst({
         where: {
           expiresAt: { gt: new Date(now.getTime() + this.TOKEN_CACHE_BUFFER) },
         },
@@ -158,7 +158,7 @@ class OptimizedZohoService {
         const expiresAt = new Date(Date.now() + response.data.expires_in * 1000);
 
         // Store token in Supabase for persistence across function invocations
-        await prisma.zohoTokenCache.create({
+        await prisma.zoho_token_cache.create({
           data: {
             accessToken: response.data.access_token,
             expiresAt,
@@ -168,12 +168,12 @@ class OptimizedZohoService {
         });
 
         // Clean up old tokens (keep only last 5)
-        const oldTokens = await prisma.zohoTokenCache.findMany({
+        const oldTokens = await prisma.zoho_token_cache.findMany({
           orderBy: { createdAt: 'desc' },
           skip: 5,
         });
         if (oldTokens.length > 0) {
-          await prisma.zohoTokenCache.deleteMany({
+          await prisma.zoho_token_cache.deleteMany({
             where: { id: { in: oldTokens.map((t) => t.id) } },
           });
         }
@@ -465,7 +465,7 @@ class OptimizedZohoService {
   ): Promise<T> {
     try {
       // Check cache
-      const cached = await prisma.financialDataCache.findUnique({
+      const cached = await prisma.financial_data_cache.findUnique({
         where: { cacheKey },
       });
 
@@ -481,7 +481,7 @@ class OptimizedZohoService {
 
       // Store in cache
       const expiresAt = new Date(Date.now() + ttl);
-      await prisma.financialDataCache.upsert({
+      await prisma.financial_data_cache.upsert({
         where: { cacheKey },
         create: {
           cacheKey,
@@ -709,7 +709,7 @@ class OptimizedZohoService {
    * Clear all caches
    */
   async clearAllCaches(): Promise<void> {
-    await prisma.financialDataCache.deleteMany({});
+    await prisma.financial_data_cache.deleteMany({});
     console.log('🧹 All caches cleared');
   }
 
@@ -722,7 +722,7 @@ class OptimizedZohoService {
     expiredItems: number;
     totalSize: number;
   }> {
-    const allItems = await prisma.financialDataCache.findMany();
+    const allItems = await prisma.financial_data_cache.findMany();
     const now = new Date();
     
     const activeItems = allItems.filter((item) => item.expiresAt > now);

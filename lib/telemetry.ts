@@ -49,14 +49,14 @@ export class PerformanceTelemetry {
     const duration = Date.now() - this.startTime;
     
     try {
-      await prisma.performanceTelemetry.create({
+      await prisma.performance_telemetry.create({
         data: {
           endpoint: this.endpoint,
           duration,
           success: true,
-          rateLimitHit: this.rateLimitHit,
-          retryCount: this.retryCount,
-          totalWaitTime: this.totalWaitTime,
+          rate_limit_hit: this.rateLimitHit,
+          retry_count: this.retryCount,
+          total_wait_time: this.totalWaitTime,
           metadata: metadata ? JSON.stringify(metadata) : null,
         },
       });
@@ -65,8 +65,8 @@ export class PerformanceTelemetry {
       const logData = {
         endpoint: this.endpoint,
         duration: `${duration}ms`,
-        rateLimitHit: this.rateLimitHit,
-        retryCount: this.retryCount,
+        rate_limit_hit: this.rateLimitHit,
+        retry_count: this.retryCount,
         totalWaitTime: this.totalWaitTime > 0 ? `${this.totalWaitTime}ms` : '0ms',
       };
 
@@ -89,15 +89,15 @@ export class PerformanceTelemetry {
     const duration = Date.now() - this.startTime;
     
     try {
-      await prisma.performanceTelemetry.create({
+      await prisma.performance_telemetry.create({
         data: {
           endpoint: this.endpoint,
           duration,
           success: false,
-          errorMessage: error.message,
-          rateLimitHit: this.rateLimitHit,
-          retryCount: this.retryCount,
-          totalWaitTime: this.totalWaitTime,
+          error_message: error.message,
+          rate_limit_hit: this.rateLimitHit,
+          retry_count: this.retryCount,
+          total_wait_time: this.totalWaitTime,
           metadata: metadata ? JSON.stringify(metadata) : null,
         },
       });
@@ -106,8 +106,8 @@ export class PerformanceTelemetry {
         endpoint: this.endpoint,
         duration: `${duration}ms`,
         error: error.message,
-        rateLimitHit: this.rateLimitHit,
-        retryCount: this.retryCount,
+        rate_limit_hit: this.rateLimitHit,
+        retry_count: this.retryCount,
         totalWaitTime: this.totalWaitTime > 0 ? `${this.totalWaitTime}ms` : '0ms',
       });
     } catch (dbError) {
@@ -128,7 +128,7 @@ export class PerformanceTelemetry {
   }> {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const records = await prisma.performanceTelemetry.findMany({
+    const records = await prisma.performance_telemetry.findMany({
       where: {
         endpoint,
         timestamp: { gte: since },
@@ -137,9 +137,9 @@ export class PerformanceTelemetry {
 
     const totalCalls = records.length;
     const successfulCalls = records.filter((r) => r.success).length;
-    const rateLimitHits = records.filter((r) => r.rateLimitHit).length;
+    const rateLimitHits = records.filter((r) => r.rate_limit_hit).length;
     const totalDuration = records.reduce((sum, r) => sum + r.duration, 0);
-    const totalWaitTime = records.reduce((sum, r) => sum + r.totalWaitTime, 0);
+    const totalWaitTime = records.reduce((sum, r) => sum + r.total_wait_time, 0);
     const slowCalls = records.filter((r) => r.duration > 3000).length;
 
     return {
@@ -164,7 +164,7 @@ export class PerformanceTelemetry {
   }> {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const records = await prisma.performanceTelemetry.findMany({
+    const records = await prisma.performance_telemetry.findMany({
       where: {
         timestamp: { gte: since },
       },
@@ -172,15 +172,15 @@ export class PerformanceTelemetry {
 
     const totalApiCalls = records.length;
     const successfulCalls = records.filter((r) => r.success).length;
-    const totalRateLimitHits = records.filter((r) => r.rateLimitHit).length;
-    const totalWaitTime = records.reduce((sum, r) => sum + r.totalWaitTime, 0);
+    const totalRateLimitHits = records.filter((r) => r.rate_limit_hit).length;
+    const totalWaitTime = records.reduce((sum, r) => sum + r.total_wait_time, 0);
 
     // Group by endpoint to find high wait time endpoints
     const endpointWaitTimes = records.reduce((acc, record) => {
       if (!acc[record.endpoint]) {
         acc[record.endpoint] = { total: 0, count: 0 };
       }
-      acc[record.endpoint].total += record.totalWaitTime;
+      acc[record.endpoint].total += record.total_wait_time;
       acc[record.endpoint].count += 1;
       return acc;
     }, {} as Record<string, { total: number; count: number }>);
@@ -208,7 +208,7 @@ export class PerformanceTelemetry {
   static async cleanup(daysToKeep: number = 30): Promise<number> {
     const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000);
 
-    const result = await prisma.performanceTelemetry.deleteMany({
+    const result = await prisma.performance_telemetry.deleteMany({
       where: {
         timestamp: { lt: cutoffDate },
       },
