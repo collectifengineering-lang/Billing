@@ -310,6 +310,14 @@ export async function GET(request: NextRequest) {
       totalInvoices: invoices.length
     });
     
+    // Debug: log first few invoice totals to verify parsing
+    console.log('🔍 Sample invoice totals for debugging:', ytdInvoices.slice(0, 5).map(inv => ({
+      number: inv.invoice_number,
+      total: inv.total,
+      parsed: parseFloat(inv.total),
+      type: typeof inv.total
+    })));
+    
     // Calculate billing from Clockify time tracking (if available)
     let clockifyTotalBilled = 0;
     let clockifyTotalUnbilled = 0;
@@ -386,7 +394,13 @@ export async function GET(request: NextRequest) {
       method: 'Invoice-based (Accrual)',
       revenue: ytdRevenue,
       operatingIncome: ytdOperatingIncome,
-      dataSource: 'Zoho Invoices API'
+      dataSource: 'Zoho Invoices API',
+      finalTotalBilled: finalTotalBilled,
+      zohoTotalBilled: zohoTotalBilled,
+      breakdown: {
+        ytdRevenue_equals_finalTotalBilled: ytdRevenue === finalTotalBilled,
+        ytdOperatingIncome_equals_ytdRevenue: ytdOperatingIncome === ytdRevenue
+      }
     });
     
     // Calculate other financial metrics with fallback logic
@@ -508,6 +522,7 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ Homepage dashboard data generated:', safeDashboardData);
     console.log('🚀 Returning dashboard data to client...');
+    console.log('🔍 CRITICAL - ytdOperatingIncome being returned:', safeDashboardData.ytdOperatingIncome, '(type:', typeof safeDashboardData.ytdOperatingIncome, ')');
 
     return NextResponse.json(safeDashboardData);
   } catch (error) {
