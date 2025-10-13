@@ -98,16 +98,16 @@ class OptimizedZohoService {
       // Try to get cached token from Supabase
       const cachedToken = await prisma.zoho_token_cache.findFirst({
         where: {
-          expiresAt: { gt: new Date(now.getTime() + this.TOKEN_CACHE_BUFFER) },
+          expires_at: { gt: new Date(now.getTime() + this.TOKEN_CACHE_BUFFER) },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
       });
 
       if (cachedToken && !process.env.ZOHO_FORCE_REFRESH) {
-        const minutesLeft = Math.round((cachedToken.expiresAt.getTime() - now.getTime()) / 60000);
+        const minutesLeft = Math.round((cachedToken.expires_at.getTime() - now.getTime()) / 60000);
         console.log(`🔐 Using cached Zoho token from Supabase (expires in ${minutesLeft} minutes)`);
         await telemetry.recordSuccess({ source: 'cache', minutesLeft });
-        return cachedToken.accessToken;
+        return cachedToken.access_token;
       }
 
       // Token expired or missing, refresh it
@@ -160,16 +160,18 @@ class OptimizedZohoService {
         // Store token in Supabase for persistence across function invocations
         await prisma.zoho_token_cache.create({
           data: {
-            accessToken: response.data.access_token,
-            expiresAt,
-            refreshToken: response.data.refresh_token,
-            apiDomain: response.data.api_domain,
+            access_token: response.data.access_token,
+            expires_at: expiresAt,
+            refresh_token: response.data.refresh_token,
+            api_domain: response.data.api_domain,
+            created_at: new Date(),
+            updated_at: new Date(),
           },
         });
 
         // Clean up old tokens (keep only last 5)
         const oldTokens = await prisma.zoho_token_cache.findMany({
-          orderBy: { createdAt: 'desc' },
+          orderBy: { created_at: 'desc' },
           skip: 5,
         });
         if (oldTokens.length > 0) {
@@ -466,11 +468,11 @@ class OptimizedZohoService {
     try {
       // Check cache
       const cached = await prisma.financial_data_cache.findUnique({
-        where: { cacheKey },
+        where: { cache_key: cacheKey },
       });
 
-      if (cached && cached.expiresAt > new Date()) {
-        const minutesLeft = Math.round((cached.expiresAt.getTime() - Date.now()) / 60000);
+      if (cached && cached.expires_at > new Date()) {
+        const minutesLeft = Math.round((cached.expires_at.getTime() - Date.now()) / 60000);
         console.log(`💾 Using cached data for ${cacheKey} (expires in ${minutesLeft} minutes)`);
         return JSON.parse(cached.data) as T;
       }
@@ -482,15 +484,18 @@ class OptimizedZohoService {
       // Store in cache
       const expiresAt = new Date(Date.now() + ttl);
       await prisma.financial_data_cache.upsert({
-        where: { cacheKey },
+        where: { cache_key: cacheKey },
         create: {
-          cacheKey,
+          cache_key: cacheKey,
           data: JSON.stringify(data),
-          expiresAt,
+          expires_at: expiresAt,
+          created_at: new Date(),
+          updated_at: new Date(),
         },
         update: {
           data: JSON.stringify(data),
-          expiresAt,
+          expires_at: expiresAt,
+          updated_at: new Date(),
         },
       });
 
@@ -725,8 +730,8 @@ class OptimizedZohoService {
     const allItems = await prisma.financial_data_cache.findMany();
     const now = new Date();
     
-    const activeItems = allItems.filter((item) => item.expiresAt > now);
-    const expiredItems = allItems.filter((item) => item.expiresAt <= now);
+    const activeItems = allItems.filter((item) => item.expires_at > now);
+    const expiredItems = allItems.filter((item) => item.expires_at <= now);
     const totalSize = allItems.reduce((sum, item) => sum + item.data.length, 0);
 
     return {
