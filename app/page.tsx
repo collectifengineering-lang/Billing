@@ -29,7 +29,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import TremorBillingChart from '@/components/TremorBillingChart';
+import TremorKPICards from '@/components/TremorKPICards';
+import BillingTable from '@/components/BillingTable';
+import { generateSampleBillingData, convertToBillingFormat } from '@/lib/sampleData';
 
 interface DashboardStats {
   totalProjects: number;
@@ -111,6 +114,49 @@ export default function HomePage() {
   const [projections, setProjections] = useState<any>({});
   const [closedProjects, setClosedProjects] = useState<Set<string>>(new Set());
   const [projectStatuses, setProjectStatuses] = useState<Record<string, string>>({});
+  const [billingTableData, setBillingTableData] = useState(generateSampleBillingData());
+
+  // Sample billing data for Tremor charts
+  const sampleBillingData = [
+    { projectName: 'Project Alpha', month: 'Jan', billed: 15000, projected: 18000 },
+    { projectName: 'Project Beta', month: 'Feb', billed: 22000, projected: 20000 },
+    { projectName: 'Project Gamma', month: 'Mar', billed: 18500, projected: 22000 },
+    { projectName: 'Project Delta', month: 'Apr', billed: 25000, projected: 24000 },
+    { projectName: 'Project Epsilon', month: 'May', billed: 19800, projected: 21000 },
+    { projectName: 'Project Zeta', month: 'Jun', billed: 23000, projected: 25000 },
+  ];
+
+  // Sample KPI data for Tremor cards
+  const sampleKPIData = [
+    {
+      title: 'Total Revenue',
+      metric: '$1,234,567',
+      delta: '12.5%',
+      deltaType: 'increase' as const,
+      description: 'Year-to-date revenue growth'
+    },
+    {
+      title: 'Active Projects',
+      metric: '24',
+      delta: '8.2%',
+      deltaType: 'increase' as const,
+      description: 'Currently active projects'
+    },
+    {
+      title: 'Avg. Project Value',
+      metric: '$51,440',
+      delta: '-2.1%',
+      deltaType: 'decrease' as const,
+      description: 'Average project billing amount'
+    },
+    {
+      title: 'Completion Rate',
+      metric: '94.2%',
+      delta: '0.0%',
+      deltaType: 'unchanged' as const,
+      description: 'Projects completed on time'
+    }
+  ];
 
   // Monitor topProjects state to ensure it's always an array
   useEffect(() => {
@@ -463,7 +509,7 @@ export default function HomePage() {
           onValueChange={setSelectedTab}
           className="w-full space-y-8"
         >
-          <TabsList className="grid w-full grid-cols-6 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-xl p-1 shadow-lg">
+          <TabsList className="grid w-full grid-cols-7 h-16 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-gray-200 dark:border-slate-700 rounded-xl p-1 shadow-lg">
             <TabsTrigger 
               value="projections-table" 
               className="text-white data-[state=active]:bg-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
@@ -505,6 +551,13 @@ export default function HomePage() {
             >
               <AlertTriangle className="h-5 w-5 mr-2" />
               Bottom Projects
+            </TabsTrigger>
+            <TabsTrigger 
+              value="billing-table" 
+              className="text-white data-[state=active]:bg-teal-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200 rounded-lg"
+            >
+              <DollarSign className="h-5 w-5 mr-2" />
+              Billing Table
             </TabsTrigger>
           </TabsList>
 
@@ -954,7 +1007,7 @@ export default function HomePage() {
                   ))}
                 </div>
 
-                {/* Efficiency Chart */}
+                {/* Tremor KPI Cards */}
                 <motion.div
                   variants={cardVariants}
                   initial="hidden"
@@ -964,46 +1017,32 @@ export default function HomePage() {
                   <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
                     <CardHeader>
                       <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">
-                        Billable vs Non-Billable Hours
+                        Key Performance Indicators
                       </CardTitle>
                       <CardDescription>
-                        Visual breakdown of time allocation efficiency
+                        Real-time metrics and performance indicators
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={timeTrackingData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={60}
-                              outerRadius={100}
-                              paddingAngle={5}
-                              dataKey="value"
-                            >
-                              {timeTrackingData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="flex justify-center space-x-8 mt-4">
-                        {timeTrackingData.map((item) => (
-                          <div key={item.name} className="flex items-center space-x-2">
-                            <div 
-                              className="w-4 h-4 rounded-full" 
-                              style={{ backgroundColor: item.color }}
-                            />
-                            <span className="text-sm text-gray-600 dark:text-gray-300">
-                              {item.name}: {item.value}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                      <TremorKPICards data={sampleKPIData} />
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Tremor Billing Chart */}
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: 0.5 }}
+                >
+                  <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-xl">
+                    <CardContent className="p-6">
+                      <TremorBillingChart 
+                        data={sampleBillingData}
+                        title="Monthly Billing Overview"
+                        description="Billed vs projected amounts by month"
+                      />
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -1200,23 +1239,16 @@ export default function HomePage() {
                     </CardHeader>
                     <CardContent>
                       {topProjectsChartData.length > 0 ? (
-                        <div className="h-80">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={topProjectsChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                              <XAxis dataKey="name" />
-                              <YAxis />
-                              <Tooltip 
-                                formatter={(value, name) => [
-                                  name === 'multiplier' ? Number(value).toFixed(2) + 'x' : 
-                                  name === 'revenue' ? formatCurrency(Number(value)) : value,
-                                  name === 'multiplier' ? 'Multiplier' : 
-                                  name === 'revenue' ? 'Revenue' : 'Hours'
-                                ]}
-                              />
-                              <Bar dataKey="multiplier" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
+                        <TremorBillingChart 
+                          data={topProjectsChartData.map(project => ({
+                            projectName: project.name,
+                            month: project.name,
+                            billed: project.multiplier * 1000, // Convert multiplier to visual scale
+                            projected: project.revenue
+                          }))}
+                          title="Top Projects Performance"
+                          description="Multiplier and revenue comparison"
+                        />
                       ) : (
                         <div className="h-80 flex items-center justify-center">
                           <div className="text-center">
@@ -1327,23 +1359,16 @@ export default function HomePage() {
                     </CardHeader>
                     <CardContent>
                       {bottomProjectsChartData.length > 0 ? (
-                        <div className="h-80">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={bottomProjectsChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                              <XAxis dataKey="name" />
-                              <YAxis />
-                              <Tooltip 
-                                formatter={(value, name) => [
-                                  name === 'multiplier' ? Number(value).toFixed(2) + 'x' : 
-                                  name === 'revenue' ? formatCurrency(Number(value)) : value,
-                                  name === 'multiplier' ? 'Multiplier' : 
-                                  name === 'revenue' ? 'Revenue' : 'Hours'
-                                ]}
-                              />
-                              <Bar dataKey="multiplier" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
+                        <TremorBillingChart 
+                          data={bottomProjectsChartData.map(project => ({
+                            projectName: project.name,
+                            month: project.name,
+                            billed: project.multiplier * 1000, // Convert multiplier to visual scale
+                            projected: project.revenue
+                          }))}
+                          title="Bottom Projects Performance"
+                          description="Multiplier and revenue comparison"
+                        />
                       ) : (
                         <div className="h-80 flex items-center justify-center">
                           <div className="text-center">
@@ -1427,6 +1452,26 @@ export default function HomePage() {
                     </CardContent>
                   </Card>
                 </motion.div>
+              </motion.div>
+            </AnimatePresence>
+          </TabsContent>
+
+          {/* Billing Table Tab */}
+          <TabsContent value="billing-table" className="space-y-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="billing-table"
+                variants={tabVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <BillingTable 
+                  data={billingTableData}
+                  onDataChange={setBillingTableData}
+                />
               </motion.div>
             </AnimatePresence>
           </TabsContent>
