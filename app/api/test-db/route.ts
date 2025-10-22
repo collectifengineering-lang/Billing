@@ -1,49 +1,61 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/db';
+import { PrismaClient } from '@prisma/client';
 
-// Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  // Only attempt database connection in production runtime
-  if (process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV) {
-    return NextResponse.json({ 
-      success: false, 
-      message: 'Database connection skipped during build'
-    });
-  }
-
-  // Check if prisma client is available
-  if (!prisma) {
-    return NextResponse.json({ 
-      success: false, 
-      message: 'Prisma client not available'
-    }, { status: 500 });
-  }
-
   try {
-    console.log('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
-    console.log('Testing basic database connection...');
+    console.log('🧪 TEST DB API: Starting database test...');
+    console.log('🧪 TEST DB API: DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('🧪 TEST DB API: NODE_ENV:', process.env.NODE_ENV);
     
-    // Try a simple query using the singleton
-    const result = await prisma.$queryRaw`SELECT 1 as test`;
-    
-    console.log('Database connection successful:', result);
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Database connection successful',
-      result
+    // Create a new Prisma client instance
+    const prisma = new PrismaClient({
+      log: ['query', 'info', 'warn', 'error'],
     });
     
-  } catch (error: unknown) {
-    console.error('Database connection failed:', error);
-    console.error('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
+    // Test basic connection
+    await prisma.$connect();
+    console.log('✅ TEST DB API: Database connected');
     
-    return NextResponse.json({ 
-      error: 'Database connection failed', 
-      details: error instanceof Error ? error.message : 'Unknown error',
-      code: error instanceof Error && 'code' in error ? (error as any).code : undefined
+    // Test projections table
+    const projectionCount = await prisma.projection.count();
+    console.log('✅ TEST DB API: Projection count:', projectionCount);
+    
+    // Get sample projections
+    const sampleProjections = await prisma.projection.findMany({
+      take: 3,
+      orderBy: { id: 'asc' }
+    });
+    
+    console.log('✅ TEST DB API: Sample projections:', sampleProjections);
+    
+    // Test the same transformation as the main API
+    const allProjections = await prisma.projection.findMany();
+    const formatted = allProjections.reduce((acc, projection) => {
+      if (!acc[projection.projectId]) acc[projection.projectId] = {};
+      acc[projection.projectId][projection.month] = projection.value;
+      return acc;
+    }, {} as Record<string, Record<string, number>>);
+    
+    console.log('✅ TEST DB API: Formatted keys count:', Object.keys(formatted).length);
+    
+    await prisma.$disconnect();
+    
+    return NextResponse.json({
+      success: true,
+      projectionCount,
+      sampleProjections,
+      formattedKeysCount: Object.keys(formatted).length,
+      sampleFormatted: Object.keys(formatted).slice(0, 5)
+    });
+    
+  } catch (error) {
+    console.error('❌ TEST DB API: Error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
 }

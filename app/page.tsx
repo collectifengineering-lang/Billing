@@ -249,10 +249,14 @@ export default function HomePage() {
           const projectionsResponse = await fetch('/api/projections');
           if (projectionsResponse.ok) {
             const projectionsData = await projectionsResponse.json();
+            console.log('Homepage: Loaded projections data:', projectionsData);
+            console.log('Homepage: Projections data keys:', Object.keys(projectionsData));
             setProjections(projectionsData);
+          } else {
+            console.warn('Homepage: Failed to load projections, status:', projectionsResponse.status);
           }
         } catch (projectionsError) {
-          console.error('Error loading projections:', projectionsError);
+          console.error('Homepage: Error loading projections:', projectionsError);
         }
 
         // Validate and set dashboard stats

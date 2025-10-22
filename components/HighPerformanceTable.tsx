@@ -156,8 +156,12 @@ export default function HighPerformanceTable({
   }, [asrFeesData]);
 
   useEffect(() => {
+    console.log('HighPerformanceTable: monthlyProjectionsData from SWR:', monthlyProjectionsData);
     if (monthlyProjectionsData && Object.keys(monthlyProjectionsData).length > 0) {
+      console.log('HighPerformanceTable: Setting monthlyProjections from SWR data');
       setMonthlyProjections(monthlyProjectionsData);
+    } else {
+      console.log('HighPerformanceTable: No SWR monthlyProjectionsData available');
     }
   }, [monthlyProjectionsData]);
 
@@ -212,6 +216,12 @@ export default function HighPerformanceTable({
       // Event listeners are cleaned up in their respective useEffect hooks
     };
   }, []);
+
+  // Debug projections prop changes
+  useEffect(() => {
+    console.log('HighPerformanceTable: projections prop changed:', projections);
+    console.log('HighPerformanceTable: projections prop keys:', projections ? Object.keys(projections) : 'null/undefined');
+  }, [projections]);
 
   // Debug project managers state changes
   useEffect(() => {
@@ -535,10 +545,20 @@ export default function HighPerformanceTable({
     setScrollbarHeight(calculateScrollbarHeight());
   }, []);
 
-  // Data getters using SWR data (database only, no localStorage fallback)
+  // Data getters using SWR data with projections prop fallback
   const getCellValue = useCallback((projectId: string, month: string) => {
-    return monthlyProjectionsData?.[projectId]?.[month] || 0;
-  }, [monthlyProjectionsData]);
+    // Use SWR data first, then fall back to projections prop
+    const swrValue = monthlyProjectionsData?.[projectId]?.[month];
+    const propValue = projections?.[projectId]?.[month];
+    const finalValue = swrValue || propValue || 0;
+    
+    // Debug logging for projection data source
+    if (finalValue > 0 && !swrValue && propValue) {
+      console.log(`HighPerformanceTable: Using projections prop for ${projectId}/${month}:`, propValue);
+    }
+    
+    return finalValue;
+  }, [monthlyProjectionsData, projections]);
 
   const getAsrFee = useCallback((projectId: string) => {
     return asrFeesData?.[projectId] || 0;
