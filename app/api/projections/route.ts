@@ -7,22 +7,9 @@ export const dynamic = 'force-dynamic';
 // GET: Fetch all projections
 export async function GET() {
   try {
-    console.log('🚀 PROJECTIONS API: Starting fetch...');
-    console.log('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
-    
-    // Test basic connection first
-    await prisma.$connect();
-    console.log('✅ PROJECTIONS API: Database connected');
-    
-    // Test a simple query first
-    const testQuery = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "Projection"`;
-    console.log('✅ PROJECTIONS API: Test query result:', testQuery);
-    
     const projections = await prisma.projection.findMany();
-    console.log('✅ PROJECTIONS API: Fetched', projections.length, 'projections from database');
     
     if (projections.length === 0) {
-      console.log('⚠️ PROJECTIONS API: No projections found in database');
       return NextResponse.json({});
     }
     
@@ -33,27 +20,16 @@ export async function GET() {
       return acc;
     }, {} as Record<string, Record<string, number>>);
     
-    console.log('✅ PROJECTIONS API: Formatted data keys:', Object.keys(formatted).length);
-    console.log('✅ PROJECTIONS API: Sample formatted data:', JSON.stringify(formatted, null, 2).substring(0, 200) + '...');
-    
     return NextResponse.json(formatted);
   } catch (error: unknown) {
-    console.error('❌ PROJECTIONS API: Error fetching projections:', error);
-    console.error('DATABASE_URL (redacted):', process.env.DATABASE_URL?.replace(/\/\/.*@/, '//[redacted]@') || 'Not set');
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : undefined
-    });
+    console.error('Error fetching projections:', error);
     
     // If it's a table doesn't exist error, return empty data
     if (error instanceof Error && (error.message?.includes('does not exist') || error.message?.includes('no such table') || 'code' in error && (error as any).code === 'P2021')) {
-      console.log('⚠️ PROJECTIONS API: Tables do not exist, returning empty projections');
       return NextResponse.json({});
     }
     
     // For any other error, return empty data instead of 500
-    console.log('⚠️ PROJECTIONS API: Unknown error, returning empty projections');
     return NextResponse.json({});
   }
 }

@@ -156,11 +156,15 @@ export default function HighPerformanceTable({
   }, [asrFeesData]);
 
   useEffect(() => {
-    console.log('HighPerformanceTable: monthlyProjectionsData from SWR:', monthlyProjectionsData);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('HighPerformanceTable: monthlyProjectionsData from SWR:', monthlyProjectionsData);
+    }
     if (monthlyProjectionsData && Object.keys(monthlyProjectionsData).length > 0) {
-      console.log('HighPerformanceTable: Setting monthlyProjections from SWR data');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('HighPerformanceTable: Setting monthlyProjections from SWR data');
+      }
       setMonthlyProjections(monthlyProjectionsData);
-    } else {
+    } else if (process.env.NODE_ENV === 'development') {
       console.log('HighPerformanceTable: No SWR monthlyProjectionsData available');
     }
   }, [monthlyProjectionsData]);
@@ -217,10 +221,12 @@ export default function HighPerformanceTable({
     };
   }, []);
 
-  // Debug projections prop changes
+  // Debug projections prop changes (only in development)
   useEffect(() => {
-    console.log('HighPerformanceTable: projections prop changed:', projections);
-    console.log('HighPerformanceTable: projections prop keys:', projections ? Object.keys(projections) : 'null/undefined');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('HighPerformanceTable: projections prop changed:', projections);
+      console.log('HighPerformanceTable: projections prop keys:', projections ? Object.keys(projections) : 'null/undefined');
+    }
   }, [projections]);
 
   // Debug project managers state changes
@@ -552,8 +558,8 @@ export default function HighPerformanceTable({
     const propValue = projections?.[projectId]?.[month];
     const finalValue = swrValue || propValue || 0;
     
-    // Debug logging for projection data source
-    if (finalValue > 0 && !swrValue && propValue) {
+    // Debug logging for projection data source (only in development)
+    if (process.env.NODE_ENV === 'development' && finalValue > 0 && !swrValue && propValue) {
       console.log(`HighPerformanceTable: Using projections prop for ${projectId}/${month}:`, propValue);
     }
     
