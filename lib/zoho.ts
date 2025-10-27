@@ -740,6 +740,7 @@ class ZohoService {
       const processedInvoices = allInvoices.map((invoice: any) => {
         const total = invoice.total || 0;
         const status = invoice.status || 'unknown';
+        const date = invoice.date || '';
         
         // Calculate billed/unbilled amounts based on status
         let billed_amount = 0;
@@ -761,13 +762,23 @@ class ZohoService {
           invoice_id: invoice.invoice_id,
           project_id: invoice.project_id,
           invoice_number: invoice.invoice_number,
-          date: invoice.date,
+          date: date,
           amount: total,
           status: status,
           billed_amount: billed_amount,
           unbilled_amount: unbilled_amount,
         };
       }) || [];
+      
+      // Log date information to verify parsing
+      if (processedInvoices.length > 0) {
+        console.log('📅 Sample invoice dates from Zoho:', processedInvoices.slice(0, 5).map(inv => ({
+          invoice: inv.invoice_number,
+          date: inv.date,
+          status: inv.status,
+          amount: inv.amount
+        })));
+      }
       
       // Log invoice counts and details
       console.log(`📊 Zoho invoices processed: ${processedInvoices.length} total invoices`);

@@ -589,6 +589,7 @@ class OptimizedZohoService {
           const processedInvoices = allInvoices.map((invoice: any) => {
             const total = invoice.total || 0;
             const status = invoice.status || 'unknown';
+            const date = invoice.date || '';
             
             let billed_amount = 0;
             let unbilled_amount = 0;
@@ -605,13 +606,23 @@ class OptimizedZohoService {
               invoice_id: invoice.invoice_id,
               project_id: invoice.project_id,
               invoice_number: invoice.invoice_number,
-              date: invoice.date,
+              date: date,
               amount: total,
               status,
               billed_amount,
               unbilled_amount,
             };
           });
+          
+          // Log date information to verify parsing
+          if (processedInvoices.length > 0) {
+            console.log('📅 Sample invoice dates from Zoho (optimized):', processedInvoices.slice(0, 5).map(inv => ({
+              invoice: inv.invoice_number,
+              date: inv.date,
+              status: inv.status,
+              amount: inv.amount
+            })));
+          }
 
           console.log(`✅ Fetched ${processedInvoices.length} invoices from Zoho`);
           return processedInvoices;

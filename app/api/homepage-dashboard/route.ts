@@ -344,10 +344,30 @@ export async function GET(request: NextRequest) {
     const totalProjects = projects.length || 0;
     
     // Calculate billing metrics from YTD invoices
-    // Filter for current year invoices (reuse variables defined at top of function)
+    // Filter for current year invoices (Jan 1 to today)
     const ytdInvoices = invoices.filter(inv => {
+      if (!inv.date) return false;
       const invoiceDate = new Date(inv.date);
+      // Check if invoice date is valid and within YTD range
+      if (isNaN(invoiceDate.getTime())) {
+        console.warn('Invalid invoice date:', inv.date, 'for invoice:', inv.invoice_number);
+        return false;
+      }
       return invoiceDate >= currentYearStart && invoiceDate <= now;
+    });
+    
+    console.log('📅 YTD Invoice filtering:', {
+      totalInvoices: invoices.length,
+      ytdInvoicesCount: ytdInvoices.length,
+      dateRange: {
+        start: currentYearStart.toISOString().split('T')[0],
+        end: now.toISOString().split('T')[0]
+      },
+      sampleDates: invoices.slice(0, 3).map(inv => ({
+        invoice: inv.invoice_number,
+        date: inv.date,
+        status: inv.status
+      }))
     });
     
     const paidInvoices = ytdInvoices.filter(inv => inv.status === 'paid') || [];
@@ -355,17 +375,34 @@ export async function GET(request: NextRequest) {
       inv.status === 'sent' || inv.status === 'viewed' || inv.status === 'draft' || inv.status === 'overdue'
     ) || [];
     
+    console.log('💰 Invoice status breakdown:', {
+      totalYTD: ytdInvoices.length,
+      paid: paidInvoices.length,
+      outstanding: outstandingInvoices.length,
+      otherStatuses: ytdInvoices.filter(inv => 
+        inv.status !== 'paid' && 
+        inv.status !== 'sent' && 
+        inv.status !== 'viewed' && 
+        inv.status !== 'draft' && 
+        inv.status !== 'overdue'
+      ).length
+    });
+    
     // Calculate revenue using correct invoice fields
+    // Use inv.amount or inv.total (handle both field names for compatibility)
+    const getInvoiceAmount = (inv: any) => parseFloat(inv.amount || inv.total || 0);
+    
     // Cash basis: only paid invoices
-    const zohoTotalBilledCash = paidInvoices.reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0);
+    const zohoTotalBilledCash = paidInvoices.reduce((sum, inv) => sum + getInvoiceAmount(inv), 0);
     
     // Accrual basis: all invoices (paid + outstanding, excluding void/draft)
     const zohoTotalBilledAccrual = ytdInvoices
       .filter(inv => inv.status !== 'void' && inv.status !== 'draft')
-      .reduce((sum, inv) => sum + (parseFloat(inv.total) || 0), 0);
+      .reduce((sum, inv) => sum + getInvoiceAmount(inv), 0);
     
-    // Unbilled is the balance on outstanding invoices
-    const zohoTotalUnbilled = outstandingInvoices.reduce((sum, inv) => sum + (parseFloat(inv.balance) || 0), 0);
+    // Unbilled is the balance on outstanding invoices (or amount if balance not available)
+    const getInvoiceBalance = (inv: any) => parseFloat(inv.balance || inv.amount || inv.total || 0);
+    const zohoTotalUnbilled = outstandingInvoices.reduce((sum, inv) => sum + getInvoiceBalance(inv), 0);
     
     // Use accrual basis for operating income (matches Zoho Books standard)
     const zohoTotalBilled = zohoTotalBilledAccrual;
@@ -383,9 +420,11 @@ export async function GET(request: NextRequest) {
     // Debug: log first few invoice totals to verify parsing
     console.log('🔍 Sample invoice totals for debugging:', ytdInvoices.slice(0, 5).map(inv => ({
       number: inv.invoice_number,
+      amount: inv.amount,
       total: inv.total,
-      parsed: parseFloat(inv.total),
-      type: typeof inv.total
+      balance: inv.balance,
+      parsed: parseFloat(inv.amount || inv.total || 0),
+      type: typeof (inv.amount || inv.total)
     })));
     
     // Calculate billing from Clockify time tracking (if available)
@@ -535,12 +574,13 @@ export async function GET(request: NextRequest) {
         topPerformingProjects = projects
           .filter(p => p.status === 'active')
           .sort((a, b) => {
+            const getInvoiceRevenue = (inv: any) => parseFloat(inv.amount || inv.total || 0);
             const aRevenue = invoices
               .filter(inv => inv.project_id === a.project_id)
-              .reduce((sum, inv) => sum + (inv.total || 0), 0);
+              .reduce((sum, inv) => sum + getInvoiceRevenue(inv), 0);
             const bRevenue = invoices
               .filter(inv => inv.project_id === b.project_id)
-              .reduce((sum, inv) => sum + (inv.total || 0), 0);
+              .reduce((sum, inv) => sum + getInvoiceRevenue(inv), 0);
             return bRevenue - aRevenue;
           })
           .slice(0, 5)
