@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { optimizedZohoService } from '@/lib/zohoOptimized';
+import { zohoService } from '@/lib/zoho';
 import clockifyService from '@/lib/clockify';
 
 // Force dynamic rendering to prevent static generation errors
@@ -30,21 +30,21 @@ export async function GET(request: NextRequest) {
       console.warn('Clockify service not configured - using mock data for time tracking metrics');
     }
 
-    // Get Zoho data for financial metrics using optimized service with caching
+    // Get Zoho data for financial metrics
     let projects: any[] = [];
     let invoices: any[] = [];
     let currentYearFinancials: any = null;
     let lastYearFinancials: any = null;
     let twoYearsAgoFinancials: any = null;
     
-    console.log('🔄 Starting optimized Zoho data fetch with caching...');
+    console.log('🔄 Starting Zoho data fetch...');
     
     try {
-      // Fetch projects and invoices in parallel with caching
-      console.log('📊 Fetching projects and invoices (cached if available)...');
+      // Fetch projects and invoices in parallel
+      console.log('📊 Fetching projects and invoices...');
       [projects, invoices] = await Promise.all([
-        optimizedZohoService.getProjects(),
-        optimizedZohoService.getInvoices()
+        zohoService.getProjects(),
+        zohoService.getInvoices()
       ]);
       console.log('✅ Projects and invoices fetched:', { projectsCount: projects.length, invoicesCount: invoices.length });
 
@@ -66,9 +66,13 @@ export async function GET(request: NextRequest) {
         }
       ];
 
-      // Fetch all financial metrics in parallel
+      // Fetch financial metrics for each year
       const [currentYear_Financials, lastYear_Financials, twoYearsAgo_Financials] = 
-        await optimizedZohoService.getComprehensiveFinancialData(dateRanges);
+        await Promise.all([
+          zohoService.getFinancialMetrics(dateRanges[0].startDate, dateRanges[0].endDate),
+          zohoService.getFinancialMetrics(dateRanges[1].startDate, dateRanges[1].endDate),
+          zohoService.getFinancialMetrics(dateRanges[2].startDate, dateRanges[2].endDate)
+        ]);
 
       currentYearFinancials = currentYear_Financials;
       lastYearFinancials = lastYear_Financials;

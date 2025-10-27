@@ -95,13 +95,18 @@ class OptimizedZohoService {
     try {
       const now = new Date();
       
-      // Try to get cached token from Supabase
-      const cachedToken = await prisma.zoho_token_cache.findFirst({
-        where: {
-          expires_at: { gt: new Date(now.getTime() + this.TOKEN_CACHE_BUFFER) },
-        },
-        orderBy: { created_at: 'desc' },
-      });
+      // Try to get cached token from Supabase, but handle database errors gracefully
+      let cachedToken = null;
+      try {
+        cachedToken = await prisma.zoho_token_cache.findFirst({
+          where: {
+            expires_at: { gt: new Date(now.getTime() + this.TOKEN_CACHE_BUFFER) },
+          },
+          orderBy: { created_at: 'desc' },
+        });
+      } catch (dbError) {
+        console.warn('⚠️ Could not access token cache from database, proceeding to refresh token:', dbError instanceof Error ? dbError.message : 'Unknown error');
+      }
 
       if (cachedToken && !process.env.ZOHO_FORCE_REFRESH) {
         const minutesLeft = Math.round((cachedToken.expires_at.getTime() - now.getTime()) / 60000);
@@ -158,26 +163,31 @@ class OptimizedZohoService {
         const expiresAt = new Date(Date.now() + response.data.expires_in * 1000);
 
         // Store token in Supabase for persistence across function invocations
-        await prisma.zoho_token_cache.create({
-          data: {
-            access_token: response.data.access_token,
-            expires_at: expiresAt,
-            refresh_token: response.data.refresh_token,
-            api_domain: response.data.api_domain,
-            created_at: new Date(),
-            updated_at: new Date(),
-          },
-        });
-
-        // Clean up old tokens (keep only last 5)
-        const oldTokens = await prisma.zoho_token_cache.findMany({
-          orderBy: { created_at: 'desc' },
-          skip: 5,
-        });
-        if (oldTokens.length > 0) {
-          await prisma.zoho_token_cache.deleteMany({
-            where: { id: { in: oldTokens.map((t) => t.id) } },
+        // Handle database errors gracefully
+        try {
+          await prisma.zoho_token_cache.create({
+            data: {
+              access_token: response.data.access_token,
+              expires_at: expiresAt,
+              refresh_token: response.data.refresh_token,
+              api_domain: response.data.api_domain,
+              created_at: new Date(),
+              updated_at: new Date(),
+            },
           });
+
+          // Clean up old tokens (keep only last 5)
+          const oldTokens = await prisma.zoho_token_cache.findMany({
+            orderBy: { created_at: 'desc' },
+            skip: 5,
+          });
+          if (oldTokens.length > 0) {
+            await prisma.zoho_token_cache.deleteMany({
+              where: { id: { in: oldTokens.map((t) => t.id) } },
+            });
+          }
+        } catch (dbError) {
+          console.warn('⚠️ Could not store token in database, continuing without caching:', dbError instanceof Error ? dbError.message : 'Unknown error');
         }
 
         const minutesValid = Math.round(response.data.expires_in / 60);
@@ -466,10 +476,15 @@ class OptimizedZohoService {
     fetchFn: () => Promise<T>
   ): Promise<T> {
     try {
-      // Check cache
-      const cached = await prisma.financial_data_cache.findUnique({
-        where: { cache_key: cacheKey },
-      });
+      // Try to check cache, but handle database errors gracefully
+      let cached = null;
+      try {
+        cached = await prisma.financial_data_cache.findUnique({
+          where: { cache_key: cacheKey },
+        });
+      } catch (dbError) {
+        console.warn(`⚠️ Could not access cache for ${cacheKey}, fetching fresh data:`, dbError instanceof Error ? dbError.message : 'Unknown error');
+      }
 
       if (cached && cached.expires_at > new Date()) {
         const minutesLeft = Math.round((cached.expires_at.getTime() - Date.now()) / 60000);
@@ -481,25 +496,30 @@ class OptimizedZohoService {
       console.log(`🔄 Cache miss for ${cacheKey}, fetching fresh data...`);
       const data = await fetchFn();
 
-      // Store in cache
-      const expiresAt = new Date(Date.now() + ttl);
-      await prisma.financial_data_cache.upsert({
-        where: { cache_key: cacheKey },
-        create: {
-          cache_key: cacheKey,
-          data: JSON.stringify(data),
-          expires_at: expiresAt,
-          created_at: new Date(),
-          updated_at: new Date(),
-        },
-        update: {
-          data: JSON.stringify(data),
-          expires_at: expiresAt,
-          updated_at: new Date(),
-        },
-      });
+      // Try to store in cache, but don't fail if it doesn't work
+      try {
+        const expiresAt = new Date(Date.now() + ttl);
+        await prisma.financial_data_cache.upsert({
+          where: { cache_key: cacheKey },
+          create: {
+            cache_key: cacheKey,
+            data: JSON.stringify(data),
+            expires_at: expiresAt,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+          update: {
+            data: JSON.stringify(data),
+            expires_at: expiresAt,
+            updated_at: new Date(),
+          },
+        });
 
-      console.log(`✅ Data cached for ${cacheKey} (TTL: ${ttl / 1000}s)`);
+        console.log(`✅ Data cached for ${cacheKey} (TTL: ${ttl / 1000}s)`);
+      } catch (dbError) {
+        console.warn(`⚠️ Could not store cache for ${cacheKey}, continuing without caching:`, dbError instanceof Error ? dbError.message : 'Unknown error');
+      }
+
       return data;
     } catch (error) {
       console.error(`❌ Cache error for ${cacheKey}, falling back to fresh data:`, error);

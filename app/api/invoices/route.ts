@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { optimizedZohoService } from '../../../lib/zohoOptimized';
+import { zohoService } from '@/lib/zoho';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
 export async function GET(_request: NextRequest) {
   try {
-    console.log('API: Fetching invoices from Zoho (optimized with caching)');
+    console.log('API: Fetching invoices from Zoho');
     
     let invoices: any[] = [];
     let zohoAuthFailed = false;
     
     try {
-      invoices = await optimizedZohoService.getInvoices();
+      invoices = await zohoService.getInvoices();
       console.log('API: Fetched', invoices.length, 'invoices (from cache or fresh)');
     } catch (error) {
       console.error('API: Error fetching invoices:', error);
