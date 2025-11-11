@@ -188,85 +188,7 @@ function DashboardPageContent() {
   const currentProjectIdRef = useRef<string>('');
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const syncLocalStorageWithDatabase = async () => {
-    try {
-      const savedClosedProjects = localStorage.getItem('closedProjects');
-      if (savedClosedProjects) {
-        const localClosedProjects = JSON.parse(savedClosedProjects);
-        if (Array.isArray(localClosedProjects) && localClosedProjects.length > 0) {
-          console.log('Syncing localStorage closed projects with database...');
-          
-          // Add each project to the database
-          for (const projectId of localClosedProjects) {
-            try {
-              await fetch('/api/closed-projects', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ projectId }),
-              });
-            } catch (error) {
-              console.error(`Failed to sync project ${projectId}:`, error);
-            }
-          }
-          
-          console.log('LocalStorage sync completed');
-        }
-      }
-    } catch (error) {
-      console.error('Error syncing localStorage with database:', error);
-    }
-  };
-
-  useEffect(() => {
-    const initializeDashboard = async () => {
-      try {
-        setError(null);
-        await Promise.all([
-          fetchDashboardData(),
-          fetchProjects()
-        ]);
-        await loadClosedProjects();
-        await syncLocalStorageWithDatabase();
-      } catch (error) {
-        console.error('Failed to initialize dashboard:', error);
-        setError('Failed to initialize dashboard. Please refresh the page.');
-      }
-    };
-    
-    initializeDashboard();
-  }, []);
-
-  useEffect(() => {
-    // Clear any existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    
-    console.log('Project selection changed:', selectedProjectId, 'Current ref:', currentProjectIdRef.current);
-    
-    // Set a new timer to debounce the API call
-    debounceTimerRef.current = setTimeout(() => {
-      if (selectedProjectId && selectedProjectId !== currentProjectIdRef.current) {
-        console.log('Fetching project metrics for:', selectedProjectId);
-        currentProjectIdRef.current = selectedProjectId;
-        fetchProjectMetrics(selectedProjectId);
-      } else if (!selectedProjectId) {
-        console.log('Clearing project metrics');
-        currentProjectIdRef.current = '';
-        setProjectMetrics(null);
-      }
-    }, 300); // 300ms debounce delay
-    
-    // Cleanup function to prevent memory leaks
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-      // Cancel any ongoing requests by clearing the ref
-      currentProjectIdRef.current = '';
-    };
-  }, [selectedProjectId, fetchProjectMetrics]);
-
+  // Define all data fetching functions before useEffects that use them
   const fetchDashboardData = async () => {
     try {
       console.log('🔄 Starting dashboard data fetch...');
@@ -320,6 +242,71 @@ function DashboardPageContent() {
     }
   };
 
+  const loadClosedProjects = async () => {
+    try {
+      // First try to load from database
+      const response = await fetch('/api/closed-projects');
+      if (response.ok) {
+        const dbClosedProjects = await response.json();
+        if (Array.isArray(dbClosedProjects)) {
+          setClosedProjects(new Set(dbClosedProjects));
+          // Update localStorage to match database
+          localStorage.setItem('closedProjects', JSON.stringify(dbClosedProjects));
+          return;
+        }
+      }
+      
+      // Fallback to localStorage if database fails
+      const savedClosedProjects = localStorage.getItem('closedProjects');
+      if (savedClosedProjects) {
+        const closedProjectsArray = JSON.parse(savedClosedProjects);
+        setClosedProjects(new Set(closedProjectsArray));
+      }
+    } catch (error) {
+      console.error('Error loading closed projects:', error);
+      // Fallback to localStorage
+      try {
+        const savedClosedProjects = localStorage.getItem('closedProjects');
+        if (savedClosedProjects) {
+          const closedProjectsArray = JSON.parse(savedClosedProjects);
+          setClosedProjects(new Set(closedProjectsArray));
+        }
+      } catch (localStorageError) {
+        console.error('Error loading from localStorage:', localStorageError);
+      }
+    }
+  };
+
+  const syncLocalStorageWithDatabase = async () => {
+    try {
+      const savedClosedProjects = localStorage.getItem('closedProjects');
+      if (savedClosedProjects) {
+        const localClosedProjects = JSON.parse(savedClosedProjects);
+        if (Array.isArray(localClosedProjects) && localClosedProjects.length > 0) {
+          console.log('Syncing localStorage closed projects with database...');
+          
+          // Add each project to the database
+          for (const projectId of localClosedProjects) {
+            try {
+              await fetch('/api/closed-projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId }),
+              });
+            } catch (error) {
+              console.error(`Failed to sync project ${projectId}:`, error);
+            }
+          }
+          
+          console.log('LocalStorage sync completed');
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing localStorage with database:', error);
+    }
+  };
+
+  // Define fetchProjectMetrics before the useEffect that uses it
   const fetchProjectMetrics = useCallback(async (projectId: string) => {
     console.log('fetchProjectMetrics called with:', projectId, 'Loading:', projectLoading, 'Current ref:', currentProjectIdRef.current);
     
@@ -419,6 +406,57 @@ function DashboardPageContent() {
     }
   }, [projectLoading, projectMetrics]);
 
+  useEffect(() => {
+    // Clear any existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    console.log('Project selection changed:', selectedProjectId, 'Current ref:', currentProjectIdRef.current);
+    
+    // Set a new timer to debounce the API call
+    debounceTimerRef.current = setTimeout(() => {
+      if (selectedProjectId && selectedProjectId !== currentProjectIdRef.current) {
+        console.log('Fetching project metrics for:', selectedProjectId);
+        currentProjectIdRef.current = selectedProjectId;
+        fetchProjectMetrics(selectedProjectId);
+      } else if (!selectedProjectId) {
+        console.log('Clearing project metrics');
+        currentProjectIdRef.current = '';
+        setProjectMetrics(null);
+      }
+    }, 300); // 300ms debounce delay
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      // Cancel any ongoing requests by clearing the ref
+      currentProjectIdRef.current = '';
+    };
+  }, [selectedProjectId, fetchProjectMetrics]);
+
+  // Initialize dashboard on mount
+  useEffect(() => {
+    const initializeDashboard = async () => {
+      try {
+        setError(null);
+        await Promise.all([
+          fetchDashboardData(),
+          fetchProjects()
+        ]);
+        await loadClosedProjects();
+        await syncLocalStorageWithDatabase();
+      } catch (error) {
+        console.error('Failed to initialize dashboard:', error);
+        setError('Failed to initialize dashboard. Please refresh the page.');
+      }
+    };
+    
+    initializeDashboard();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -440,41 +478,6 @@ function DashboardPageContent() {
         return <TrendingDown className="h-4 w-4 text-red-600" />;
       default:
         return <Minus className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
-  const loadClosedProjects = async () => {
-    try {
-      // First try to load from database
-      const response = await fetch('/api/closed-projects');
-      if (response.ok) {
-        const dbClosedProjects = await response.json();
-        if (Array.isArray(dbClosedProjects)) {
-          setClosedProjects(new Set(dbClosedProjects));
-          // Update localStorage to match database
-          localStorage.setItem('closedProjects', JSON.stringify(dbClosedProjects));
-          return;
-        }
-      }
-      
-      // Fallback to localStorage if database fails
-      const savedClosedProjects = localStorage.getItem('closedProjects');
-      if (savedClosedProjects) {
-        const closedProjectsArray = JSON.parse(savedClosedProjects);
-        setClosedProjects(new Set(closedProjectsArray));
-      }
-    } catch (error) {
-      console.error('Error loading closed projects:', error);
-      // Fallback to localStorage
-      try {
-        const savedClosedProjects = localStorage.getItem('closedProjects');
-        if (savedClosedProjects) {
-          const closedProjectsArray = JSON.parse(savedClosedProjects);
-          setClosedProjects(new Set(closedProjectsArray));
-        }
-      } catch (localStorageError) {
-        console.error('Error loading from localStorage:', localStorageError);
-      }
     }
   };
 
