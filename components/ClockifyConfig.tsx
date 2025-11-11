@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Settings, Key, Building2, TestTube, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ClockifyConfigProps {
@@ -71,7 +71,7 @@ export default function ClockifyConfig({ onConfigChange }: ClockifyConfigProps) 
     }
   };
 
-  const loadWorkspaces = async () => {
+  const loadWorkspaces = useCallback(async () => {
     if (!apiKey) return;
 
     setIsLoadingWorkspaces(true);
@@ -96,13 +96,13 @@ export default function ClockifyConfig({ onConfigChange }: ClockifyConfigProps) 
     } finally {
       setIsLoadingWorkspaces(false);
     }
-  };
+  }, [apiKey]);
 
   useEffect(() => {
     if (apiKey) {
       loadWorkspaces();
     }
-  }, [apiKey]);
+  }, [apiKey, loadWorkspaces]);
 
   return (
     <div className="bg-white rounded-lg shadow p-6">

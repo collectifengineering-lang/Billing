@@ -208,7 +208,7 @@ export default function CSVImportExport({
               
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-blue-800">
-                  <strong>Tip:</strong> Use the "Download Template" button to get a sample CSV file with the correct format.
+                  <strong>Tip:</strong> Use the &quot;Download Template&quot; button to get a sample CSV file with the correct format.
                 </p>
               </div>
               
@@ -255,7 +255,7 @@ export default function CSVImportExport({
                 {!importResult.success && importResult.data && Object.keys(importResult.data).length > 0 && (
                   <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-yellow-800 text-sm">
-                      Some data was successfully parsed. You can still import the valid data by clicking "Import Valid Data".
+                      Some data was successfully parsed. You can still import the valid data by clicking &quot;Import Valid Data&quot;.
                     </p>
                   </div>
                 )}

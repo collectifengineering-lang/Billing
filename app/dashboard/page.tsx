@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, DollarSign, Users, Calendar, Target, PieChart, Building2, Clock, AlertTriangle, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -265,7 +265,7 @@ function DashboardPageContent() {
       // Cancel any ongoing requests by clearing the ref
       currentProjectIdRef.current = '';
     };
-  }, [selectedProjectId]);
+  }, [selectedProjectId, fetchProjectMetrics]);
 
   const fetchDashboardData = async () => {
     try {
@@ -320,7 +320,7 @@ function DashboardPageContent() {
     }
   };
 
-  const fetchProjectMetrics = async (projectId: string) => {
+  const fetchProjectMetrics = useCallback(async (projectId: string) => {
     console.log('fetchProjectMetrics called with:', projectId, 'Loading:', projectLoading, 'Current ref:', currentProjectIdRef.current);
     
     // Prevent duplicate requests for the same project
@@ -417,7 +417,7 @@ function DashboardPageContent() {
         setProjectLoading(false);
       }
     }
-  };
+  }, [projectLoading, projectMetrics]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -616,7 +616,7 @@ function DashboardPageContent() {
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
             <p className="text-sm text-blue-800 mb-2">
-              <strong>What's happening:</strong>
+              <strong>What&apos;s happening:</strong>
             </p>
             <ul className="text-sm text-blue-700 space-y-1">
               <li>• Connecting to Zoho Books API</li>
@@ -1190,7 +1190,7 @@ function DashboardPageContent() {
                     <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                       <h4 className="font-semibold text-sm text-blue-800 mb-2">How to Verify Data Accuracy</h4>
                       <div className="text-sm text-blue-700 space-y-1">
-                        <p>1. <strong>Click "Test Zoho Financial Integration"</strong> above</p>
+                        <p>1. <strong>Click &quot;Test Zoho Financial Integration&quot;</strong> above</p>
                         <p>2. <strong>Check browser console</strong> for detailed API responses</p>
                         <p>3. <strong>Compare dashboard metrics</strong> with your Zoho Books reports</p>
                         <p>4. <strong>Verify YTD Profit</strong> matches your P&L statement</p>

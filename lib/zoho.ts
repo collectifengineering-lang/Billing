@@ -200,19 +200,25 @@ class ZohoService {
 
         // Check if response is HTML (error page from Zoho)
         const contentType = response.headers['content-type'] || '';
-        const responseData = response.data;
-        const isHtml = typeof responseData === 'string' && (
+        const responseData: unknown = response.data;
+        
+        // Type guard for string (HTML response)
+        const isStringResponse = typeof responseData === 'string';
+        const isHtml = isStringResponse && (
           responseData.trim().startsWith('<!DOCTYPE') || 
           responseData.trim().startsWith('<html') ||
           contentType.includes('text/html')
         );
         
         if (isHtml || response.status >= 400) {
-          const errorMsg = typeof responseData === 'object' && responseData?.error_description
-            ? responseData.error_description
-            : isHtml
-            ? 'Zoho returned an HTML error page. Check your ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, and ZOHO_CLIENT_SECRET.'
-            : `Zoho token refresh failed: ${response.status} ${response.statusText}`;
+          let errorMsg: string;
+          if (isHtml) {
+            errorMsg = 'Zoho returned an HTML error page. Check your ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, and ZOHO_CLIENT_SECRET.';
+          } else if (typeof responseData === 'object' && responseData !== null && 'error_description' in responseData) {
+            errorMsg = String((responseData as { error_description?: string }).error_description || 'Unknown error');
+          } else {
+            errorMsg = `Zoho token refresh failed: ${response.status} ${response.statusText}`;
+          }
           throw new Error(errorMsg);
         }
 
@@ -240,16 +246,17 @@ class ZohoService {
         // Check if response is HTML (error page)
         let errorMessage = err?.message || 'Unknown error';
         if (hasResponse(err) && err.response?.data) {
-          const data = err.response.data;
-          const isHtml = typeof data === 'string' && (
+          const data: unknown = err.response.data;
+          const isStringData = typeof data === 'string';
+          const isHtml = isStringData && (
             data.trim().startsWith('<!DOCTYPE') || 
             data.trim().startsWith('<html')
           );
           
           if (isHtml) {
             errorMessage = 'Zoho returned an HTML error page during token refresh. This usually means invalid credentials or the refresh token has expired. Please regenerate your ZOHO_REFRESH_TOKEN.';
-          } else if (typeof data === 'object' && data.error_description) {
-            errorMessage = data.error_description;
+          } else if (typeof data === 'object' && data !== null && 'error_description' in data) {
+            errorMessage = String((data as { error_description?: string }).error_description || 'Unknown error');
           }
         }
         
@@ -298,19 +305,25 @@ class ZohoService {
 
       // Check if response is HTML (error page from Zoho)
       const contentType = response.headers['content-type'] || '';
-      const responseData = response.data;
-      const isHtml = typeof responseData === 'string' && (
+      const responseData: unknown = response.data;
+      
+      // Type guard for string (HTML response)
+      const isStringResponse = typeof responseData === 'string';
+      const isHtml = isStringResponse && (
         responseData.trim().startsWith('<!DOCTYPE') || 
         responseData.trim().startsWith('<html') ||
         contentType.includes('text/html')
       );
       
       if (isHtml || response.status >= 400) {
-        const errorMsg = typeof responseData === 'object' && responseData?.error_description
-          ? responseData.error_description
-          : isHtml
-          ? 'Zoho returned an HTML error page. Check your ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, and ZOHO_CLIENT_SECRET.'
-          : `Zoho token refresh failed: ${response.status} ${response.statusText}`;
+        let errorMsg: string;
+        if (isHtml) {
+          errorMsg = 'Zoho returned an HTML error page. Check your ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, and ZOHO_CLIENT_SECRET.';
+        } else if (typeof responseData === 'object' && responseData !== null && 'error_description' in responseData) {
+          errorMsg = String((responseData as { error_description?: string }).error_description || 'Unknown error');
+        } else {
+          errorMsg = `Zoho token refresh failed: ${response.status} ${response.statusText}`;
+        }
         throw new Error(errorMsg);
       }
 
@@ -384,8 +397,11 @@ class ZohoService {
         
         // Check if response is HTML (error page from Zoho)
         const contentType = response.headers['content-type'] || '';
-        const responseData = response.data;
-        const isHtml = typeof responseData === 'string' && (
+        const responseData: unknown = response.data;
+        
+        // Type guard for string (HTML response)
+        const isStringResponse = typeof responseData === 'string';
+        const isHtml = isStringResponse && (
           responseData.trim().startsWith('<!DOCTYPE') || 
           responseData.trim().startsWith('<html') ||
           contentType.includes('text/html')
@@ -397,9 +413,12 @@ class ZohoService {
         
         // Check for error responses
         if (response.status >= 400) {
-          const errorMsg = typeof responseData === 'object' && responseData?.message 
-            ? responseData.message 
-            : `Zoho API error: ${response.status} ${response.statusText}`;
+          let errorMsg: string;
+          if (typeof responseData === 'object' && responseData !== null && 'message' in responseData) {
+            errorMsg = String((responseData as { message?: string }).message || 'Unknown error');
+          } else {
+            errorMsg = `Zoho API error: ${response.status} ${response.statusText}`;
+          }
           throw new Error(errorMsg);
         }
         
@@ -420,8 +439,9 @@ class ZohoService {
         
         // Check if response is HTML (error page)
         if (hasResponse(axiosError) && axiosError.response?.data) {
-          const data = axiosError.response.data;
-          const isHtml = typeof data === 'string' && (
+          const data: unknown = axiosError.response.data;
+          const isStringData = typeof data === 'string';
+          const isHtml = isStringData && (
             data.trim().startsWith('<!DOCTYPE') || 
             data.trim().startsWith('<html')
           );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { Search, Download, ArrowLeft, RotateCcw, FolderOpen, TrendingUp, DollarSign, Clock, BarChart3 } from 'lucide-react';
 import { BillingData } from '@/lib/types';
@@ -57,9 +57,9 @@ export default function ProjectsPage() {
     return () => {
       window.removeEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
     };
-  }, []);
+  }, [fetchProjectsData]);
 
-  const fetchProjectsData = async () => {
+  const fetchProjectsData = useCallback(async () => {
     try {
       setLoading(true);
       console.log('ProjectsPage: Starting fetchProjectsData');
@@ -96,7 +96,7 @@ export default function ProjectsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [closedProjects]);
 
   const loadProjectStatuses = async () => {
     try {
@@ -274,7 +274,7 @@ export default function ProjectsPage() {
             </p>
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-left">
               <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
-                <strong>What's happening:</strong>
+                <strong>What&apos;s happening:</strong>
               </p>
               <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
                 <li>• Connecting to Zoho Books API</li>

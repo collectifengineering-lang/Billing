@@ -35,7 +35,7 @@ const DashboardHeader = memo(function DashboardHeader({ cacheInfo, autoRefreshSt
                   className="object-contain"
                 />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">Collectif MEP's Billings</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Collectif MEP&apos;s Billings</h1>
             </div>
             <div className="flex items-center space-x-4">
               <Link 

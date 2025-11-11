@@ -13,7 +13,7 @@ const PerformanceMonitor = memo(function PerformanceMonitor({ componentName, dat
     const now = performance.now();
     setRenderCount(prev => prev + 1);
     setLastRenderTime(now);
-  });
+  }, []); // Empty dependency array - this effect runs on mount only
 
   // Only show in development
   if (process.env.NODE_ENV !== 'development') {
