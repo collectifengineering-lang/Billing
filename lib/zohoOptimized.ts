@@ -1,14 +1,7 @@
 import axios from 'axios';
 import pLimit from 'p-limit';
-import { PrismaClient } from '@prisma/client';
+import prisma from './db';
 import { PerformanceTelemetry, withTelemetry } from './telemetry';
-
-// Singleton pattern for Prisma Client (prevents multiple instances in development)
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-
-const prisma = globalForPrisma.prisma || new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 // Type guard for errors with response property
 const hasResponse = (err: unknown): err is { response: { status?: number; statusText?: string; data?: any; headers?: any } } => {

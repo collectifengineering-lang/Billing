@@ -39,70 +39,35 @@ export const graphConfig = {
   graphMeEndpoint: 'https://graph.microsoft.com/v1.0/me'
 };
 
-// Enhanced admin check function with multiple fallback mechanisms
+// Admin check function - relies on environment variable configuration
 export function checkAdminStatus(userEmail: string | null | undefined): boolean {
   if (!userEmail) {
-    console.warn('checkAdminStatus: No user email provided');
     return false;
   }
 
-  console.log('checkAdminStatus: Checking admin status for:', userEmail);
-
-  // Method 1: Check against NEXT_PUBLIC_ADMIN_EMAILS environment variable
+  // Check against NEXT_PUBLIC_ADMIN_EMAILS environment variable
   try {
     const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
-    console.log('checkAdminStatus: Admin emails from env:', adminEmails);
-    console.log('checkAdminStatus: Raw NEXT_PUBLIC_ADMIN_EMAILS value:', process.env.NEXT_PUBLIC_ADMIN_EMAILS);
     
-    if (adminEmails.includes(userEmail)) {
-      console.log('checkAdminStatus: User is admin via NEXT_PUBLIC_ADMIN_EMAILS');
+    if (adminEmails.length > 0 && adminEmails.includes(userEmail)) {
       return true;
     }
   } catch (error) {
-    console.warn('checkAdminStatus: Error checking NEXT_PUBLIC_ADMIN_EMAILS:', error);
+    // Silently fail if env var parsing fails
   }
 
-  // Method 2: Check domain-based admin access (always allow @collectif.nyc)
-  if (userEmail.endsWith('@collectif.nyc')) {
-    console.log('checkAdminStatus: User is admin via @collectif.nyc domain');
-    return true;
-  }
-
-  // Method 3: Check localStorage for admin override (for development/testing)
-  if (typeof window !== 'undefined') {
+  // Check localStorage for admin override (for development/testing only)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     try {
       const adminOverride = localStorage.getItem('adminOverride');
       if (adminOverride === userEmail) {
-        console.log('checkAdminStatus: User is admin via localStorage override');
         return true;
       }
     } catch (error) {
-      console.warn('checkAdminStatus: Error checking localStorage override:', error);
+      // Silently fail if localStorage is not available
     }
   }
 
-  // Method 4: Check for specific admin patterns
-  const adminPatterns = [
-    /^admin@/i,
-    /^administrator@/i,
-    /^superuser@/i,
-    /^root@/i
-  ];
-  
-  for (const pattern of adminPatterns) {
-    if (pattern.test(userEmail)) {
-      console.log('checkAdminStatus: User is admin via pattern match:', pattern);
-      return true;
-    }
-  }
-
-  // Method 5: Temporary hardcoded admin for jonathan@collectif.nyc (fallback)
-  if (userEmail === 'jonathan@collectif.nyc') {
-    console.log('checkAdminStatus: User is admin via hardcoded fallback');
-    return true;
-  }
-
-  console.log('checkAdminStatus: User is not admin:', userEmail);
   return false;
 }
 

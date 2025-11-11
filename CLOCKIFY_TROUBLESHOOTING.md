@@ -45,8 +45,8 @@ vercel --prod
 2. Select your project
 3. Go to Settings → Environment Variables
 4. Add:
-   - `CLOCKIFY_API_KEY` = `ZjM1N2ExMWItYmY1Ny00OTdlLTkwNWEtMGRkYTI5OTgzOGQ4`
-   - `CLOCKIFY_WORKSPACE_ID` = `614b50a11a9df259f8713e9a`
+   - `CLOCKIFY_API_KEY` = `your-clockify-api-key`
+   - `CLOCKIFY_WORKSPACE_ID` = `your-clockify-workspace-id`
 5. Redeploy your project
 
 ### Step 3: Validate Configuration

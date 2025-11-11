@@ -27,8 +27,8 @@ Add these to your `.env.local` file:
 
 ```bash
 # BambooHR Configuration
-BAMBOOHR_SUBDOMAIN=collectifengineering
-BAMBOOHR_API_KEY=cd8d51ebb52f59d5801e53b183be26894c0f7161
+BAMBOOHR_SUBDOMAIN=your-company
+BAMBOOHR_API_KEY=your-bamboohr-api-key
 BAMBOOHR_WEBHOOK_SECRET="optional-webhook-secret"
 ```
 

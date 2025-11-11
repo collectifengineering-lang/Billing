@@ -1,38 +1,159 @@
 import prisma from './db';
 
+/**
+ * Database connection retry configuration
+ */
+const DB_RETRY_CONFIG = {
+  maxRetries: 3,
+  retryDelay: 1000, // 1 second
+  backoffMultiplier: 2, // Exponential backoff
+  timeout: 10000, // 10 seconds
+};
+
+/**
+ * Wait for a specified duration
+ */
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if error is retryable
+ */
+function isRetryableError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorCode = 'code' in error ? (error as { code: string }).code : undefined;
+  
+  // Retryable errors
+  const retryablePatterns = [
+    'ECONNREFUSED',
+    'ETIMEDOUT',
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'connection',
+    'timeout',
+    'P1001', // Prisma connection error
+    'P1008', // Prisma timeout
+  ];
+  
+  return retryablePatterns.some(pattern => 
+    errorMessage.includes(pattern) || errorCode === pattern
+  );
+}
+
+/**
+ * Execute database operation with retry logic
+ */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  operationName: string,
+  retries = DB_RETRY_CONFIG.maxRetries
+): Promise<T> {
+  let lastError: unknown;
+  let delay = DB_RETRY_CONFIG.retryDelay;
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: unknown) {
+      lastError = error;
+      
+      // Don't retry if error is not retryable or if we've exhausted retries
+      if (!isRetryableError(error) || attempt === retries) {
+        throw error;
+      }
+      
+      // Log retry attempt
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(
+          `⚠️ Database operation "${operationName}" failed (attempt ${attempt}/${retries}), retrying in ${delay}ms...`,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+      
+      // Wait before retrying with exponential backoff
+      await wait(delay);
+      delay *= DB_RETRY_CONFIG.backoffMultiplier;
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * Test database connection with timeout
+ */
+async function testConnection(): Promise<boolean> {
+  try {
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1 as test`,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), DB_RETRY_CONFIG.timeout)
+      )
+    ]);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 export async function ensureDatabaseSchema() {
   try {
-    // First, test the database connection
-    await prisma.$connect();
+    // Test database connection with retry
+    const isConnected = await withRetry(
+      testConnection,
+      'database connection test',
+      2
+    );
+    
+    if (!isConnected) {
+      console.error('❌ Database connection failed after retries');
+      return false;
+    }
+    
     console.log('Database connection successful');
     
     // Check if tables already exist by trying to query them
-    await prisma.projection.findFirst();
+    await withRetry(
+      () => prisma.projection.findFirst(),
+      'schema check'
+    );
+    
     console.log('Database schema already exists');
     return true; // Tables exist
-  } catch (error: any) {
-    console.error('Database connection or schema check failed:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorCode = error && typeof error === 'object' && 'code' in error 
+      ? String((error as { code: unknown }).code) 
+      : undefined;
+    
+    console.error('Database connection or schema check failed:', errorMessage);
     
     // Check for specific database connection errors
-    if (error.message?.includes('ENOTFOUND') || error.message?.includes('ECONNREFUSED')) {
+    if (errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
       console.error('❌ Database connection failed - check your DATABASE_URL');
       console.error('   Current DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
       return false;
     }
     
     // If it's a table doesn't exist error, we need to create the schema
-    if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+    if (errorCode === 'P2021' || errorMessage.includes('does not exist')) {
       try {
         console.log('Tables do not exist, attempting to create schema...');
         
         // Try to create a test record to trigger table creation
-        await prisma.projection.create({
-          data: {
-            projectId: '__test__',
-            month: '__test__',
-            value: 0
-          }
-        });
+        await withRetry(
+          () => prisma.projection.create({
+            data: {
+              projectId: '__test__',
+              month: '__test__',
+              value: 0
+            }
+          }),
+          'schema creation'
+        );
         
         // If successful, delete the test record
         await prisma.projection.deleteMany({
@@ -40,12 +161,14 @@ export async function ensureDatabaseSchema() {
             projectId: '__test__',
             month: '__test__'
           }
+        }).catch(() => {
+          // Ignore errors when deleting test record
         });
         
         console.log('Database schema created successfully');
         return true;
-      } catch (createError: any) {
-        console.error('Failed to create database schema:', createError);
+      } catch (createError: unknown) {
+        console.error('Failed to create database schema:', createError instanceof Error ? createError.message : String(createError));
         return false;
       }
     }
@@ -53,8 +176,6 @@ export async function ensureDatabaseSchema() {
     console.log('Tables do not exist, but Prisma Accelerate will create them automatically');
     console.log('Note: With Prisma Accelerate, tables are created automatically when you first insert data');
     return false; // Tables don't exist yet
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -81,32 +202,43 @@ export async function createDatabaseSchema() {
 
 export async function testDatabaseConnection() {
   try {
-    // Test basic connection
-    await prisma.$connect();
+    // Test basic connection with retry
+    const isConnected = await withRetry(
+      testConnection,
+      'database connection test'
+    );
+    
+    if (!isConnected) {
+      console.error('Database connection test failed after retries');
+      return false;
+    }
+    
     console.log('Database connection successful');
     
     // Test a simple query
-    const result = await prisma.$queryRaw`SELECT 1 as test`;
-    console.log('Database query test successful:', result);
+    const result = await withRetry(
+      () => prisma.$queryRaw`SELECT 1 as test`,
+      'database query test'
+    );
     
+    console.log('Database query test successful:', result);
     return true;
-  } catch (error: any) {
-    console.error('Database connection test failed:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Database connection test failed:', errorMessage);
     
     // Provide specific error guidance
-    if (error.message?.includes('ENOTFOUND')) {
+    if (errorMessage.includes('ENOTFOUND')) {
       console.error('Network error: Check your DATABASE_URL and network connectivity');
-    } else if (error.message?.includes('authentication failed')) {
+    } else if (errorMessage.includes('authentication failed')) {
       console.error('Authentication error: Check your database credentials');
-    } else if (error.message?.includes('does not exist')) {
+    } else if (errorMessage.includes('does not exist')) {
       console.error('Database does not exist: Check your database name in the connection URL');
-    } else if (error.message?.includes('connection timeout')) {
+    } else if (errorMessage.includes('connection timeout') || errorMessage.includes('timeout')) {
       console.error('Connection timeout: Check your network and database server status');
     }
     
     return false;
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -457,4 +589,5 @@ export async function getAllEmployeeTimeEntries() {
   }
 }
 
-export { prisma };
+// Re-export prisma for backward compatibility
+export { default as prisma } from './db';
