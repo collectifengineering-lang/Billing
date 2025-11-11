@@ -195,7 +195,26 @@ class ZohoService {
         const response = await axios.post<TokenResponse>(`${this.ACCOUNTS_BASE}/oauth/v2/token`, formData, {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           timeout: 15000,
+          validateStatus: (status) => status < 500, // Don't throw on 4xx errors
         });
+
+        // Check if response is HTML (error page from Zoho)
+        const contentType = response.headers['content-type'] || '';
+        const responseData = response.data;
+        const isHtml = typeof responseData === 'string' && (
+          responseData.trim().startsWith('<!DOCTYPE') || 
+          responseData.trim().startsWith('<html') ||
+          contentType.includes('text/html')
+        );
+        
+        if (isHtml || response.status >= 400) {
+          const errorMsg = typeof responseData === 'object' && responseData?.error_description
+            ? responseData.error_description
+            : isHtml
+            ? 'Zoho returned an HTML error page. Check your ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, and ZOHO_CLIENT_SECRET.'
+            : `Zoho token refresh failed: ${response.status} ${response.statusText}`;
+          throw new Error(errorMsg);
+        }
 
         if (!response.data.access_token) {
           throw new Error('No access token received from Zoho');
@@ -210,23 +229,30 @@ class ZohoService {
         this.cachedAccessToken = response.data.access_token;
 
         console.log(`Token refreshed successfully. Expires in ${Math.round(response.data.expires_in / 60)} minutes`);
-        console.log('Zoho token refresh response:', response.data);
         
         // Log token caching details
         console.log(`🔐 Token cached: access_token=${this.accessToken.substring(0, 10)}..., expires_in=${response.data.expires_in}s, expiry=${new Date(this.tokenExpiry).toISOString()}`);
         
-        // Validate scopes on refreshed token
-        try {
-          const scopeInfo = await this.checkTokenScopes(this.accessToken);
-          console.log('Zoho granted scopes:', scopeInfo?.scope || 'unknown');
-          if (typeof scopeInfo?.scope === 'string' && !scopeInfo.scope.includes('ZohoBooks.reports.READ')) {
-            console.warn('⚠️ Missing ZohoBooks.reports.READ scope. Regenerate token.');
-          }
-        } catch (scopeErr) {
-          console.error('Zoho token scope verification failed:', (scopeErr as Error)?.message);
-        }
+        // Skip scope validation - it's non-critical and the tokeninfo endpoint may not be reliable
+        // Token validation will happen naturally when making API calls
         return this.accessToken;
       } catch (err: any) {
+        // Check if response is HTML (error page)
+        let errorMessage = err?.message || 'Unknown error';
+        if (hasResponse(err) && err.response?.data) {
+          const data = err.response.data;
+          const isHtml = typeof data === 'string' && (
+            data.trim().startsWith('<!DOCTYPE') || 
+            data.trim().startsWith('<html')
+          );
+          
+          if (isHtml) {
+            errorMessage = 'Zoho returned an HTML error page during token refresh. This usually means invalid credentials or the refresh token has expired. Please regenerate your ZOHO_REFRESH_TOKEN.';
+          } else if (typeof data === 'object' && data.error_description) {
+            errorMessage = data.error_description;
+          }
+        }
+        
         // If rate-limited by Zoho during token refresh, implement exponential backoff
         const isAxios = axios.isAxiosError(err);
         const status = isAxios && hasResponse(err) ? err.response?.status : undefined;
@@ -242,10 +268,10 @@ class ZohoService {
         
         // For other errors, do not retry endlessly
         if (attempt === maxAttempts) {
-          console.error(`Zoho token refresh failed after ${maxAttempts} attempts:`, err);
-          throw new Error('Zoho token refresh rate-limited. Check daily API limits or token validity.');
+          console.error(`Zoho token refresh failed after ${maxAttempts} attempts:`, errorMessage);
+          throw new Error(errorMessage);
         }
-        throw err;
+        throw new Error(errorMessage);
       }
     }
     throw new Error('Zoho token refresh failed after maximum retries');
@@ -266,7 +292,31 @@ class ZohoService {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
+        timeout: 15000,
+        validateStatus: (status) => status < 500, // Don't throw on 4xx errors
       });
+
+      // Check if response is HTML (error page from Zoho)
+      const contentType = response.headers['content-type'] || '';
+      const responseData = response.data;
+      const isHtml = typeof responseData === 'string' && (
+        responseData.trim().startsWith('<!DOCTYPE') || 
+        responseData.trim().startsWith('<html') ||
+        contentType.includes('text/html')
+      );
+      
+      if (isHtml || response.status >= 400) {
+        const errorMsg = typeof responseData === 'object' && responseData?.error_description
+          ? responseData.error_description
+          : isHtml
+          ? 'Zoho returned an HTML error page. Check your ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, and ZOHO_CLIENT_SECRET.'
+          : `Zoho token refresh failed: ${response.status} ${response.statusText}`;
+        throw new Error(errorMsg);
+      }
+
+      if (!response.data.access_token) {
+        throw new Error('No access token received from Zoho');
+      }
 
       // Cache the successful token and expiry information
       this.accessToken = response.data.access_token;
@@ -279,9 +329,10 @@ class ZohoService {
       console.log(`🔐 Token cached: access_token=${this.accessToken.substring(0, 10)}..., expires_in=${response.data.expires_in}s, expiry=${new Date(this.tokenExpiry).toISOString()}`);
       
       return this.accessToken;
-    } catch (error) {
-      console.error('Error refreshing Zoho access token:', error);
-      throw new Error('Failed to authenticate with Zoho');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error refreshing Zoho access token:', errorMessage);
+      throw new Error(`Failed to authenticate with Zoho: ${errorMessage}`);
     }
   }
 
@@ -326,9 +377,31 @@ class ZohoService {
           },
           timeout: 15000, // 15 second timeout
           signal: controller.signal,
+          validateStatus: (status) => status < 500, // Don't throw on 4xx errors
         });
 
         clearTimeout(timeoutId);
+        
+        // Check if response is HTML (error page from Zoho)
+        const contentType = response.headers['content-type'] || '';
+        const responseData = response.data;
+        const isHtml = typeof responseData === 'string' && (
+          responseData.trim().startsWith('<!DOCTYPE') || 
+          responseData.trim().startsWith('<html') ||
+          contentType.includes('text/html')
+        );
+        
+        if (isHtml) {
+          throw new Error(`Zoho API returned HTML error page for ${endpoint}. This usually means the endpoint doesn't exist or requires different authentication.`);
+        }
+        
+        // Check for error responses
+        if (response.status >= 400) {
+          const errorMsg = typeof responseData === 'object' && responseData?.message 
+            ? responseData.message 
+            : `Zoho API error: ${response.status} ${response.statusText}`;
+          throw new Error(errorMsg);
+        }
         
         // Reset retry count on success
         this.retryCount = 0;
@@ -343,6 +416,19 @@ class ZohoService {
         // Handle timeout specifically
         if (axiosError.code === 'ECONNABORTED' || axiosError.message?.includes('timeout')) {
           throw new Error(`Zoho API request timed out for ${endpoint}`);
+        }
+        
+        // Check if response is HTML (error page)
+        if (hasResponse(axiosError) && axiosError.response?.data) {
+          const data = axiosError.response.data;
+          const isHtml = typeof data === 'string' && (
+            data.trim().startsWith('<!DOCTYPE') || 
+            data.trim().startsWith('<html')
+          );
+          
+          if (isHtml) {
+            throw new Error(`Zoho API returned HTML error page for ${endpoint}. Check if the endpoint exists and your OAuth scopes are correct.`);
+          }
         }
         
         throw axiosError;
@@ -462,17 +548,8 @@ class ZohoService {
   }
 
   // Check granted scopes for current access token
-  private async checkTokenScopes(token: string): Promise<{ scope?: string } | null> {
-    try {
-      const url = `${this.ACCOUNTS_BASE}/oauth/v2/tokeninfo?token=${encodeURIComponent(token)}`;
-      const res = await axios.get(url, { timeout: 10000 });
-      return res.data as { scope?: string };
-    } catch (err: any) {
-      // Surface concise context but do not fail the main flow
-      const msg = axios.isAxiosError(err) ? (hasResponse(err) ? err.response?.data : undefined) || err.message : String(err);
-      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
-    }
-  }
+  // Removed checkTokenScopes - the tokeninfo endpoint is unreliable and returns HTML errors
+  // Token validation happens naturally when making API calls
 
   // Validate the configured organization ID by calling organizations endpoint
   private async validateOrganization(token: string): Promise<void> {

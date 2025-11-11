@@ -35,19 +35,14 @@ interface DashboardResponse {
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🚀 Homepage Dashboard API called - starting data collection...');
-    
-    // Check if we have cached data
+    // Check if we have cached data (increase cache TTL for better performance)
     const CACHE_KEY = 'homepage-dashboard-data';
-    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    const CACHE_TTL = 15 * 60 * 1000; // 15 minutes (increased from 5 minutes)
     
     const cachedData = serverCache.get<DashboardResponse>(CACHE_KEY);
     if (cachedData) {
-      console.log('✅ Returning cached dashboard data');
       return NextResponse.json(cachedData);
     }
-    
-    console.log('❌ No cache found, fetching fresh data...');
     
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -74,174 +69,77 @@ export async function GET(request: NextRequest) {
 
     // Fetch Zoho data with timeout (15 seconds for all Zoho calls)
     try {
-      console.log('🔄 Starting Zoho data fetch...');
-      
       // Fetch projects and invoices in parallel with timeout
-      const ZOHO_TIMEOUT = 15000; // 15 seconds
-      const zohoDataPromise = Promise.all([
+      const ZOHO_TIMEOUT = 10000; // 10 seconds (reduced from 15)
+      const zohoDataPromise = Promise.allSettled([
         withTimeout(
           zohoService.getProjects(),
           ZOHO_TIMEOUT,
-          'Zoho getProjects() timed out after 15 seconds'
+          'Zoho getProjects() timed out'
         ),
         withTimeout(
           zohoService.getInvoices(),
           ZOHO_TIMEOUT,
-          'Zoho getInvoices() timed out after 15 seconds'
+          'Zoho getInvoices() timed out'
         )
       ]);
       
-      [projects, invoices] = await zohoDataPromise;
-      zohoApiCallCount += 2;
+      const [projectsResult, invoicesResult] = await zohoDataPromise;
       
-      console.log('✅ Zoho data fetched:', { projectsCount: projects.length, invoicesCount: invoices.length });
-      
-      // Log raw invoice data counts and details
-      if (invoices.length > 0) {
-        console.log('📊 Raw invoice data analysis:');
-        console.log(`  - Total invoices: ${invoices.length}`);
-        
-        // Count by status
-        const statusCounts = invoices.reduce((acc: Record<string, number>, inv: any) => {
-          acc[inv.status] = (acc[inv.status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        console.log('  - Status breakdown:', statusCounts);
-        
-        // Count by project
-        const projectCounts = invoices.reduce((acc: Record<string, number>, inv: any) => {
-          acc[inv.project_id] = (acc[inv.project_id] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        console.log(`  - Projects with invoices: ${Object.keys(projectCounts).length}`);
-        
-        // Amount analysis
-        const totalAmount = invoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0);
-        const avgAmount = totalAmount / invoices.length;
-        console.log(`  - Total amount: $${totalAmount.toFixed(2)}`);
-        console.log(`  - Average amount: $${avgAmount.toFixed(2)}`);
-        
-        // Sample invoice data
-        const sampleInvoice = invoices[0];
-        console.log('  - Sample invoice:', {
-          id: sampleInvoice.invoice_id,
-          number: sampleInvoice.invoice_number,
-          project: sampleInvoice.project_id,
-          amount: sampleInvoice.amount,
-          status: sampleInvoice.status,
-          date: sampleInvoice.date
-        });
+      // Handle projects result
+      if (projectsResult.status === 'fulfilled') {
+        projects = projectsResult.value || [];
+        zohoApiCallCount++;
       } else {
-        console.log('⚠️ No invoices found in Zoho data');
+        console.warn('Failed to fetch projects:', projectsResult.reason?.message || 'Unknown error');
+      }
+      
+      // Handle invoices result
+      if (invoicesResult.status === 'fulfilled') {
+        invoices = invoicesResult.value || [];
+        zohoApiCallCount++;
       }
 
-      // Get financial metrics for current year with timeout
+      // Get financial metrics for current year with timeout (optional - don't block on failure)
       try {
-        console.log('💰 Fetching financial metrics...');
-        console.log('📅 Date range:', {
-          start: currentYearStart.toISOString().split('T')[0],
-          end: now.toISOString().split('T')[0]
-        });
-        
         zohoApiCallCount++;
         financialMetrics = await withTimeout(
           zohoService.getFinancialMetrics(
             currentYearStart.toISOString().split('T')[0],
             now.toISOString().split('T')[0]
           ),
-          10000, // 10 seconds timeout
-          'Zoho getFinancialMetrics() timed out after 10 seconds'
+          8000, // 8 seconds timeout (reduced)
+          'Zoho getFinancialMetrics() timed out'
         );
-        console.log('✅ Financial metrics loaded:', financialMetrics);
-        
-        // Log the full financialMetrics object after fetch to confirm values
-        console.log('📊 Full financialMetrics object:', JSON.stringify(financialMetrics, null, 2));
-        
-        // Check if we got meaningful data
-        if (financialMetrics?.operatingIncome === 0 && financialMetrics?.revenue === 0) {
-          console.warn('⚠️ Financial metrics returned all zeros - this might indicate an issue');
-          console.warn('   - Check if Zoho Books has financial data for the date range');
-          console.warn('   - Verify OAuth scopes include ZohoBooks.reports.READ');
-          console.warn('   - Check if Reports module is enabled in your Zoho Books account');
-        }
-        
-        // If cashFlow is 0, log warning to verify data in Zoho
-        if (financialMetrics?.cashFlow === 0) {
-          console.warn('⚠️ Cash Flow is 0 - verify data in Zoho for date range');
-        }
-      } catch (error) {
-        console.error('❌ Failed to fetch financial metrics:', error);
-        
-        // Type guard to check if error has response property
-        const hasResponse = (err: unknown): err is { response: { status?: number; statusText?: string; data?: any } } => {
-          return typeof err === 'object' && err !== null && 'response' in err;
-        };
-        
-        console.error('Error details:', {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          status: hasResponse(error) ? error.response?.status : undefined,
-          statusText: hasResponse(error) ? error.response?.statusText : undefined,
-          data: hasResponse(error) ? error.response?.data : undefined,
-          stack: error instanceof Error ? error.stack : undefined
-        });
-        
-        // Provide specific guidance based on error type
-        if (hasResponse(error) && error.response?.status === 404) {
-          console.error('🔍 404 Error: Reports endpoints not found. Check if your Zoho Books plan includes financial reporting.');
-        } else if (hasResponse(error) && error.response?.status === 401) {
-          console.error('🔐 401 Error: Authentication failed. Check OAuth scopes and token validity.');
-        } else if (hasResponse(error) && error.response?.status === 403) {
-          console.error('🚫 403 Error: Access forbidden. Check if Reports module is enabled in your Zoho Books account.');
-        } else if (hasResponse(error) && error.response?.status === 429) {
-          console.error('⏰ 429 Error: Rate limited. Zoho API rate limits exceeded.');
-        }
-        
+      } catch (error: unknown) {
+        // Silently fail for financial metrics - not critical for dashboard
         financialMetrics = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
       }
-    } catch (error) {
-      console.error('❌ Failed to fetch Zoho data:', error);
-      
-      // Check if it's an authentication/rate limit error
-      if (error instanceof Error) {
-        const errorMessage = error.message.toLowerCase();
-        if (errorMessage.includes('rate limit') || errorMessage.includes('authentication') || errorMessage.includes('token')) {
-          zohoAuthFailed = true;
-          console.warn('⚠️ Zoho authentication failed due to rate limits or token issues. Showing partial data.');
-        }
+    } catch (error: unknown) {
+      // Outer catch handles any unexpected errors - use empty defaults
+      if (error instanceof Error && error.message.includes('HTML error page')) {
+        zohoAuthFailed = true;
       }
-      
-      projects = [];
-      invoices = [];
-      financialMetrics = { revenue: 0, expenses: 0, netProfit: 0, grossProfit: 0, operatingIncome: 0, cashFlow: 0 };
+      // Keep empty arrays - already initialized above
     }
-
-    // Log Zoho API call count for monitoring
-    console.log(`📊 Zoho API calls made in this request: ${zohoApiCallCount}`);
 
     // Fetch Clockify data
     try {
-      console.log('🔄 Starting Clockify data fetch...');
-      console.log('🔑 Environment check - CLOCKIFY_API_KEY:', process.env.CLOCKIFY_API_KEY ? '✅ Set' : '❌ Missing');
-      console.log('🔑 Environment check - CLOCKIFY_WORKSPACE_ID:', process.env.CLOCKIFY_WORKSPACE_ID ? '✅ Set' : '❌ Missing');
-      
       const clockifyConfig = clockifyService.getConfigurationStatus();
-      console.log('📋 Clockify config status:', clockifyConfig);
       
       if (clockifyConfig.configured) {
-        console.log('⏰ Clockify configured, fetching real data...');
-        
-        // Fetch Clockify data with timeout (10 seconds for all calls)
-        const CLOCKIFY_TIMEOUT = 10000; // 10 seconds
-        const [clockifyUser, clockifyProjects, timeEntries] = await Promise.all([
+        // Fetch Clockify data with timeout (8 seconds for all calls)
+        const CLOCKIFY_TIMEOUT = 8000; // 8 seconds (reduced)
+        const clockifyResults = await Promise.allSettled([
           withTimeout(
             clockifyService.getUser(),
             CLOCKIFY_TIMEOUT,
-            'Clockify getUser() timed out after 10 seconds'
+            'Clockify getUser() timed out'
           ),
           withTimeout(
             clockifyService.getProjects(),
             CLOCKIFY_TIMEOUT,
-            'Clockify getProjects() timed out after 10 seconds'
+            'Clockify getProjects() timed out'
           ),
           withTimeout(
             clockifyService.getAllTimeEntries(
@@ -249,22 +147,13 @@ export async function GET(request: NextRequest) {
               now.toISOString()
             ),
             CLOCKIFY_TIMEOUT,
-            'Clockify getAllTimeEntries() timed out after 10 seconds'
+            'Clockify getAllTimeEntries() timed out'
           )
         ]);
 
-        console.log('📊 Clockify raw data received:', {
-          user: clockifyUser?.name || 'Unknown',
-          projectsCount: clockifyProjects?.length || 0,
-          timeEntriesCount: timeEntries?.length || 0
-        });
-
-        // Log unique users in time entries to verify we're getting data from multiple users
-        const uniqueUsers = new Set(timeEntries.map(entry => entry.userId || entry.userName).filter(Boolean));
-        console.log('👥 Unique users in time entries:', {
-          count: uniqueUsers.size,
-          users: Array.from(uniqueUsers)
-        });
+        const clockifyUser = clockifyResults[0].status === 'fulfilled' ? clockifyResults[0].value : null;
+        const clockifyProjects = clockifyResults[1].status === 'fulfilled' ? clockifyResults[1].value : [];
+        const timeEntries = clockifyResults[2].status === 'fulfilled' ? clockifyResults[2].value : [];
 
         // Calculate time tracking metrics
         const totalHours = timeEntries.reduce((sum, entry) => {
@@ -302,16 +191,7 @@ export async function GET(request: NextRequest) {
           averageHoursPerProject: projects.length > 0 ? totalHours / projects.length : 0
         };
 
-        console.log('✅ Clockify data calculated:', clockifyData);
-    console.log('📊 Clockify billing calculations:', {
-      billableHours: clockifyData.billableHours,
-      averageHourlyRate: clockifyData.averageHourlyRate,
-      totalTimeValue: clockifyData.totalTimeValue,
-      calculatedBilled: clockifyData.billableHours * clockifyData.averageHourlyRate * 0.7,
-      calculatedUnbilled: clockifyData.billableHours * clockifyData.averageHourlyRate * 0.3
-    });
       } else {
-        console.log('🎭 Clockify not configured, using mock data');
         clockifyData = {
           totalHours: 28400,
           billableHours: 25200,
@@ -322,12 +202,8 @@ export async function GET(request: NextRequest) {
           averageHoursPerProject: 70
         };
       }
-    } catch (error) {
-      console.warn('⚠️ Failed to fetch Clockify data, using defaults:', error);
-      console.error('Clockify error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
+    } catch (error: unknown) {
+      // Silently fall back to defaults
       clockifyData = {
         totalHours: 28400,
         billableHours: 25200,
@@ -616,35 +492,12 @@ export async function GET(request: NextRequest) {
       zohoApiCallCount
     };
 
-    // Log comprehensive financial summary
-    console.log('💰 Final Financial Metrics Summary:', {
-      ytdRevenue,
-      ytdExpenses,
-      ytdOperatingIncome,
-      ytdGrossProfit,
-      ytdNetProfit,
-      ytdCashFlow,
-      totalBilled: finalTotalBilled,
-      totalUnbilled: finalTotalUnbilled,
-      totalProjects,
-      dataSource: financialMetrics ? 'Zoho API' : 'Calculated/Estimated'
-    });
-
-    console.log('✅ Homepage dashboard data generated:', safeDashboardData);
-    console.log('🚀 Returning dashboard data to client...');
-    console.log('🔍 CRITICAL - ytdOperatingIncome being returned:', safeDashboardData.ytdOperatingIncome, '(type:', typeof safeDashboardData.ytdOperatingIncome, ')');
-
-    // Cache the response for 5 minutes
+    // Cache the response
     serverCache.set(CACHE_KEY, safeDashboardData, CACHE_TTL);
 
     return NextResponse.json(safeDashboardData);
-  } catch (error) {
-    console.error('❌ Homepage Dashboard API error:', error);
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      timestamp: new Date().toISOString()
-    });
+  } catch (error: unknown) {
+    console.error('Homepage Dashboard API error:', error instanceof Error ? error.message : 'Unknown error');
     
     // Try to return stale cached data if available
     const CACHE_KEY = 'homepage-dashboard-data';
