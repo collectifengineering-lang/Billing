@@ -62,8 +62,8 @@ export default function HighPerformanceTable({
   onClosedProjectsChange,
   useDB = true
 }: HighPerformanceTableProps) {
-  // Handle undefined or null billingData
-  const safeBillingData = billingData || [];
+  // Handle undefined or null billingData - wrap in useMemo to prevent re-renders
+  const safeBillingData = useMemo(() => billingData || [], [billingData]);
   
   // State management
   const [editingCell, setEditingCell] = useState<{ projectId: string; month: string } | null>(null);
@@ -311,24 +311,28 @@ export default function HighPerformanceTable({
 
   // Vertical scroll synchronization
   useEffect(() => {
+    // Capture ref values to use in cleanup
+    const stickyListElement = stickyListRef.current;
+    const scrollableListElement = scrollableListRef.current;
+
     const handleStickyScroll = () => {
-      if (stickyListRef.current && scrollableListRef.current) {
-        scrollableListRef.current.scrollTop = stickyListRef.current.scrollTop;
+      if (stickyListElement && scrollableListElement) {
+        scrollableListElement.scrollTop = stickyListElement.scrollTop;
       }
     };
 
     const handleScrollableScroll = () => {
-      if (stickyListRef.current && scrollableListRef.current) {
-        stickyListRef.current.scrollTop = scrollableListRef.current.scrollTop;
+      if (stickyListElement && scrollableListElement) {
+        stickyListElement.scrollTop = scrollableListElement.scrollTop;
       }
     };
 
-    stickyListRef.current?.addEventListener('scroll', handleStickyScroll);
-    scrollableListRef.current?.addEventListener('scroll', handleScrollableScroll);
+    stickyListElement?.addEventListener('scroll', handleStickyScroll);
+    scrollableListElement?.addEventListener('scroll', handleScrollableScroll);
 
     return () => {
-      stickyListRef.current?.removeEventListener('scroll', handleStickyScroll);
-      scrollableListRef.current?.removeEventListener('scroll', handleScrollableScroll);
+      stickyListElement?.removeEventListener('scroll', handleStickyScroll);
+      scrollableListElement?.removeEventListener('scroll', handleScrollableScroll);
     };
   }, []);
 
@@ -476,14 +480,17 @@ export default function HighPerformanceTable({
 
   // Handle horizontal scroll state on outer container
   useEffect(() => {
+    // Capture ref value to use in cleanup
+    const scrollableOuterElement = scrollableOuterRef.current;
+    
     const handleScroll = () => {
-      if (scrollableOuterRef.current) {
-        setIsScrolledHorizontal(scrollableOuterRef.current.scrollLeft > 0);
+      if (scrollableOuterElement) {
+        setIsScrolledHorizontal(scrollableOuterElement.scrollLeft > 0);
       }
     };
-    scrollableOuterRef.current?.addEventListener('scroll', handleScroll);
+    scrollableOuterElement?.addEventListener('scroll', handleScroll);
     return () => {
-      scrollableOuterRef.current?.removeEventListener('scroll', handleScroll);
+      scrollableOuterElement?.removeEventListener('scroll', handleScroll);
     };
   }, []);
 

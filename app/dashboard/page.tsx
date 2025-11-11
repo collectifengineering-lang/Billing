@@ -187,8 +187,6 @@ function DashboardPageContent() {
   // Use ref to prevent unnecessary API calls
   const currentProjectIdRef = useRef<string>('');
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Define all data fetching functions before useEffects that use them
   const fetchDashboardData = async () => {
     try {
       console.log('🔄 Starting dashboard data fetch...');
@@ -306,7 +304,7 @@ function DashboardPageContent() {
     }
   };
 
-  // Define fetchProjectMetrics before the useEffect that uses it
+  // Define fetchProjectMetrics function
   const fetchProjectMetrics = useCallback(async (projectId: string) => {
     console.log('fetchProjectMetrics called with:', projectId, 'Loading:', projectLoading, 'Current ref:', currentProjectIdRef.current);
     
@@ -406,6 +404,7 @@ function DashboardPageContent() {
     }
   }, [projectLoading, projectMetrics]);
 
+  // Effect to handle project selection changes
   useEffect(() => {
     // Clear any existing timer
     if (debounceTimerRef.current) {
