@@ -29,36 +29,7 @@ export default function ProjectsPage() {
   const [sortBy, setSortBy] = useState<keyof ProjectSummary>('projectName');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  useEffect(() => {
-    fetchProjectsData();
-    loadProjectStatuses();
-    
-    // Listen for project status changes from other components
-    const handleProjectStatusChange = (event: CustomEvent) => {
-      const { projectId, status, closedProjects: newClosedProjects } = event.detail;
-      console.log('ProjectsPage: Received project status change:', { projectId, status, newClosedProjects });
-      
-      if (newClosedProjects) {
-        setClosedProjects(newClosedProjects);
-        
-        // Update the project status in the projects array
-        setProjects(prevProjects => 
-          prevProjects.map(project => 
-            project.projectId === projectId 
-              ? { ...project, status: status === 'closed' ? 'closed' : 'active' }
-              : project
-          )
-        );
-      }
-    };
-
-    window.addEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
-    
-    return () => {
-      window.removeEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
-    };
-  }, [fetchProjectsData]);
-
+  // Define fetchProjectsData before useEffect that uses it
   const fetchProjectsData = useCallback(async () => {
     try {
       setLoading(true);
@@ -97,6 +68,36 @@ export default function ProjectsPage() {
       setLoading(false);
     }
   }, [closedProjects]);
+
+  useEffect(() => {
+    fetchProjectsData();
+    loadProjectStatuses();
+    
+    // Listen for project status changes from other components
+    const handleProjectStatusChange = (event: CustomEvent) => {
+      const { projectId, status, closedProjects: newClosedProjects } = event.detail;
+      console.log('ProjectsPage: Received project status change:', { projectId, status, newClosedProjects });
+      
+      if (newClosedProjects) {
+        setClosedProjects(newClosedProjects);
+        
+        // Update the project status in the projects array
+        setProjects(prevProjects => 
+          prevProjects.map(project => 
+            project.projectId === projectId 
+              ? { ...project, status: status === 'closed' ? 'closed' : 'active' }
+              : project
+          )
+        );
+      }
+    };
+
+    window.addEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('projectStatusChanged', handleProjectStatusChange as EventListener);
+    };
+  }, [fetchProjectsData]);
 
   const loadProjectStatuses = async () => {
     try {
